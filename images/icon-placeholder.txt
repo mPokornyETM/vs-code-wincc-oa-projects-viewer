@@ -1,0 +1,24 @@
+# WinCC OA Extension Icon
+
+✅ **Icon Created Successfully!**
+
+The `icon.png` file has been generated with the following features:
+
+## Icon Specifications
+- **Size**: 128x128 pixels PNG format ✅
+- **Text**: Prominent "OA" text in white ✅  
+- **Theme**: Industrial/SCADA design ✅
+- **Colors**: Blue gradient background that works in both light and dark themes ✅
+
+## Icon Elements
+- **Background**: Industrial blue gradient (#1f4e79 to #0f2c4c)
+- **Border**: White border for definition
+- **Circuit Elements**: Green circuit lines and connection nodes (SCADA theme)
+- **"OA" Text**: Large white bold text prominently displayed
+- **Project Icon**: Orange folder representing project management
+- **HMI Icon**: Blue monitor representing SCADA/HMI systems
+
+## Generation
+The icon was generated programmatically using Node.js canvas library via `generate-icon.js` script.
+
+The icon is now referenced in `package.json` and ready for VS Code Marketplace publication.

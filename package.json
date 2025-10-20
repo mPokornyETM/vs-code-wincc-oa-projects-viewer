@@ -1,0 +1,160 @@
+{
+  "name": "wincc-oa-projects",
+  "displayName": "WinCC OA Projects",
+  "description": "View and manage WinCC OA projects in VS Code",
+  "version": "0.0.1",
+  "publisher": "mPokornyETM",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/issues"
+  },
+  "homepage": "https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer#readme",
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "keywords": [
+    "wincc-oa",
+    "scada",
+    "hmi",
+    "wincc-oa-project-admin",
+    "wincc-oa-engineering",
+    "wincc-oa-runtime",
+    "siemens",
+    "etm",
+    "industrial",
+    "automation"
+  ],
+  "engines": {
+    "vscode": "^1.105.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "views": {
+      "winccOAExplorer": [
+        {
+          "id": "winccOAProjects",
+          "name": "Locale Projects",
+          "when": "true",
+          "icon": "$(folder)"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "winccOAExplorer",
+          "title": "WinCC OA Projects",
+          "icon": "$(folder-library)"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "winccOAProjects.refresh",
+        "title": "WinCC OA: Refresh Projects",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "winccOAProjects.openProject",
+        "title": "WinCC OA: Open Project",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "winccOAProjects.openProjectNewWindow",
+        "title": "WinCC OA: Open Project in New Window",
+        "icon": "$(window)"
+      },
+      {
+        "command": "winccOAProjects.openInExplorer",
+        "title": "WinCC OA: Open in Explorer",
+        "icon": "$(file-directory)"
+      },
+      {
+        "command": "winccOAProjects.showProjectView",
+        "title": "WinCC OA: Show Project Details",
+        "icon": "$(info)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "winccOAProjects.refresh",
+          "when": "view == winccOAProjects",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "winccOAProjects.openProject",
+          "when": "view == winccOAProjects && viewItem == winccOAProject",
+          "group": "inline@1"
+        },
+        {
+          "command": "winccOAProjects.openProjectNewWindow",
+          "when": "view == winccOAProjects && viewItem == winccOAProject",
+          "group": "inline@2"
+        },
+        {
+          "command": "winccOAProjects.openInExplorer",
+          "when": "view == winccOAProjects && viewItem == winccOAProject",
+          "group": "navigation@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "winccOAProjects.showProjectView"
+        },
+        {
+          "command": "winccOAProjects.refresh"
+        },
+        {
+          "command": "winccOAProjects.openProject"
+        },
+        {
+          "command": "winccOAProjects.openProjectNewWindow"
+        },
+        {
+          "command": "winccOAProjects.openInExplorer"
+        }
+      ]
+    },
+    "extensionPoints": [
+      {
+        "name": "winccOAProjectActions",
+        "description": "Contribute custom actions for WinCC OA projects"
+      },
+      {
+        "name": "winccOAProjectView",
+        "description": "Contribute custom views to WinCC OA project details panel"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "@types/vscode": "^1.105.0",
+    "@typescript-eslint/eslint-plugin": "^8.45.0",
+    "@typescript-eslint/parser": "^8.45.0",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2",
+    "canvas": "^3.2.0",
+    "eslint": "^9.36.0",
+    "typescript": "^5.9.3"
+  }
+}
