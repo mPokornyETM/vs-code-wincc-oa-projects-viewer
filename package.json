@@ -2,7 +2,7 @@
   "name": "wincc-oa-projects",
   "displayName": "WinCC OA Projects",
   "description": "View and manage WinCC OA projects in VS Code",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "mPokornyETM",
   "repository": {
     "type": "git",
@@ -143,7 +143,9 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "build:vsix": "npm run compile && vsce package",
+    "package": "vsce package"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
