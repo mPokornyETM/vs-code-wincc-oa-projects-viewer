@@ -1,6 +1,21 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
+
+/**
+ * Gets the platform-specific path to the pvssInst.conf file
+ * @returns The full path to the pvssInst.conf file
+ */
+function getPvssInstConfPath(): string {
+	if (os.platform() === 'win32') {
+		// Windows path
+		return 'C:\\ProgramData\\Siemens\\WinCC_OA\\pvssInst.conf';
+	} else {
+		// Unix/Linux path
+		return '/etc/opt/pvss/pvssInst.conf';
+	}
+}
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('WinCC OA Projects extension is now active!');
@@ -21,7 +36,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	// Watch for changes to pvssInst.conf file
-	const configPath = 'C:\\ProgramData\\Siemens\\WinCC_OA\\pvssInst.conf';
+	const configPath = getPvssInstConfPath();
 	const watcher = vscode.workspace.createFileSystemWatcher(configPath);
 	
 	watcher.onDidChange(() => {
@@ -293,7 +308,7 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<WinCCOAProject> 
 	}
 
 	private loadProjects(): void {
-		const configPath = 'C:\\ProgramData\\Siemens\\WinCC_OA\\pvssInst.conf';
+		const configPath = getPvssInstConfPath();
 		
 		if (!fs.existsSync(configPath)) {
 			vscode.window.showWarningMessage(`WinCC OA configuration file not found: ${configPath}`);
@@ -637,7 +652,7 @@ class ProjectViewPanel {
 
 	private _getProjectDetails(project: WinCCOAProject): string {
 		// Read additional project details from pvssInst.conf
-		const configPath = 'C:\\ProgramData\\Siemens\\WinCC_OA\\pvssInst.conf';
+		const configPath = getPvssInstConfPath();
 		let projectSection = '';
 		
 		try {
@@ -800,6 +815,7 @@ export interface WinCCOAExtensionAPI {
     getProjectVersion(installationDir: string): string | undefined;
     getRegisteredProjects(): ProjectConfig[];
     refreshProjects(): void;
+    getPvssInstConfPath(): string;
 }
 
 // Export the types so other extensions can use them
@@ -822,7 +838,7 @@ export function getProjectVersion(installationDir: string): string | undefined {
 }
 
 export function getRegisteredProjects(): ProjectConfig[] {
-    const configPath = 'C:\\ProgramData\\Siemens\\WinCC_OA\\pvssInst.conf';
+    const configPath = getPvssInstConfPath();
     if (projectProvider && fs.existsSync(configPath)) {
         return projectProvider.parseConfigFile(configPath);
     }
@@ -833,6 +849,9 @@ export function refreshProjects(): void {
     projectProvider?.refresh();
 }
 
+// Export the path utility function
+export { getPvssInstConfPath };
+
 // Backward compatibility: Keep the getAPI function for existing consumers
 export function getAPI(): WinCCOAExtensionAPI {
     return {
@@ -840,6 +859,7 @@ export function getAPI(): WinCCOAExtensionAPI {
         getProjectByPath,
         getProjectVersion,
         getRegisteredProjects,
-        refreshProjects
+        refreshProjects,
+        getPvssInstConfPath
     };
 }
