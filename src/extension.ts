@@ -28,10 +28,13 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	// Handle tree view selection - show project details when clicked
-	treeView.onDidChangeSelection((e: vscode.TreeViewSelectionChangeEvent<WinCCOAProject>) => {
+	treeView.onDidChangeSelection((e: vscode.TreeViewSelectionChangeEvent<TreeItem>) => {
 		if (e.selection.length > 0) {
-			const project = e.selection[0];
-			ProjectViewPanel.createOrShow(context.extensionUri, project);
+			const selected = e.selection[0];
+			// Only show project details for WinCCOAProject items, not categories
+			if (selected instanceof WinCCOAProject) {
+				ProjectViewPanel.createOrShow(context.extensionUri, selected);
+			}
 		}
 	});
 
@@ -188,6 +191,99 @@ interface ProjectConfig {
 	currentProject?: boolean;
 }
 
+// Standalone utility functions for testing
+export function extractVersionFromProject(project: WinCCOAProject): string | null {
+	// Try to extract version from project version field first
+	if (project.version) {
+		return project.version;
+	}
+	
+	// Try to extract version from project name (look for patterns like 3.20, 3.21, etc.)
+	const versionMatch = project.config.name.match(/(\d+\.\d+)/);
+	if (versionMatch) {
+		return versionMatch[1];
+	}
+	
+	// Try to extract from installation directory path
+	const pathVersionMatch = project.config.installationDir.match(/(\d+\.\d+)/);
+	if (pathVersionMatch) {
+		return pathVersionMatch[1];
+	}
+	
+	return null;
+}
+
+export function isWinCCOADeliveredSubProject(project: WinCCOAProject): boolean {
+	// Check if the project is installed in the WinCC OA installation directory
+	const installDir = project.config.installationDir.toLowerCase();
+	
+	// Common WinCC OA installation paths
+	const winccOAPaths = [
+		'siemens\\automation\\wincc_oa',
+		'wincc_oa',
+		'programdata\\siemens\\wincc_oa',
+		'program files\\siemens\\wincc_oa',
+		'/opt/wincc_oa',
+		'/usr/local/wincc_oa'
+	];
+	
+	return winccOAPaths.some(path => installDir.includes(path));
+}
+
+class ProjectCategory extends vscode.TreeItem {
+	public subCategories: ProjectCategory[] = [];
+
+	constructor(
+		public readonly label: string,
+		public readonly projects: WinCCOAProject[],
+		public readonly categoryType: 'runnable' | 'system' | 'subprojects' | 'notregistered' | 'version',
+		public readonly version?: string,
+		public readonly categoryDescription?: string
+	) {
+		super(label, vscode.TreeItemCollapsibleState.Expanded);
+		
+		this.tooltip = this.createTooltip();
+		this.description = this.createDescription();
+		this.contextValue = this.version ? 'projectVersionCategory' : 'projectCategory';
+		this.iconPath = this.getCategoryIcon();
+	}
+
+	private createTooltip(): string {
+		if (this.version) {
+			return `WinCC OA ${this.version}: ${this.projects.length} sub-project(s)`;
+		}
+		if (this.categoryDescription) {
+			return `${this.categoryDescription}\n${this.projects.length} project(s)`;
+		}
+		return `${this.projects.length} project(s)`;
+	}
+
+	private createDescription(): string {
+		if (this.subCategories.length > 0) {
+			const totalProjects = this.subCategories.reduce((sum, cat) => sum + cat.projects.length, 0);
+			return `(${this.subCategories.length} versions, ${totalProjects} projects)`;
+		}
+		return `(${this.projects.length})`;
+	}
+
+	private getCategoryIcon(): vscode.ThemeIcon {
+		switch (this.categoryType) {
+			case 'runnable':
+				return new vscode.ThemeIcon('rocket', new vscode.ThemeColor('charts.green'));
+			case 'system':
+				return new vscode.ThemeIcon('gear', new vscode.ThemeColor('charts.purple'));
+			case 'subprojects':
+				return new vscode.ThemeIcon('library', new vscode.ThemeColor('charts.blue'));
+			case 'version':
+				return new vscode.ThemeIcon('tag', new vscode.ThemeColor('charts.orange'));
+			case 'notregistered':
+				return new vscode.ThemeIcon('warning', new vscode.ThemeColor('charts.yellow'));
+			default:
+				return new vscode.ThemeIcon('folder');
+		}
+	}
+}
+
 class WinCCOAProject extends vscode.TreeItem {
 	constructor(
 		public readonly config: ProjectConfig,
@@ -281,11 +377,14 @@ class WinCCOAProject extends vscode.TreeItem {
 	}
 }
 
-class WinCCOAProjectProvider implements vscode.TreeDataProvider<WinCCOAProject> {
-	private _onDidChangeTreeData: vscode.EventEmitter<WinCCOAProject | undefined | void> = new vscode.EventEmitter<WinCCOAProject | undefined | void>();
-	readonly onDidChangeTreeData: vscode.Event<WinCCOAProject | undefined | void> = this._onDidChangeTreeData.event;
+type TreeItem = ProjectCategory | WinCCOAProject;
+
+class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
+	private _onDidChangeTreeData: vscode.EventEmitter<TreeItem | undefined | void> = new vscode.EventEmitter<TreeItem | undefined | void>();
+	readonly onDidChangeTreeData: vscode.Event<TreeItem | undefined | void> = this._onDidChangeTreeData.event;
 
 	private projects: WinCCOAProject[] = [];
+	public categories: ProjectCategory[] = [];
 
 	refresh(): void {
 		this.loadProjects();
@@ -296,13 +395,21 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<WinCCOAProject> 
 		return this.projects;
 	}
 
-	getTreeItem(element: WinCCOAProject): vscode.TreeItem {
+	getTreeItem(element: TreeItem): vscode.TreeItem {
 		return element;
 	}
 
-	getChildren(element?: WinCCOAProject): Promise<WinCCOAProject[]> {
+	getChildren(element?: TreeItem): Promise<TreeItem[]> {
 		if (!element) {
-			return Promise.resolve(this.projects);
+			// Return top-level categories
+			return Promise.resolve(this.categories);
+		} else if (element instanceof ProjectCategory) {
+			// If category has sub-categories, return those first, then projects
+			if (element.subCategories.length > 0) {
+				return Promise.resolve([...element.subCategories, ...element.projects]);
+			}
+			// Return projects within this category
+			return Promise.resolve(element.projects);
 		}
 		return Promise.resolve([]);
 	}
@@ -341,10 +448,147 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<WinCCOAProject> 
 			});
 
 			this.projects = projects;
+			this.createCategories();
 		} catch (error) {
 			vscode.window.showErrorMessage(`Error loading WinCC OA projects: ${error}`);
 			this.projects = [];
+			this.categories = [];
 		}
+	}
+
+	private createCategories(): void {
+		// Filter projects into categories
+		const runnableProjects = this.projects.filter(p => p.isRunnable && !p.isWinCCOASystem);
+		const winccOASystemVersions = this.projects.filter(p => p.isWinCCOASystem);
+		
+		// Separate WinCC OA delivered sub-projects from user sub-projects
+		const allSubProjects = this.projects.filter(p => !p.isRunnable && !p.isWinCCOASystem && !this.isUnregistered(p));
+		const winccOADeliveredSubProjects = allSubProjects.filter(p => this.isWinCCOADeliveredSubProject(p));
+		const userSubProjects = allSubProjects.filter(p => !this.isWinCCOADeliveredSubProject(p));
+		
+		const notRegisteredProjects = this.projects.filter(p => this.isUnregistered(p));
+
+		// Create categories
+		this.categories = [];
+		
+		// Always create categories, even if empty, to show the structure
+		this.categories.push(new ProjectCategory('Runnable Projects', runnableProjects, 'runnable'));
+		
+		if (winccOASystemVersions.length > 0) {
+			this.categories.push(new ProjectCategory('WinCC OA Versions', winccOASystemVersions, 'system'));
+		}
+		
+		if (winccOADeliveredSubProjects.length > 0) {
+			const winccOASubProjectsCategory = this.createSubProjectsWithVersions(winccOADeliveredSubProjects, 'WinCC OA Version Sub-Projects', 'Delivered by WinCC OA installation');
+			this.categories.push(winccOASubProjectsCategory);
+		}
+		
+		if (userSubProjects.length > 0) {
+			const userSubProjectsCategory = this.createSubProjectsWithVersions(userSubProjects, 'User Sub-Projects', 'Manually registered sub-projects');
+			this.categories.push(userSubProjectsCategory);
+		}
+		
+		if (notRegisteredProjects.length > 0) {
+			this.categories.push(new ProjectCategory('Not Registered', notRegisteredProjects, 'notregistered'));
+		}
+
+		// Log category summary
+		console.log(`WinCC OA Projects loaded: ${this.projects.length} total, ${this.categories.length} categories`);
+	}
+
+	private createSubProjectsWithVersions(
+		subProjects: WinCCOAProject[], 
+		categoryName: string = 'WinCC OA Sub-Projects',
+		categoryDescription: string = 'Sub-projects organized by version'
+	): ProjectCategory {
+		// Group sub-projects by version
+		const versionGroups = new Map<string, WinCCOAProject[]>();
+		
+		subProjects.forEach(project => {
+			// Try to extract version from project name or use 'Unknown' if not found
+			const version = this.extractVersionFromProject(project) || 'Unknown';
+			
+			if (!versionGroups.has(version)) {
+				versionGroups.set(version, []);
+			}
+			versionGroups.get(version)!.push(project);
+		});
+
+		// Create the main sub-projects category
+		const subProjectsCategory = new ProjectCategory(categoryName, [], 'subprojects', undefined, categoryDescription);
+		
+		// Create version sub-categories
+		const sortedVersions = Array.from(versionGroups.keys()).sort();
+		
+		for (const version of sortedVersions) {
+			const versionProjects = versionGroups.get(version)!;
+			const versionCategory = new ProjectCategory(
+				`Version ${version}`,
+				versionProjects,
+				'version',
+				version
+			);
+			subProjectsCategory.subCategories.push(versionCategory);
+		}
+
+		return subProjectsCategory;
+	}
+
+	private extractVersionFromProject(project: WinCCOAProject): string | null {
+		// Try to extract version from project version field first
+		if (project.version) {
+			return project.version;
+		}
+		
+		// Try to extract version from project name (look for patterns like 3.20, 3.21, etc.)
+		const versionMatch = project.config.name.match(/(\d+\.\d+)/);
+		if (versionMatch) {
+			return versionMatch[1];
+		}
+		
+		// Try to extract from installation directory path
+		const pathVersionMatch = project.config.installationDir.match(/(\d+\.\d+)/);
+		if (pathVersionMatch) {
+			return pathVersionMatch[1];
+		}
+		
+		return null;
+	}
+
+	private isUnregistered(project: WinCCOAProject): boolean {
+		// For now, we'll consider projects as "not registered" if they don't have proper config
+		// This can be expanded based on specific criteria
+		return !project.config.installationDir || project.config.installationDir === 'Unknown';
+	}
+
+	private isWinCCOADeliveredSubProject(project: WinCCOAProject): boolean {
+		// Check if the project is installed in the WinCC OA installation directory
+		// Typical patterns: C:\Siemens\Automation\WinCC_OA\{version}\
+		const installDir = project.config.installationDir.toLowerCase();
+		
+		// Common WinCC OA installation paths
+		const winccOAInstallPaths = [
+			'c:\\siemens\\automation\\wincc_oa\\',
+			'c:\\program files\\siemens\\wincc_oa\\',
+			'c:\\program files (x86)\\siemens\\wincc_oa\\',
+			'/opt/wincc_oa/',
+			'/usr/local/wincc_oa/'
+		];
+		
+		// Check if the installation directory starts with any WinCC OA installation path
+		return winccOAInstallPaths.some(path => installDir.startsWith(path));
+	}
+
+	private async findUnregisteredProjects(): Promise<WinCCOAProject[]> {
+		// This method can be extended to scan file system for WinCC OA projects
+		// that are not registered in pvssInst.conf
+		const unregisteredProjects: WinCCOAProject[] = [];
+		
+		// Example: Scan common WinCC OA project locations
+		// This would need to be implemented based on specific requirements
+		// For now, return empty array
+		
+		return unregisteredProjects;
 	}
 
 	public parseConfigFile(configPath: string): ProjectConfig[] {
@@ -816,6 +1060,13 @@ export interface WinCCOAExtensionAPI {
     getRegisteredProjects(): ProjectConfig[];
     refreshProjects(): void;
     getPvssInstConfPath(): string;
+    getProjectCategories(): ProjectCategory[];
+    getRunnableProjects(): WinCCOAProject[];
+    getSubProjects(): WinCCOAProject[];
+    getWinCCOASystemVersions(): WinCCOAProject[];
+    getSubProjectsByVersion(version: string): WinCCOAProject[];
+    getWinCCOADeliveredSubProjects(): WinCCOAProject[];
+    getUserSubProjects(): WinCCOAProject[];
 }
 
 // Export the types so other extensions can use them
@@ -849,8 +1100,66 @@ export function refreshProjects(): void {
     projectProvider?.refresh();
 }
 
-// Export the path utility function
-export { getPvssInstConfPath };
+export function getProjectCategories(): ProjectCategory[] {
+    return projectProvider?.categories || [];
+}
+
+export function getRunnableProjects(): WinCCOAProject[] {
+    return projectProvider?.getProjects().filter(p => p.isRunnable && !p.isWinCCOASystem) || [];
+}
+
+export function getSubProjects(): WinCCOAProject[] {
+    return projectProvider?.getProjects().filter(p => !p.isRunnable && !p.isWinCCOASystem) || [];
+}
+
+export function getWinCCOASystemVersions(): WinCCOAProject[] {
+    return projectProvider?.getProjects().filter(p => p.isWinCCOASystem) || [];
+}
+
+export function getSubProjectsByVersion(version: string): WinCCOAProject[] {
+    const subProjects = projectProvider?.getProjects().filter(p => !p.isRunnable && !p.isWinCCOASystem) || [];
+    return subProjects.filter(p => {
+        // Use the same version extraction logic as in the provider
+        const projectVersion = p.version || 
+                              p.config.name.match(/(\d+\.\d+)/)?.[1] || 
+                              p.config.installationDir.match(/(\d+\.\d+)/)?.[1] || 
+                              'Unknown';
+        return projectVersion === version;
+    });
+}
+
+export function getWinCCOADeliveredSubProjects(): WinCCOAProject[] {
+    const allSubProjects = projectProvider?.getProjects().filter(p => !p.isRunnable && !p.isWinCCOASystem) || [];
+    return allSubProjects.filter(p => {
+        const installDir = p.config.installationDir.toLowerCase();
+        const winccOAInstallPaths = [
+            'c:\\siemens\\automation\\wincc_oa\\',
+            'c:\\program files\\siemens\\wincc_oa\\',
+            'c:\\program files (x86)\\siemens\\wincc_oa\\',
+            '/opt/wincc_oa/',
+            '/usr/local/wincc_oa/'
+        ];
+        return winccOAInstallPaths.some(path => installDir.startsWith(path));
+    });
+}
+
+export function getUserSubProjects(): WinCCOAProject[] {
+    const allSubProjects = projectProvider?.getProjects().filter(p => !p.isRunnable && !p.isWinCCOASystem) || [];
+    return allSubProjects.filter(p => {
+        const installDir = p.config.installationDir.toLowerCase();
+        const winccOAInstallPaths = [
+            'c:\\siemens\\automation\\wincc_oa\\',
+            'c:\\program files\\siemens\\wincc_oa\\',
+            'c:\\program files (x86)\\siemens\\wincc_oa\\',
+            '/opt/wincc_oa/',
+            '/usr/local/wincc_oa/'
+        ];
+        return !winccOAInstallPaths.some(path => installDir.startsWith(path));
+    });
+}
+
+// Export the path utility function and new types
+export { getPvssInstConfPath, ProjectCategory, WinCCOAProjectProvider };
 
 // Backward compatibility: Keep the getAPI function for existing consumers
 export function getAPI(): WinCCOAExtensionAPI {
@@ -860,6 +1169,13 @@ export function getAPI(): WinCCOAExtensionAPI {
         getProjectVersion,
         getRegisteredProjects,
         refreshProjects,
-        getPvssInstConfPath
+        getPvssInstConfPath,
+        getProjectCategories,
+        getRunnableProjects,
+        getSubProjects,
+        getWinCCOASystemVersions,
+        getSubProjectsByVersion,
+        getWinCCOADeliveredSubProjects,
+        getUserSubProjects
     };
 }
