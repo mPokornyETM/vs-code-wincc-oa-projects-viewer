@@ -25,7 +25,6 @@ jobs:
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
-          const { context } = require('@actions/github');
           const pr = context.payload.pull_request;
           
           // Get PR details
@@ -41,7 +40,7 @@ jobs:
           const commits = await github.rest.pulls.listCommits({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            pull_request_number: pr.number,
+            pull_number: pr.number,
           });
           
           const commitMessages = commits.data.map(commit => 
@@ -248,7 +247,7 @@ jobs:
           const files = await github.rest.pulls.listFiles({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            pull_request_number: pr.number,
+            pull_number: pr.number,
           });
           
           const fileCount = files.data.length;

@@ -68,7 +68,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
         
     - name: Use Node.js 20.x
       uses: actions/setup-node@v4
@@ -150,27 +150,40 @@ jobs:
           # Manual workflow dispatch
           RELEASE_TYPE="${{ github.event.inputs.release_type }}"
           echo "Manual release: $RELEASE_TYPE"
-          standard-version --release-as $RELEASE_TYPE --no-verify
+          standard-version --release-as $RELEASE_TYPE --no-verify --skip.commit=true --skip.tag=true
         elif [[ -n "${{ steps.detect-type.outputs.force-version }}" ]]; then
           # Specific version from label
           FORCE_VERSION="${{ steps.detect-type.outputs.force-version }}"
           echo "Forcing version to: $FORCE_VERSION"
-          standard-version --release-as $FORCE_VERSION --no-verify
+          standard-version --release-as $FORCE_VERSION --no-verify --skip.commit=true --skip.tag=true
         elif [[ -n "${{ steps.detect-type.outputs.release-type }}" ]]; then
           # Release type from PR labels
           RELEASE_TYPE="${{ steps.detect-type.outputs.release-type }}"
           echo "Release type from labels: $RELEASE_TYPE"
-          standard-version --release-as $RELEASE_TYPE --no-verify
+          standard-version --release-as $RELEASE_TYPE --no-verify --skip.commit=true --skip.tag=true
         else
           # Auto-determine based on conventional commits
           echo "Auto-detecting from conventional commits"
-          standard-version --no-verify
+          standard-version --no-verify --skip.commit=true --skip.tag=true
         fi
         
         # Get the new version
         NEW_VERSION=$(node -p "require('./package.json').version")
         echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
         echo "New version: $NEW_VERSION"
+        
+        # Create tag locally (we'll push it later)
+        git tag "v$NEW_VERSION"
+        echo "📌 Created tag: v$NEW_VERSION"
+        
+        # Check if we have changes to commit
+        if ! git diff --staged --quiet || ! git diff --quiet; then
+          echo "📝 Version and changelog changes detected"
+          echo "has-changes=true" >> $GITHUB_OUTPUT
+        else
+          echo "📝 No changes to commit"
+          echo "has-changes=false" >> $GITHUB_OUTPUT
+        fi
         
     - name: Extract Changelog
       id: changelog
@@ -198,9 +211,68 @@ jobs:
           echo "EOF"
         } >> $GITHUB_OUTPUT
         
-    - name: Push changes
+    - name: Create PR for version changes
+      if: steps.release.outputs.has-changes == 'true'
       run: |
-        git push --follow-tags origin HEAD
+        VERSION="${{ steps.release.outputs.version }}"
+        BRANCH_NAME="release/v$VERSION"
+        
+        # Create a new branch for the version changes
+        git checkout -b "$BRANCH_NAME"
+        
+        # Stage and commit the changes
+        git add package.json CHANGELOG.md
+        git commit -m "chore(release): $VERSION
+
+        - Update version to $VERSION
+        - Update CHANGELOG.md with release notes
+        
+        [skip ci]" || echo "No changes to commit"
+        
+        # Push the branch
+        if git push origin "$BRANCH_NAME"; then
+          echo "✅ Pushed branch: $BRANCH_NAME"
+          
+          # Create PR using GitHub CLI if available, otherwise skip
+          if command -v gh &> /dev/null; then
+            gh pr create \
+              --title "chore(release): Release v$VERSION" \
+              --body "🚀 **Automated Release PR**
+
+            This PR contains version and changelog updates for release v$VERSION.
+
+            **Changes:**
+            - 📦 Update package.json version to $VERSION
+            - 📝 Update CHANGELOG.md with release notes
+
+            **This PR is automatically created by the release workflow.**
+
+            ✅ **Safe to merge** - Contains only version metadata updates.
+            " \
+              --label "chore,release,size/small" \
+              --head "$BRANCH_NAME" \
+              --base main || echo "Failed to create PR via CLI"
+          else
+            echo "📋 Branch pushed. Please create PR manually for version updates."
+          fi
+        else
+          echo "⚠️ Failed to push branch $BRANCH_NAME"
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Push tag only
+      run: |
+        # Push only the tag (not the commit changes) to avoid branch protection issues
+        NEW_TAG="v${{ steps.release.outputs.version }}"
+        echo "📌 Pushing tag: $NEW_TAG"
+        
+        if git push origin "$NEW_TAG"; then
+          echo "✅ Successfully pushed tag: $NEW_TAG"
+        else
+          echo "⚠️ Failed to push tag, but continuing with release creation"
+          echo "The tag will be created as part of the GitHub release"
+        fi
         
     - name: Package Extension
       run: |
@@ -219,6 +291,7 @@ jobs:
       with:
         tag_name: "v${{ steps.release.outputs.version }}"
         name: "Release v${{ steps.release.outputs.version }}"
+        target_commitish: ${{ github.sha }}
         body: |
           ## 🚀 WinCC OA Projects v${{ steps.release.outputs.version }}
           
