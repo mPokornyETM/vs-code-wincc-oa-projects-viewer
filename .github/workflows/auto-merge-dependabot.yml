@@ -16,6 +16,9 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'dependencies')
     
     steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
     - name: Wait for CI checks
       run: |
         echo "⏳ Waiting for CI checks to complete..."
