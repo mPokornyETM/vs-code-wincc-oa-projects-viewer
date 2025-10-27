@@ -17,6 +17,25 @@ function getPvssInstConfPath(): string {
 	}
 }
 
+/**
+ * Gets the common WinCC OA installation paths for detecting delivered sub-projects
+ * @returns Array of common installation paths in lowercase
+ */
+function getWinCCOAInstallationPaths(): string[] {
+	if (os.platform() === 'win32') {
+		return [
+			'c:\\siemens\\automation\\wincc_oa\\',
+			'c:\\program files\\siemens\\wincc_oa\\',
+			'c:\\program files (x86)\\siemens\\wincc_oa\\',
+			'c:\\programdata\\siemens\\wincc_oa\\'
+		];
+	} else {
+		return [
+			'/opt/wincc_oa/'
+		];
+	}
+}
+
 export function activate(context: vscode.ExtensionContext) {
 	console.log('WinCC OA Projects extension is now active!');
 
@@ -216,18 +235,9 @@ export function extractVersionFromProject(project: WinCCOAProject): string | nul
 export function isWinCCOADeliveredSubProject(project: WinCCOAProject): boolean {
 	// Check if the project is installed in the WinCC OA installation directory
 	const installDir = project.config.installationDir.toLowerCase();
+	const winccOAInstallPaths = getWinCCOAInstallationPaths();
 	
-	// Common WinCC OA installation paths
-	const winccOAPaths = [
-		'siemens\\automation\\wincc_oa',
-		'wincc_oa',
-		'programdata\\siemens\\wincc_oa',
-		'program files\\siemens\\wincc_oa',
-		'/opt/wincc_oa',
-		'/usr/local/wincc_oa'
-	];
-	
-	return winccOAPaths.some(path => installDir.includes(path));
+	return winccOAInstallPaths.some(path => installDir.startsWith(path));
 }
 
 class ProjectCategory extends vscode.TreeItem {
@@ -562,21 +572,8 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
 	}
 
 	private isWinCCOADeliveredSubProject(project: WinCCOAProject): boolean {
-		// Check if the project is installed in the WinCC OA installation directory
-		// Typical patterns: C:\Siemens\Automation\WinCC_OA\{version}\
-		const installDir = project.config.installationDir.toLowerCase();
-		
-		// Common WinCC OA installation paths
-		const winccOAInstallPaths = [
-			'c:\\siemens\\automation\\wincc_oa\\',
-			'c:\\program files\\siemens\\wincc_oa\\',
-			'c:\\program files (x86)\\siemens\\wincc_oa\\',
-			'/opt/wincc_oa/',
-			'/usr/local/wincc_oa/'
-		];
-		
-		// Check if the installation directory starts with any WinCC OA installation path
-		return winccOAInstallPaths.some(path => installDir.startsWith(path));
+		// Use the global utility function to check for WinCC OA delivered sub-projects
+		return isWinCCOADeliveredSubProject(project);
 	}
 
 	private async findUnregisteredProjects(): Promise<WinCCOAProject[]> {
@@ -1130,36 +1127,16 @@ export function getSubProjectsByVersion(version: string): WinCCOAProject[] {
 
 export function getWinCCOADeliveredSubProjects(): WinCCOAProject[] {
     const allSubProjects = projectProvider?.getProjects().filter(p => !p.isRunnable && !p.isWinCCOASystem) || [];
-    return allSubProjects.filter(p => {
-        const installDir = p.config.installationDir.toLowerCase();
-        const winccOAInstallPaths = [
-            'c:\\siemens\\automation\\wincc_oa\\',
-            'c:\\program files\\siemens\\wincc_oa\\',
-            'c:\\program files (x86)\\siemens\\wincc_oa\\',
-            '/opt/wincc_oa/',
-            '/usr/local/wincc_oa/'
-        ];
-        return winccOAInstallPaths.some(path => installDir.startsWith(path));
-    });
+    return allSubProjects.filter(p => isWinCCOADeliveredSubProject(p));
 }
 
 export function getUserSubProjects(): WinCCOAProject[] {
     const allSubProjects = projectProvider?.getProjects().filter(p => !p.isRunnable && !p.isWinCCOASystem) || [];
-    return allSubProjects.filter(p => {
-        const installDir = p.config.installationDir.toLowerCase();
-        const winccOAInstallPaths = [
-            'c:\\siemens\\automation\\wincc_oa\\',
-            'c:\\program files\\siemens\\wincc_oa\\',
-            'c:\\program files (x86)\\siemens\\wincc_oa\\',
-            '/opt/wincc_oa/',
-            '/usr/local/wincc_oa/'
-        ];
-        return !winccOAInstallPaths.some(path => installDir.startsWith(path));
-    });
+    return allSubProjects.filter(p => !isWinCCOADeliveredSubProject(p));
 }
 
-// Export the path utility function and new types
-export { getPvssInstConfPath, ProjectCategory, WinCCOAProjectProvider };
+// Export the path utility functions and new types
+export { getPvssInstConfPath, getWinCCOAInstallationPaths, ProjectCategory, WinCCOAProjectProvider };
 
 // Backward compatibility: Keep the getAPI function for existing consumers
 export function getAPI(): WinCCOAExtensionAPI {
