@@ -128,6 +128,17 @@ npm run watch
 npm test
 ```
 
+### 🤖 Automated Dependency Management
+
+This project uses **Dependabot** to automatically manage dependencies:
+
+- **Weekly updates** every Monday at 9:00 AM CET
+- **Security updates** get high priority  
+- **Automatic releases** for dependency updates
+- **Grouped PRs** for related dependencies
+
+See [DEPENDABOT.md](DEPENDABOT.md) for complete configuration details.
+
 ### Debugging
 
 Press `F5` to launch a new VS Code window with the extension loaded for testing.

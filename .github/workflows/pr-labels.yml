@@ -1,0 +1,338 @@
+name: PR Label Automation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  label-pr:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Analyze PR and Add Labels
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const { context } = require('@actions/github');
+          const pr = context.payload.pull_request;
+          
+          // Get PR details
+          const prTitle = pr.title.toLowerCase();
+          const prBody = (pr.body || '').toLowerCase();
+          const branchName = pr.head.ref.toLowerCase();
+          const baseBranch = pr.base.ref;
+          
+          console.log(`Analyzing PR #${pr.number}: "${pr.title}"`);
+          console.log(`Branch: ${branchName} -> ${baseBranch}`);
+          
+          // Get commit messages from the PR
+          const commits = await github.rest.pulls.listCommits({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_request_number: pr.number,
+          });
+          
+          const commitMessages = commits.data.map(commit => 
+            commit.commit.message.toLowerCase()
+          ).join(' ');
+          
+          console.log(`Found ${commits.data.length} commits`);
+          
+          // Combine all text for analysis
+          const allText = `${prTitle} ${prBody} ${branchName} ${commitMessages}`;
+          
+          // Check if this is a Dependabot PR
+          const isDependabotPR = pr.user.login === 'dependabot[bot]' || 
+                                branchName.includes('dependabot/') ||
+                                prTitle.includes('bump ') ||
+                                prTitle.includes('update ');
+          
+          console.log(`Is Dependabot PR: ${isDependabotPR}`);
+          
+          // Define label detection rules
+          const labelRules = {
+            // Type labels (mutually exclusive - highest priority wins)
+            'breaking-change': [
+              /breaking[\s-_]change/i,
+              /major[\s-_]change/i,
+              /\bbreakingt?\b/i,
+              /\bmajor\b.*version/i,
+              /api[\s-_]breaking/i
+            ],
+            'enhancement': [
+              /\bfeat(\(|:|\b)/i,
+              /\bfeature\b/i,
+              /enhancement/i,
+              /\bnew\b/i,
+              /\badd(ed|ing)?\b/i,
+              /improvement/i,
+              /feature[\/-]/i
+            ],
+            'bug': [
+              /\bfix(\(|:|\b)/i,
+              /\bbug\b/i,
+              /\bissue\b/i,
+              /\berror\b/i,
+              /\bproblem\b/i,
+              /\bresolve/i,
+              /hotfix/i,
+              /bugfix/i,
+              /security.*fix/i
+            ],
+            'documentation': [
+              /\bdocs?(\(|:|\b)/i,
+              /documentation/i,
+              /\breadme\b/i,
+              /\bguide\b/i,
+              /\bexample/i,
+              /\btutorial/i,
+              /\bcomment/i
+            ],
+            'dependencies': [
+              /\bdep(s|endencies)?\b/i,
+              /\bupgrade\b/i,
+              /\bupdate.*dep/i,
+              /\bbump\b/i,
+              /\bpackage.*json\b/i,
+              /npm.*update/i,
+              /security.*update/i,
+              /dependabot/i
+            ],
+            'chore': [
+              /\bchore(\(|:|\b)/i,
+              /\bmaintenance\b/i,
+              /\brefactor\b/i,
+              /\bcleanup\b/i,
+              /\btooling\b/i,
+              /\bbuild\b/i,
+              /\bci\b/i
+            ],
+            
+            // Area labels (can have multiple)
+            'area/ui': [
+              /\bui\b/i,
+              /interface/i,
+              /\bview\b/i,
+              /\btree\b/i,
+              /\bicon/i,
+              /visual/i,
+              /display/i,
+              /\bmenu\b/i
+            ],
+            'area/api': [
+              /\bapi\b/i,
+              /interface/i,
+              /export/i,
+              /method/i,
+              /function/i,
+              /extension.*point/i
+            ],
+            'area/parser': [
+              /pars(e|er|ing)/i,
+              /config.*file/i,
+              /\bconf\b/i,
+              /registry/i,
+              /pvss/i,
+              /wincc.*oa/i
+            ],
+            'area/build': [
+              /\bbuild\b/i,
+              /compile/i,
+              /typescript/i,
+              /\bci\b/i,
+              /workflow/i,
+              /action/i,
+              /\bvsix\b/i
+            ],
+            'area/docs': [
+              /\bdocs?\b/i,
+              /readme/i,
+              /documentation/i,
+              /\bmd\b/i,
+              /markdown/i
+            ],
+            
+            // Size labels
+            'size/small': [],  // Will be determined by file count
+            'size/medium': [],
+            'size/large': [],
+            
+            // Priority labels (based on keywords)
+            'priority/high': [
+              /urgent/i,
+              /critical/i,
+              /\bhot[\s-_]?fix/i,
+              /security/i,
+              /\bblock(er|ing)\b/i,
+              /vulnerability/i
+            ],
+            'priority/medium': [
+              /important/i,
+              /\bneeded\b/i,
+              /\brequired\b/i
+            ]
+          };
+          
+          // Collect labels to add
+          const labelsToAdd = [];
+          
+          // Special handling for Dependabot PRs
+          if (isDependabotPR) {
+            labelsToAdd.push('dependencies');
+            console.log('Auto-added dependencies label for Dependabot PR');
+            
+            // Check if it's a security update
+            if (/security/i.test(allText) || /vulnerability/i.test(allText)) {
+              labelsToAdd.push('priority/high');
+              console.log('Detected security update - added high priority');
+            }
+          }
+          
+          // Detect type labels (only add the highest priority one)
+          const typeLabels = ['breaking-change', 'enhancement', 'bug', 'documentation', 'dependencies', 'chore'];
+          let foundTypeLabel = labelsToAdd.includes('dependencies'); // Dependabot already has dependencies
+          
+          for (const label of typeLabels) {
+            if (foundTypeLabel) break;
+            
+            const patterns = labelRules[label];
+            for (const pattern of patterns) {
+              if (pattern.test(allText)) {
+                labelsToAdd.push(label);
+                foundTypeLabel = true;
+                console.log(`Detected type: ${label}`);
+                break;
+              }
+            }
+          }
+          
+          // Detect area labels (can have multiple)
+          for (const [label, patterns] of Object.entries(labelRules)) {
+            if (!label.startsWith('area/')) continue;
+            
+            for (const pattern of patterns) {
+              if (pattern.test(allText)) {
+                labelsToAdd.push(label);
+                console.log(`Detected area: ${label}`);
+                break;
+              }
+            }
+          }
+          
+          // Detect priority labels
+          for (const [label, patterns] of Object.entries(labelRules)) {
+            if (!label.startsWith('priority/')) continue;
+            
+            for (const pattern of patterns) {
+              if (pattern.test(allText)) {
+                labelsToAdd.push(label);
+                console.log(`Detected priority: ${label}`);
+                break;
+              }
+            }
+          }
+          
+          // Determine size based on files changed
+          const files = await github.rest.pulls.listFiles({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_request_number: pr.number,
+          });
+          
+          const fileCount = files.data.length;
+          const linesChanged = files.data.reduce((sum, file) => 
+            sum + file.additions + file.deletions, 0
+          );
+          
+          let sizeLabel;
+          // Dependabot PRs are typically small
+          if (isDependabotPR || (fileCount <= 3 && linesChanged <= 100)) {
+            sizeLabel = 'size/small';
+          } else if (fileCount <= 10 && linesChanged <= 500) {
+            sizeLabel = 'size/medium'; 
+          } else {
+            sizeLabel = 'size/large';
+          }
+          
+          labelsToAdd.push(sizeLabel);
+          console.log(`Detected size: ${sizeLabel} (${fileCount} files, ${linesChanged} lines changed)`);
+          
+          // Special handling for specific patterns
+          if (/^v\d+\.\d+\.\d+/.test(prTitle)) {
+            labelsToAdd.push('release');
+            console.log('Detected release PR');
+          }
+          
+          if (baseBranch === 'main' || baseBranch === 'master') {
+            labelsToAdd.push('target:main');
+          } else if (baseBranch === 'develop') {
+            labelsToAdd.push('target:develop');
+          }
+          
+          // Remove duplicates
+          const uniqueLabels = [...new Set(labelsToAdd)];
+          
+          if (uniqueLabels.length > 0) {
+            console.log(`Adding labels: ${uniqueLabels.join(', ')}`);
+            
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: uniqueLabels
+              });
+              
+              console.log('✅ Labels added successfully');
+            } catch (error) {
+              console.error('❌ Failed to add labels:', error);
+            }
+          } else {
+            console.log('No labels to add');
+          }
+          
+          // Add a comment with analysis summary
+          const detectedType = foundTypeLabel ? labelsToAdd.find(l => typeLabels.includes(l)) : 'None detected';
+          const detectedAreas = labelsToAdd.filter(l => l.startsWith('area/')).join(', ') || 'None';
+          const detectedPriority = labelsToAdd.filter(l => l.startsWith('priority/')).join(', ') || 'Normal';
+          
+          // Add Dependabot-specific information to comment
+          let dependabotInfo = '';
+          if (isDependabotPR) {
+            dependabotInfo = '\n🤖 **Dependabot PR Detected** - Automatic dependency update\n';
+          }
+          
+          const analysisComment = '🏷️ **Automatic Label Analysis**' + dependabotInfo + '\n' +
+            '**Detected Type:** ' + detectedType + '\n' +
+            '**Size:** ' + sizeLabel + ' (' + fileCount + ' files, ' + linesChanged + ' lines changed)\n' +
+            '**Areas:** ' + detectedAreas + '\n' +
+            '**Priority:** ' + detectedPriority + '\n\n' +
+            'This will help determine the release type when merged to main branch.\n\n' +
+            '**Release Impact:**\n' +
+            '- `breaking-change` → **Major** version bump (1.0.0 → 2.0.0)\n' +
+            '- `enhancement` → **Minor** version bump (1.0.0 → 1.1.0)\n' +
+            '- `bug`, `documentation`, `chore`, `dependencies` → **Patch** version bump (1.0.0 → 1.0.1)\n\n' +
+            '*Labels can be manually adjusted if needed.*';
+
+          try {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: analysisComment
+            });
+          } catch (error) {
+            console.log('Could not add analysis comment:', error.message);
+          }

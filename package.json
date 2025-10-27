@@ -145,7 +145,11 @@
     "lint": "eslint src",
     "test": "vscode-test",
     "build:vsix": "npm run compile && vsce package",
-    "package": "vsce package"
+    "package": "vsce package",
+    "release": "standard-version",
+    "release:minor": "standard-version --release-as minor",
+    "release:major": "standard-version --release-as major",
+    "release:patch": "standard-version --release-as patch"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
