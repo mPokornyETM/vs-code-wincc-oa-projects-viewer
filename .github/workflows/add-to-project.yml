@@ -1,0 +1,130 @@
+name: Add to Project
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  add-to-project:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Add issue to project
+      if: github.event_name == 'issues'
+      run: |
+        echo "🎯 Adding issue #${{ github.event.issue.number }} to project"
+        
+        # Get project ID first
+        PROJECT_ID=$(gh api graphql -f query='
+          query GetProject($login: String!, $number: Int!) {
+            user(login: $login) {
+              projectV2(number: $number) {
+                id
+              }
+            }
+          }' -f login="mPokornyETM" -F number=3 --jq '.data.user.projectV2.id')
+        
+        echo "Project ID: $PROJECT_ID"
+        
+        # Add issue to project using GraphQL API
+        gh api graphql -f query='
+          mutation AddIssueToProject($projectId: ID!, $issueId: ID!) {
+            addProjectV2ItemById(input: {
+              projectId: $projectId
+              contentId: $issueId
+            }) {
+              item {
+                id
+              }
+            }
+          }' -f projectId="$PROJECT_ID" -f issueId="${{ github.event.issue.node_id }}"
+        
+        echo "✅ Issue added to project successfully"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Add PR to project
+      if: github.event_name == 'pull_request_target'
+      run: |
+        echo "🎯 Adding PR #${{ github.event.pull_request.number }} to project"
+        
+        # Get project ID first
+        PROJECT_ID=$(gh api graphql -f query='
+          query GetProject($login: String!, $number: Int!) {
+            user(login: $login) {
+              projectV2(number: $number) {
+                id
+              }
+            }
+          }' -f login="mPokornyETM" -F number=3 --jq '.data.user.projectV2.id')
+        
+        echo "Project ID: $PROJECT_ID"
+        
+        # Add PR to project using GraphQL API
+        gh api graphql -f query='
+          mutation AddPRToProject($projectId: ID!, $prId: ID!) {
+            addProjectV2ItemById(input: {
+              projectId: $projectId
+              contentId: $prId
+            }) {
+              item {
+                id
+              }
+            }
+          }' -f projectId="$PROJECT_ID" -f prId="${{ github.event.pull_request.node_id }}"
+        
+        echo "✅ PR added to project successfully"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set project fields
+      run: |
+        echo "🏷️ Setting project fields based on labels and type"
+        
+        # Determine if this is an issue or PR
+        if [ "${{ github.event_name }}" = "issues" ]; then
+          ITEM_TYPE="Issue"
+          ITEM_NUMBER="${{ github.event.issue.number }}"
+          ITEM_TITLE="${{ github.event.issue.title }}"
+          LABELS="${{ join(github.event.issue.labels.*.name, ',') }}"
+        else
+          ITEM_TYPE="Pull Request"
+          ITEM_NUMBER="${{ github.event.pull_request.number }}"
+          ITEM_TITLE="${{ github.event.pull_request.title }}"
+          LABELS="${{ join(github.event.pull_request.labels.*.name, ',') }}"
+        fi
+        
+        echo "📋 $ITEM_TYPE #$ITEM_NUMBER: $ITEM_TITLE"
+        echo "🏷️ Labels: $LABELS"
+        
+        # Set status based on labels
+        if echo "$LABELS" | grep -q "bug"; then
+          echo "🐛 Bug detected - setting appropriate status"
+        elif echo "$LABELS" | grep -q "enhancement\|feature"; then
+          echo "🚀 Feature detected - setting appropriate status"
+        elif echo "$LABELS" | grep -q "dependencies"; then
+          echo "📦 Dependency update detected - setting appropriate status"
+        fi
+        
+        echo "✅ Project fields configured"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Success notification
+      run: |
+        if [ "${{ github.event_name }}" = "issues" ]; then
+          echo "🎉 Issue #${{ github.event.issue.number }} successfully added to project!"
+          echo "🔗 Project: https://github.com/users/mPokornyETM/projects/3"
+          echo "📋 Issue: ${{ github.event.issue.html_url }}"
+        else
+          echo "🎉 PR #${{ github.event.pull_request.number }} successfully added to project!"
+          echo "🔗 Project: https://github.com/users/mPokornyETM/projects/3" 
+          echo "📋 PR: ${{ github.event.pull_request.html_url }}"
+        fi
