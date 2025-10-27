@@ -1,0 +1,53 @@
+name: Auto-merge Release PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge-release:
+    runs-on: ubuntu-latest
+    if: |
+      github.event.pull_request.user.login == 'github-actions[bot]' &&
+      startsWith(github.event.pull_request.title, 'chore(release):') &&
+      contains(github.event.pull_request.labels.*.name, 'release')
+    
+    steps:
+    - name: Auto-approve release PR
+      run: |
+        echo "🤖 Auto-approving release PR from GitHub Actions bot"
+        gh pr review ${{ github.event.pull_request.number }} --approve --body "🤖 **Automated approval for release PR**
+
+        This PR contains automated version and changelog updates created by the release workflow.
+        
+        ✅ **Safe to merge** - Contains only metadata updates:
+        - 📦 package.json version bump  
+        - 📝 CHANGELOG.md updates
+        
+        Auto-merging in 30 seconds to allow for any CI checks to complete..."
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Wait for CI
+      run: sleep 30
+      
+    - name: Auto-merge release PR
+      run: |
+        echo "🚀 Auto-merging release PR"
+        gh pr merge ${{ github.event.pull_request.number }} \
+          --squash \
+          --subject "chore(release): ${{ github.event.pull_request.title }}" \
+          --body "Automated merge of release metadata updates"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Success notification
+      if: success()
+      run: |
+        echo "✅ Release PR auto-merged successfully!"
+        echo "🔗 PR: ${{ github.event.pull_request.html_url }}"
+        echo "📦 Version metadata is now updated in main branch"
