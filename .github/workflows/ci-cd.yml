@@ -65,7 +65,7 @@ jobs:
         vsce package
         
     - name: Upload VSIX as artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: wincc-oa-projects-${{ github.sha }}
         path: '*.vsix'
