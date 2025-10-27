@@ -2,9 +2,13 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ develop, feature/* ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, develop ]
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   test:
@@ -41,7 +45,6 @@ jobs:
   package:
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
     
     steps:
     - name: Checkout repository
@@ -66,60 +69,4 @@ jobs:
       with:
         name: wincc-oa-projects-${{ github.sha }}
         path: '*.vsix'
-
-  publish:
-    runs-on: ubuntu-latest
-    needs: [test, package]
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Use Node.js 20.x
-      uses: actions/setup-node@v4
-      with:
-        node-version: 20.x
-        cache: 'npm'
-        
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Package and publish to marketplace
-      run: |
-        npm install -g @vscode/vsce
-        vsce package
-        vsce publish -p ${{ secrets.VSCE_PAT }}
-      env:
-        VSCE_PAT: ${{ secrets.VSCE_PAT }}
-
-  release:
-    runs-on: ubuntu-latest
-    needs: [test, package]
-    if: startsWith(github.ref, 'refs/tags/v')
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Use Node.js 20.x
-      uses: actions/setup-node@v4
-      with:
-        node-version: 20.x
-        cache: 'npm'
-        
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Package extension
-      run: |
-        npm install -g @vscode/vsce
-        vsce package
-        
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: '*.vsix'
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        retention-days: 7
