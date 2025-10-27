@@ -10,6 +10,7 @@ permissions:
   contents: read
   issues: write
   pull-requests: write
+  repository-projects: write
 
 jobs:
   add-to-project:
@@ -29,12 +30,18 @@ jobs:
                 id
               }
             }
-          }' -f login="mPokornyETM" -F number=3 --jq '.data.user.projectV2.id')
+          }' -f login="mPokornyETM" -F number=3 --jq '.data.user.projectV2.id' 2>/dev/null || echo "")
         
-        echo "Project ID: $PROJECT_ID"
+        if [ -z "$PROJECT_ID" ]; then
+          echo "❌ Could not get project ID - project may not exist or not accessible"
+          echo "ℹ️ Please check project URL: https://github.com/users/mPokornyETM/projects/3"
+          exit 0
+        fi
+        
+        echo "✅ Project ID: $PROJECT_ID"
         
         # Add issue to project using GraphQL API
-        gh api graphql -f query='
+        if gh api graphql -f query='
           mutation AddIssueToProject($projectId: ID!, $issueId: ID!) {
             addProjectV2ItemById(input: {
               projectId: $projectId
@@ -44,9 +51,11 @@ jobs:
                 id
               }
             }
-          }' -f projectId="$PROJECT_ID" -f issueId="${{ github.event.issue.node_id }}"
-        
-        echo "✅ Issue added to project successfully"
+          }' -f projectId="$PROJECT_ID" -f issueId="${{ github.event.issue.node_id }}" >/dev/null 2>&1; then
+          echo "✅ Issue added to project successfully"
+        else
+          echo "⚠️ Failed to add issue to project - may already exist or insufficient permissions"
+        fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
@@ -63,12 +72,18 @@ jobs:
                 id
               }
             }
-          }' -f login="mPokornyETM" -F number=3 --jq '.data.user.projectV2.id')
+          }' -f login="mPokornyETM" -F number=3 --jq '.data.user.projectV2.id' 2>/dev/null || echo "")
         
-        echo "Project ID: $PROJECT_ID"
+        if [ -z "$PROJECT_ID" ]; then
+          echo "❌ Could not get project ID - project may not exist or not accessible"
+          echo "ℹ️ Please check project URL: https://github.com/users/mPokornyETM/projects/3"
+          exit 0
+        fi
+        
+        echo "✅ Project ID: $PROJECT_ID"
         
         # Add PR to project using GraphQL API
-        gh api graphql -f query='
+        if gh api graphql -f query='
           mutation AddPRToProject($projectId: ID!, $prId: ID!) {
             addProjectV2ItemById(input: {
               projectId: $projectId
@@ -78,9 +93,11 @@ jobs:
                 id
               }
             }
-          }' -f projectId="$PROJECT_ID" -f prId="${{ github.event.pull_request.node_id }}"
-        
-        echo "✅ PR added to project successfully"
+          }' -f projectId="$PROJECT_ID" -f prId="${{ github.event.pull_request.node_id }}" >/dev/null 2>&1; then
+          echo "✅ PR added to project successfully"
+        else
+          echo "⚠️ Failed to add PR to project - may already exist or insufficient permissions"
+        fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
