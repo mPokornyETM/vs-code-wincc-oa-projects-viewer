@@ -13,7 +13,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	// Handle tree view selection - show project details when clicked
-	treeView.onDidChangeSelection((e) => {
+	treeView.onDidChangeSelection((e: vscode.TreeViewSelectionChangeEvent<WinCCOAProject>) => {
 		if (e.selection.length > 0) {
 			const project = e.selection[0];
 			ProjectViewPanel.createOrShow(context.extensionUri, project);
@@ -58,7 +58,7 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		}
 		
-		if (project.installationDir && fs.existsSync(project.installationDir)) {
+		if (project && project.installationDir && fs.existsSync(project.installationDir)) {
 			vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(project.installationDir));
 		}
 	});
@@ -87,7 +87,7 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		}
 		
-		if (project.installationDir && fs.existsSync(project.installationDir)) {
+		if (project && project.installationDir && fs.existsSync(project.installationDir)) {
 			vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(project.installationDir), true);
 		}
 	});
@@ -116,7 +116,7 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		}
 		
-		if (project.installationDir && fs.existsSync(project.installationDir)) {
+		if (project && project.installationDir && fs.existsSync(project.installationDir)) {
 			vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(project.installationDir));
 		}
 	});
@@ -145,7 +145,9 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		}
 		
-		ProjectViewPanel.createOrShow(context.extensionUri, project);
+		if (project) {
+			ProjectViewPanel.createOrShow(context.extensionUri, project);
+		}
 	});
 
 	context.subscriptions.push(
@@ -283,7 +285,7 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<WinCCOAProject> 
 		return element;
 	}
 
-	getChildren(element?: WinCCOAProject): Thenable<WinCCOAProject[]> {
+	getChildren(element?: WinCCOAProject): Promise<WinCCOAProject[]> {
 		if (!element) {
 			return Promise.resolve(this.projects);
 		}
@@ -358,7 +360,7 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<WinCCOAProject> 
 				inProjectSection = true;
 				currentProject = {};
 			} else if (inProjectSection && trimmedLine.includes('=')) {
-				const [key, value] = trimmedLine.split('=', 2).map(s => s.trim());
+				const [key, value] = trimmedLine.split('=', 2).map((s: string) => s.trim());
 				
 				switch (key.toLowerCase()) {
 					case 'installationdir':
@@ -441,7 +443,7 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<WinCCOAProject> 
 			return [];
 		}
 
-		return workspaceFolders.map(folder => folder.uri.fsPath);
+		return workspaceFolders.map((folder: vscode.WorkspaceFolder) => folder.uri.fsPath);
 	}
 }
 
