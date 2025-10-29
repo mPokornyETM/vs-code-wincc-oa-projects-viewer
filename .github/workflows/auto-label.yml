@@ -1,0 +1,104 @@
+name: 🏷️ Auto Label Issues
+
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened]
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    
+    steps:
+      - name: Label feature requests
+        if: github.event_name == 'issues' && contains(github.event.issue.title, '[Feature]')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['enhancement', 'needs-triage']
+            });
+
+      - name: Label bug reports
+        if: github.event_name == 'issues' && contains(github.event.issue.title, '[Bug]')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['bug', 'needs-triage']
+            });
+
+      - name: Label documentation issues
+        if: github.event_name == 'issues' && contains(github.event.issue.title, '[Docs]')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['documentation', 'needs-triage']
+            });
+
+      - name: Label questions
+        if: github.event_name == 'issues' && contains(github.event.issue.title, '[Question]')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['question', 'needs-triage']
+            });
+
+      - name: Auto-assign to project
+        if: github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Add issue to project board
+            const projectId = 'PVT_kwDONTEJHM4AnJOZ'; // Replace with your project ID
+            
+            try {
+              await github.rest.projects.createCard({
+                column_id: 'your-column-id', // Replace with your "New Issues" column ID
+                content_id: context.issue.id,
+                content_type: 'Issue'
+              });
+            } catch (error) {
+              console.log('Could not add to project:', error.message);
+            }
+
+      - name: Welcome first-time contributors
+        if: github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Check if this is the user's first issue
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              creator: context.issue.user.login,
+              state: 'all'
+            });
+            
+            if (issues.length === 1) {
+              // This is their first issue
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: "👋 Welcome to the WinCC OA VS Code Extension project, @" + context.issue.user.login + "!\n\nThank you for opening your first issue. We appreciate your contribution to making WinCC OA development better! 🎉\n\nHere's what happens next:\n- Our team will review your issue within 2-3 business days\n- We'll add appropriate labels and assign it to a milestone\n- If you're interested in contributing code, check out our [Contributing Guide](../CONTRIBUTING.md)\n\nFeel free to ask questions in the comments if you need any clarification!"
+              });
+            }
