@@ -1,6 +1,21 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
+
+/**
+ * Gets the platform-specific path to the pvssInst.conf file
+ * @returns The full path to the pvssInst.conf file
+ */
+function getPvssInstConfPath(): string {
+	if (os.platform() === 'win32') {
+		// Windows path
+		return 'C:\\ProgramData\\Siemens\\WinCC_OA\\pvssInst.conf';
+	} else {
+		// Unix/Linux path
+		return '/etc/opt/pvss/pvssInst.conf';
+	}
+}
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('WinCC OA Projects extension is now active!');
@@ -13,7 +28,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	// Handle tree view selection - show project details when clicked
-	treeView.onDidChangeSelection((e) => {
+	treeView.onDidChangeSelection((e: vscode.TreeViewSelectionChangeEvent<WinCCOAProject>) => {
 		if (e.selection.length > 0) {
 			const project = e.selection[0];
 			ProjectViewPanel.createOrShow(context.extensionUri, project);
@@ -21,7 +36,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	// Watch for changes to pvssInst.conf file
-	const configPath = 'C:\\ProgramData\\Siemens\\WinCC_OA\\pvssInst.conf';
+	const configPath = getPvssInstConfPath();
 	const watcher = vscode.workspace.createFileSystemWatcher(configPath);
 	
 	watcher.onDidChange(() => {
@@ -58,7 +73,7 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		}
 		
-		if (project.installationDir && fs.existsSync(project.installationDir)) {
+		if (project && project.installationDir && fs.existsSync(project.installationDir)) {
 			vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(project.installationDir));
 		}
 	});
@@ -87,7 +102,7 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		}
 		
-		if (project.installationDir && fs.existsSync(project.installationDir)) {
+		if (project && project.installationDir && fs.existsSync(project.installationDir)) {
 			vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(project.installationDir), true);
 		}
 	});
@@ -116,7 +131,7 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		}
 		
-		if (project.installationDir && fs.existsSync(project.installationDir)) {
+		if (project && project.installationDir && fs.existsSync(project.installationDir)) {
 			vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(project.installationDir));
 		}
 	});
@@ -145,7 +160,9 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		}
 		
-		ProjectViewPanel.createOrShow(context.extensionUri, project);
+		if (project) {
+			ProjectViewPanel.createOrShow(context.extensionUri, project);
+		}
 	});
 
 	context.subscriptions.push(
@@ -283,7 +300,7 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<WinCCOAProject> 
 		return element;
 	}
 
-	getChildren(element?: WinCCOAProject): Thenable<WinCCOAProject[]> {
+	getChildren(element?: WinCCOAProject): Promise<WinCCOAProject[]> {
 		if (!element) {
 			return Promise.resolve(this.projects);
 		}
@@ -291,7 +308,7 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<WinCCOAProject> 
 	}
 
 	private loadProjects(): void {
-		const configPath = 'C:\\ProgramData\\Siemens\\WinCC_OA\\pvssInst.conf';
+		const configPath = getPvssInstConfPath();
 		
 		if (!fs.existsSync(configPath)) {
 			vscode.window.showWarningMessage(`WinCC OA configuration file not found: ${configPath}`);
@@ -358,7 +375,7 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<WinCCOAProject> 
 				inProjectSection = true;
 				currentProject = {};
 			} else if (inProjectSection && trimmedLine.includes('=')) {
-				const [key, value] = trimmedLine.split('=', 2).map(s => s.trim());
+				const [key, value] = trimmedLine.split('=', 2).map((s: string) => s.trim());
 				
 				switch (key.toLowerCase()) {
 					case 'installationdir':
@@ -441,7 +458,7 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<WinCCOAProject> 
 			return [];
 		}
 
-		return workspaceFolders.map(folder => folder.uri.fsPath);
+		return workspaceFolders.map((folder: vscode.WorkspaceFolder) => folder.uri.fsPath);
 	}
 }
 
@@ -635,7 +652,7 @@ class ProjectViewPanel {
 
 	private _getProjectDetails(project: WinCCOAProject): string {
 		// Read additional project details from pvssInst.conf
-		const configPath = 'C:\\ProgramData\\Siemens\\WinCC_OA\\pvssInst.conf';
+		const configPath = getPvssInstConfPath();
 		let projectSection = '';
 		
 		try {
@@ -798,6 +815,7 @@ export interface WinCCOAExtensionAPI {
     getProjectVersion(installationDir: string): string | undefined;
     getRegisteredProjects(): ProjectConfig[];
     refreshProjects(): void;
+    getPvssInstConfPath(): string;
 }
 
 // Export the types so other extensions can use them
@@ -820,7 +838,7 @@ export function getProjectVersion(installationDir: string): string | undefined {
 }
 
 export function getRegisteredProjects(): ProjectConfig[] {
-    const configPath = 'C:\\ProgramData\\Siemens\\WinCC_OA\\pvssInst.conf';
+    const configPath = getPvssInstConfPath();
     if (projectProvider && fs.existsSync(configPath)) {
         return projectProvider.parseConfigFile(configPath);
     }
@@ -831,6 +849,9 @@ export function refreshProjects(): void {
     projectProvider?.refresh();
 }
 
+// Export the path utility function
+export { getPvssInstConfPath };
+
 // Backward compatibility: Keep the getAPI function for existing consumers
 export function getAPI(): WinCCOAExtensionAPI {
     return {
@@ -838,6 +859,7 @@ export function getAPI(): WinCCOAExtensionAPI {
         getProjectByPath,
         getProjectVersion,
         getRegisteredProjects,
-        refreshProjects
+        refreshProjects,
+        getPvssInstConfPath
     };
 }
