@@ -1,0 +1,88 @@
+name: Setup GitHub Labels
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/LABELS.md'
+      - '.github/workflows/setup-labels.yml'
+
+jobs:
+  setup-labels:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup GitHub CLI
+        run: |
+          gh --version
+
+      - name: Create Priority Labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "priority/critical" --color "B60205" --description "Must have for milestone, blocks other work" --force
+          gh label create "priority/high" --color "D93F0B" --description "Important for milestone success" --force
+          gh label create "priority/medium" --color "FBCA04" --description "Nice to have, can be moved to next milestone" --force
+          gh label create "priority/low" --color "0E8A16" --description "Future consideration, not scheduled" --force
+
+      - name: Create Type Labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "enhancement" --color "0052CC" --description "New feature or improvement" --force
+          gh label create "bug" --color "B60205" --description "Something isn't working correctly" --force
+          gh label create "documentation" --color "5319E7" --description "Improvements or additions to documentation" --force
+          gh label create "question" --color "CC317C" --description "Further information is requested" --force
+          gh label create "duplicate" --color "CFD3D7" --description "This issue or pull request already exists" --force
+          gh label create "wontfix" --color "000000" --description "This will not be worked on" --force
+
+      - name: Create Component Labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "core-feature" --color "0E8A16" --description "Core extension functionality" --force
+          gh label create "ui" --color "1D76DB" --description "User interface and experience" --force
+          gh label create "api" --color "5319E7" --description "API and integration features" --force
+          gh label create "testing" --color "F9D0C4" --description "Testing framework and test cases" --force
+          gh label create "quality" --color "E4E669" --description "Code quality and static analysis" --force
+          gh label create "editor" --color "C2E0C6" --description "Code editor features (syntax, completion)" --force
+          gh label create "project-management" --color "BFD4F2" --description "Project lifecycle and management" --force
+          gh label create "discovery" --color "D4C5F9" --description "Project discovery and auto-detection" --force
+          gh label create "configuration" --color "FEF2C0" --description "Settings and configuration" --force
+          gh label create "integration" --color "C5DEF5" --description "CI/CD and third-party integrations" --force
+
+      - name: Create Status Labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "needs-triage" --color "8B5CF6" --description "New issue that needs initial review" --force
+          gh label create "status/planning" --color "A855F7" --description "In planning and design phase" --force
+          gh label create "status/in-progress" --color "3B82F6" --description "Actively being worked on" --force
+          gh label create "status/review" --color "06B6D4" --description "In code review or testing" --force
+          gh label create "status/blocked" --color "EF4444" --description "Blocked by dependency or external factor" --force
+          gh label create "status/ready" --color "10B981" --description "Ready for development to begin" --force
+
+      - name: Create Special Labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "good-first-issue" --color "7057FF" --description "Good for newcomers" --force
+          gh label create "help-wanted" --color "008672" --description "Extra attention is needed" --force
+          gh label create "breaking-change" --color "B60205" --description "Introduces breaking changes" --force
+          gh label create "security" --color "B60205" --description "Security related issue" --force
+          gh label create "performance" --color "FBCA04" --description "Performance improvement" --force
+          gh label create "dependencies" --color "0366D6" --description "Updates to dependencies" --force
+
+      - name: Remove Default Labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label delete "help wanted" --yes || true
+          gh label delete "invalid" --yes || true
+          gh label delete "good first issue" --yes || true
