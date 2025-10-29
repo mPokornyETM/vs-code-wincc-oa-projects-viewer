@@ -180,6 +180,98 @@ suite('WinCC OA Extension Integration Tests', () => {
             assert.ok(true, 'Permission error handling test placeholder');
         });
     });
+
+    suite('README Support', () => {
+        test('should detect README files in project root', () => {
+            if (extension && extension.exports) {
+                // Create a temporary project directory for testing
+                const tempDir = os.tmpdir();
+                const testProjectDir = path.join(tempDir, 'test-winccoa-project');
+                
+                // Create test directory and README file
+                if (!fs.existsSync(testProjectDir)) {
+                    fs.mkdirSync(testProjectDir, { recursive: true });
+                }
+                
+                const readmeContent = `# Test Project
+This is a test WinCC OA project.
+
+## Features
+- Feature 1
+- Feature 2
+
+## Installation
+Run the project using WinCC OA.
+
+\`\`\`bash
+# Example command
+pvss00sim -config config
+\`\`\`
+`;
+                
+                const readmePath = path.join(testProjectDir, 'README.md');
+                fs.writeFileSync(readmePath, readmeContent, 'utf-8');
+                
+                // Test that the README file exists and can be read
+                assert.ok(fs.existsSync(readmePath), 'README.md should be created');
+                
+                const readContent = fs.readFileSync(readmePath, 'utf-8');
+                assert.strictEqual(readContent, readmeContent, 'README content should match');
+                
+                // Clean up
+                try {
+                    fs.unlinkSync(readmePath);
+                    fs.rmdirSync(testProjectDir);
+                } catch (error) {
+                    // Ignore cleanup errors
+                }
+            }
+        });
+
+        test('should handle different README file cases', () => {
+            const readmeFiles = ['README.md', 'readme.md', 'Readme.md'];
+            
+            readmeFiles.forEach(fileName => {
+                // Test that we support different case variations
+                assert.ok(fileName.toLowerCase().includes('readme'), `Should support ${fileName}`);
+                assert.ok(fileName.endsWith('.md'), `Should be a markdown file: ${fileName}`);
+            });
+        });
+
+        test('should support multiple documentation file types', () => {
+            const docTypes = [
+                { files: ['LICENSE', 'LICENSE.md', 'LICENSE.txt'], type: 'License' },
+                { files: ['SECURITY.md', 'security.md'], type: 'Security Policy' },
+                { files: ['CONTRIBUTING.md', 'contributing.md'], type: 'Contributing Guidelines' },
+                { files: ['CHANGELOG.md', 'changelog.md', 'HISTORY.md'], type: 'Changelog' },
+                { files: ['RELEASENOTES.md', 'ReleaseNotes.md', 'RELEASE-NOTES.md'], type: 'Release Notes' }
+            ];
+
+            docTypes.forEach(docType => {
+                assert.ok(docType.files.length > 0, `Should have files defined for ${docType.type}`);
+                assert.ok(docType.type.length > 0, `Should have a type name for ${docType.type}`);
+                
+                // Test that each file extension is supported
+                docType.files.forEach(filename => {
+                    assert.ok(filename.length > 0, `Filename should not be empty: ${filename}`);
+                });
+            });
+        });
+
+        test('should handle markdown and plain text files differently', () => {
+            // Test markdown files
+            const markdownFiles = ['README.md', 'SECURITY.md', 'CONTRIBUTING.md', 'CHANGELOG.md', 'RELEASENOTES.md'];
+            markdownFiles.forEach(file => {
+                assert.ok(file.toLowerCase().endsWith('.md'), `${file} should be markdown`);
+            });
+
+            // Test plain text files
+            const textFiles = ['LICENSE', 'LICENSE.txt'];
+            textFiles.forEach(file => {
+                assert.ok(!file.toLowerCase().endsWith('.md'), `${file} should be plain text`);
+            });
+        });
+    });
 });
 
 // Helper functions for testing

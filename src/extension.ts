@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { JSDOM } from 'jsdom';
+import * as DOMPurify from 'dompurify';
 
 /**
  * Gets the platform-specific path to the pvssInst.conf file
@@ -880,7 +882,7 @@ class ProjectViewPanel {
 		// If we already have a panel, show it.
 		if (ProjectViewPanel.currentPanel) {
 			ProjectViewPanel.currentPanel._panel.reveal(column);
-			ProjectViewPanel.currentPanel._update(project);
+			ProjectViewPanel.currentPanel._update(project).catch(console.error);
 			return;
 		}
 
@@ -907,7 +909,7 @@ class ProjectViewPanel {
 		this._extensionUri = extensionUri;
 
 		// Set the webview's initial html content
-		this._update(project);
+		this._update(project).catch(console.error);
 
 		// Listen for when the panel is disposed
 		this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
@@ -927,15 +929,15 @@ class ProjectViewPanel {
 		}
 	}
 
-	private _update(project: WinCCOAProject) {
+	private async _update(project: WinCCOAProject) {
 		this.project = project;
 		this._panel.title = `WinCC OA Project: ${project.config.name}`;
-		this._panel.webview.html = this._getHtmlForWebview(project);
+		this._panel.webview.html = await this._getHtmlForWebview(project);
 	}
 
-	private _getHtmlForWebview(project: WinCCOAProject): string {
+	private async _getHtmlForWebview(project: WinCCOAProject): Promise<string> {
 		const configDetails = this._getConfigDetails(project);
-		const projectDetails = this._getProjectDetails(project);
+		const projectDetails = await this._getProjectDetails(project);
 
 		return `<!DOCTYPE html>
 <html lang="en">
@@ -1015,6 +1017,111 @@ class ProjectViewPanel {
             font-style: italic;
             opacity: 0.8;
         }
+        .documentation-section {
+            background-color: var(--vscode-editor-inactiveSelectionBackground);
+            padding: 15px;
+            border-radius: 4px;
+            line-height: 1.6;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .documentation-section h1, .documentation-section h2, .documentation-section h3 {
+            color: var(--vscode-textLink-foreground);
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        .documentation-section h1 {
+            font-size: 1.8em;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            padding-bottom: 5px;
+        }
+        .documentation-section h2 {
+            font-size: 1.5em;
+        }
+        .documentation-section h3 {
+            font-size: 1.3em;
+        }
+        .documentation-section code {
+            background-color: var(--vscode-textCodeBlock-background);
+            padding: 2px 4px;
+            border-radius: 2px;
+            font-family: var(--vscode-editor-font-family);
+        }
+        .documentation-section pre {
+            background-color: var(--vscode-textCodeBlock-background);
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            border-left: 3px solid var(--vscode-textLink-foreground);
+        }
+        .documentation-section pre code {
+            background: none;
+            padding: 0;
+        }
+        .documentation-section a {
+            color: var(--vscode-textLink-foreground);
+            text-decoration: none;
+        }
+        .documentation-section a:hover {
+            text-decoration: underline;
+        }
+        .documentation-section ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .documentation-section li {
+            margin: 5px 0;
+        }
+        .plain-text-content {
+            font-family: var(--vscode-editor-font-family);
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        /* Tab Navigation */
+        .tab-container {
+            margin-top: 20px;
+        }
+        .tab-nav {
+            display: flex;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            margin-bottom: 0;
+        }
+        .tab-button {
+            background: transparent;
+            border: none;
+            color: var(--vscode-foreground);
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            opacity: 0.7;
+        }
+        .tab-button:hover {
+            opacity: 1;
+            background-color: var(--vscode-toolbar-hoverBackground);
+        }
+        .tab-button.active {
+            opacity: 1;
+            border-bottom-color: var(--vscode-textLink-foreground);
+            color: var(--vscode-textLink-foreground);
+        }
+        .tab-content {
+            display: none;
+            padding: 20px 0;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .tab-badge {
+            background-color: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+            border-radius: 10px;
+            padding: 2px 6px;
+            font-size: 11px;
+            margin-left: 6px;
+        }
     </style>
 </head>
 <body>
@@ -1052,7 +1159,10 @@ class ProjectViewPanel {
 </html>`;
 	}
 
-	private _getProjectDetails(project: WinCCOAProject): string {
+	private async _getProjectDetails(project: WinCCOAProject): Promise<string> {
+		// Read documentation files if they exist
+		const documentationSection = await this._getDocumentationSection(project);
+		
 		// Read additional project details from pvssInst.conf
 		const configPath = getPvssInstConfPath();
 		let projectSection = '';
@@ -1106,7 +1216,151 @@ class ProjectViewPanel {
 			console.error('Error reading project details:', error);
 		}
 
-		return projectSection;
+		return documentationSection + projectSection;
+	}
+
+	private async _getDocumentationSection(project: WinCCOAProject): Promise<string> {
+		const documentationFiles = [
+			{
+				filenames: ['README.md', 'readme.md', 'Readme.md'],
+				title: '📖 Project README',
+				icon: '📖'
+			},
+			{
+				filenames: ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'license', 'license.md'],
+				title: '📄 License',
+				icon: '📄'
+			},
+			{
+				filenames: ['SECURITY.md', 'security.md', 'Security.md'],
+				title: '🔒 Security Policy',
+				icon: '🔒'
+			},
+			{
+				filenames: ['CONTRIBUTING.md', 'contributing.md', 'Contributing.md'],
+				title: '🤝 Contributing Guidelines',
+				icon: '🤝'
+			},
+			{
+				filenames: ['CHANGELOG.md', 'changelog.md', 'Changelog.md', 'HISTORY.md', 'RELEASES.md'],
+				title: '📝 Changelog',
+				icon: '📝'
+			},
+			{
+				filenames: ['RELEASENOTES.md', 'ReleaseNotes.md', 'releasenotes.md', 'RELEASE-NOTES.md', 'release-notes.md'],
+				title: '📋 Release Notes',
+				icon: '📋'
+			}
+		];
+
+		let documentationSections = '';
+
+		for (const docType of documentationFiles) {
+			const section = await this._getDocumentFileSection(project, docType);
+			if (section) {
+				documentationSections += section;
+			}
+		}
+
+		return documentationSections;
+	}
+
+	private async _getDocumentFileSection(project: WinCCOAProject, docType: { filenames: string[], title: string, icon: string }): Promise<string> {
+		for (const filename of docType.filenames) {
+			const filePath = path.join(project.config.installationDir, filename);
+			
+			if (fs.existsSync(filePath)) {
+				try {
+					const content = fs.readFileSync(filePath, 'utf-8');
+					const htmlContent = await this._convertDocumentToHtml(content, filename);
+					
+					return `
+					<div class="section">
+						<div class="section-title">${docType.title}</div>
+						<div class="documentation-section">
+							${htmlContent}
+						</div>
+					</div>`;
+				} catch (error) {
+					console.error(`Error reading documentation file ${filePath}:`, error);
+				}
+			}
+		}
+		
+		return ''; // No file found for this document type
+	}
+
+	private async _convertDocumentToHtml(content: string, filename: string): Promise<string> {
+		const isMarkdown = filename.toLowerCase().endsWith('.md');
+		
+		if (isMarkdown) {
+			return await this._convertMarkdownToHtml(content);
+		} else {
+			// For plain text files (LICENSE, etc.), preserve formatting
+			return this._convertPlainTextToHtml(content);
+		}
+	}
+
+	private async _convertMarkdownToHtml(markdown: string): Promise<string> {
+		try {
+			// Dynamically import marked since it's an ES module
+			const { marked } = await import('marked');
+			
+			// Configure marked options
+			marked.setOptions({
+				gfm: true, // GitHub Flavored Markdown
+				breaks: true, // Convert line breaks to <br>
+			});
+
+			// Convert markdown to HTML
+			const rawHtml = await marked.parse(markdown);
+			
+			// Sanitize HTML to prevent XSS attacks
+			const window = new JSDOM('').window;
+			const purify = DOMPurify.default(window as any);
+			
+			// Configure DOMPurify to allow safe HTML elements
+			const cleanHtml = purify.sanitize(rawHtml, {
+				ALLOWED_TAGS: [
+					'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+					'p', 'br', 'strong', 'em', 'u', 's', 'code', 'pre',
+					'ul', 'ol', 'li', 'blockquote',
+					'a', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
+					'hr', 'div', 'span'
+				],
+				ALLOWED_ATTR: [
+					'href', 'title', 'alt', 'src', 'width', 'height',
+					'class', 'id', 'style'
+				],
+				ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|ftp):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i
+			});
+
+			return cleanHtml;
+		} catch (error) {
+			console.error('Error converting markdown to HTML:', error);
+			// Fall back to simple text conversion
+			return this._convertPlainTextToHtml(markdown);
+		}
+	}
+
+	private _convertPlainTextToHtml(text: string): string {
+		// For plain text files like LICENSE, preserve formatting and make it readable
+		let html = text;
+		
+		// Escape HTML characters
+		html = html.replace(/&/g, '&amp;')
+					.replace(/</g, '&lt;')
+					.replace(/>/g, '&gt;')
+					.replace(/"/g, '&quot;')
+					.replace(/'/g, '&#39;');
+		
+		// Preserve line breaks and spacing
+		html = html.replace(/\n/g, '<br>');
+		
+		// Handle multiple spaces
+		html = html.replace(/ {2,}/g, (match) => '&nbsp;'.repeat(match.length));
+		
+		return `<div class="plain-text-content">${html}</div>`;
 	}
 
 	private _getConfigDetails(project: WinCCOAProject): string {
