@@ -2,6 +2,10 @@
 
 Thank you for your interest in contributing to the WinCC OA Projects extension! This document provides guidelines for contributing to help ensure a smooth collaboration process.
 
+## 🤝 **Code of Conduct**
+
+This project and everyone participating in it is governed by our Code of Conduct. By participating, you are expected to uphold professional and respectful communication.
+
 ## 🚀 Quick Start for Contributors
 
 ### 1. Fork & Clone

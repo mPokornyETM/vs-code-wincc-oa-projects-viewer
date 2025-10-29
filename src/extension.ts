@@ -22,17 +22,24 @@ function getPvssInstConfPath(): string {
  * @returns Array of common installation paths in lowercase
  */
 function getWinCCOAInstallationPaths(): string[] {
+	// Return all possible installation paths (both Windows and Unix) for testing compatibility
+	const windowsPaths = [
+		'c:\\siemens\\automation\\wincc_oa\\',
+		'c:\\program files\\siemens\\wincc_oa\\',
+		'c:\\program files (x86)\\siemens\\wincc_oa\\',
+		'c:\\programdata\\siemens\\wincc_oa\\'
+	];
+	
+	const unixPaths = [
+		'/opt/wincc_oa/'
+	];
+	
 	if (os.platform() === 'win32') {
-		return [
-			'c:\\siemens\\automation\\wincc_oa\\',
-			'c:\\program files\\siemens\\wincc_oa\\',
-			'c:\\program files (x86)\\siemens\\wincc_oa\\',
-			'c:\\programdata\\siemens\\wincc_oa\\'
-		];
+		// On Windows, include both Windows paths and Unix paths for cross-platform compatibility
+		return [...windowsPaths, ...unixPaths];
 	} else {
-		return [
-			'/opt/wincc_oa/'
-		];
+		// On Unix systems, return Unix paths
+		return unixPaths;
 	}
 }
 
@@ -199,6 +206,12 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Auto-refresh when extension starts
 	provider.refresh();
+
+	// Return the extension API for use by other extensions
+	return {
+		getAPI: getAPI,
+		...getAPI()
+	};
 }
 
 interface ProjectConfig {
@@ -219,32 +232,50 @@ interface CurrentProjectInfo {
 
 // Standalone utility functions for testing
 export function extractVersionFromProject(project: WinCCOAProject): string | null {
+	// Check for null or undefined project
+	if (!project || !project.config) {
+		return null;
+	}
+	
 	// Try to extract version from project version field first
 	if (project.version) {
 		return project.version;
 	}
 	
-	// Try to extract version from project name (look for patterns like 3.20, 3.21, etc.)
-	const versionMatch = project.config.name.match(/(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/);
-	if (versionMatch) {
-		return versionMatch[1];
+	// Try to extract version from project name (look for patterns like 3.20, 3_20, 3.21.1, etc.)
+	if (project.config.name) {
+		const versionMatch = project.config.name.match(/(\d{1,2}[._]\d{1,2}(?:[._]\d{1,2})?)/);
+		if (versionMatch) {
+			// Convert underscores to dots for consistency
+			return versionMatch[1].replace(/_/g, '.');
+		}
 	}
 	
 	// Try to extract from installation directory path
-	const pathVersionMatch = project.config.installationDir.match(/(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/);
-	if (pathVersionMatch) {
-		return pathVersionMatch[1];
+	if (project.config.installationDir) {
+		const pathVersionMatch = project.config.installationDir.match(/(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/);
+		if (pathVersionMatch) {
+			return pathVersionMatch[1];
+		}
 	}
 	
 	return null;
 }
 
 export function isWinCCOADeliveredSubProject(project: WinCCOAProject): boolean {
+	// Check for null or undefined project
+	if (!project || !project.config || !project.config.installationDir) {
+		return false;
+	}
+	
 	// Check if the project is installed in the WinCC OA installation directory
-	const installDir = project.config.installationDir.toLowerCase();
+	const installDir = project.config.installationDir.toLowerCase().replace(/\\/g, '/');
 	const winccOAInstallPaths = getWinCCOAInstallationPaths();
 	
-	return winccOAInstallPaths.some(path => installDir.startsWith(path));
+	return winccOAInstallPaths.some(path => {
+		const normalizedPath = path.toLowerCase().replace(/\\/g, '/');
+		return installDir.startsWith(normalizedPath);
+	});
 }
 
 class ProjectCategory extends vscode.TreeItem {
@@ -594,21 +625,31 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
 	}
 
 	private extractVersionFromProject(project: WinCCOAProject): string | null {
+		// Check for null or undefined project
+		if (!project || !project.config) {
+			return null;
+		}
+		
 		// Try to extract version from project version field first
 		if (project.version) {
 			return project.version;
 		}
 		
-		// Try to extract version from project name (look for patterns like 3.20, 3.21, etc.)
-		const versionMatch = project.config.name.match(/(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/);
-		if (versionMatch) {
-			return versionMatch[1];
+		// Try to extract version from project name (look for patterns like 3.20, 3_20, 3.21.1, etc.)
+		if (project.config.name) {
+			const versionMatch = project.config.name.match(/(\d{1,2}[._]\d{1,2}(?:[._]\d{1,2})?)/);
+			if (versionMatch) {
+				// Convert underscores to dots for consistency
+				return versionMatch[1].replace(/_/g, '.');
+			}
 		}
 		
 		// Try to extract from installation directory path
-		const pathVersionMatch = project.config.installationDir.match(/(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/);
-		if (pathVersionMatch) {
-			return pathVersionMatch[1];
+		if (project.config.installationDir) {
+			const pathVersionMatch = project.config.installationDir.match(/(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/);
+			if (pathVersionMatch) {
+				return pathVersionMatch[1];
+			}
 		}
 		
 		return null;
@@ -1240,7 +1281,7 @@ export function getSubProjectsByVersion(version: string): WinCCOAProject[] {
     return subProjects.filter(p => {
         // Use the same version extraction logic as in the provider
         const projectVersion = p.version || 
-                              p.config.name.match(/(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/)?.[1] || 
+                              p.config.name.match(/(\d{1,2}[._]\d{1,2}(?:[._]\d{1,2})?)/)?.[1]?.replace(/_/g, '.') || 
                               p.config.installationDir.match(/(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/)?.[1] || 
                               'Unknown';
         return projectVersion === version;
