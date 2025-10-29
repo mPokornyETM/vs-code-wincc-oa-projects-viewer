@@ -225,13 +225,13 @@ export function extractVersionFromProject(project: WinCCOAProject): string | nul
 	}
 	
 	// Try to extract version from project name (look for patterns like 3.20, 3.21, etc.)
-	const versionMatch = project.config.name.match(/(\d+\.\d+)/);
+	const versionMatch = project.config.name.match(/(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/);
 	if (versionMatch) {
 		return versionMatch[1];
 	}
 	
 	// Try to extract from installation directory path
-	const pathVersionMatch = project.config.installationDir.match(/(\d+\.\d+)/);
+	const pathVersionMatch = project.config.installationDir.match(/(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/);
 	if (pathVersionMatch) {
 		return pathVersionMatch[1];
 	}
@@ -600,13 +600,13 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
 		}
 		
 		// Try to extract version from project name (look for patterns like 3.20, 3.21, etc.)
-		const versionMatch = project.config.name.match(/(\d+\.\d+)/);
+		const versionMatch = project.config.name.match(/(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/);
 		if (versionMatch) {
 			return versionMatch[1];
 		}
 		
 		// Try to extract from installation directory path
-		const pathVersionMatch = project.config.installationDir.match(/(\d+\.\d+)/);
+		const pathVersionMatch = project.config.installationDir.match(/(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/);
 		if (pathVersionMatch) {
 			return pathVersionMatch[1];
 		}
@@ -716,8 +716,8 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
 			// Look for WinCC OA version sections (e.g., "Software\ETM\PVSS II\3.21")
 			for (const [sectionName, sectionData] of Object.entries(sections)) {
 				// Match WinCC OA version sections
-				const versionMatch = sectionName.match(/Software\\.*\\PVSS II\\(\d+\.\d+)/i) || 
-								   sectionName.match(/PVSS.*II.*(\d+\.\d+)/i);
+				const versionMatch = sectionName.match(/Software\\[^\\]*\\PVSS II\\(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/i) || 
+								   sectionName.match(/PVSS[^I]*II[^0-9]*(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/i);
 				
 				if (versionMatch && sectionData.currentProject) {
 					const version = versionMatch[1];
@@ -754,7 +754,7 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
 	 */
 	public parseConfigSections(content: string): Record<string, Record<string, string>> {
 		const lines = content.split('\n');
-		const sections: Record<string, Record<string, string>> = {};
+		const sections: Record<string, Record<string, string>> = Object.create(null);
 		let currentSection = '';
 
 		for (const line of lines) {
@@ -762,7 +762,7 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
 			
 			if (trimmedLine.startsWith('[') && trimmedLine.endsWith(']')) {
 				currentSection = trimmedLine.slice(1, -1);
-				sections[currentSection] = {};
+				sections[currentSection] = Object.create(null);
 			} else if (currentSection && trimmedLine.includes('=')) {
 				const [key, ...valueParts] = trimmedLine.split('=');
 				const value = valueParts.join('=').trim().replace(/['"]/g, '');
@@ -1240,8 +1240,8 @@ export function getSubProjectsByVersion(version: string): WinCCOAProject[] {
     return subProjects.filter(p => {
         // Use the same version extraction logic as in the provider
         const projectVersion = p.version || 
-                              p.config.name.match(/(\d+\.\d+)/)?.[1] || 
-                              p.config.installationDir.match(/(\d+\.\d+)/)?.[1] || 
+                              p.config.name.match(/(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/)?.[1] || 
+                              p.config.installationDir.match(/(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/)?.[1] || 
                               'Unknown';
         return projectVersion === version;
     });
