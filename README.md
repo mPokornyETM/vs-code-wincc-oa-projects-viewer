@@ -64,6 +64,9 @@ The extension organizes projects into a hierarchical tree structure with intelli
 
 ```
 📁 WinCC OA Projects Viewer
+├── ⭐ Current Project(s) (Currently active projects per WinCC OA version)
+│   ├── TfCustomized (v3.21)
+│   └── Bla_3.20 (v3.20)
 ├── 🚀 Runnable Projects (Active WinCC OA projects)
 ├── ⚙️ WinCC OA System Versions (Installed versions: 3.20, 3.21, etc.)
 ├── 🏭 WinCC OA Version Sub-Projects (Delivered by WinCC OA installation)
@@ -83,6 +86,13 @@ The extension organizes projects into a hierarchical tree structure with intelli
 ```
 
 ### 🎯 **Category Details**
+
+#### ⭐ **Current Project(s)**
+- **Purpose**: Shows the currently active project for each WinCC OA version
+- **Detection**: Read from `currentProject` entries in WinCC OA version sections of pvssInst.conf
+- **Example**: `[Software\ETM\PVSS II\3.21]` section with `currentProject = "TfCustomized"`
+- **Features**: One current project per WinCC OA version, priority display with star icon
+- **Behavior**: Projects marked as current are excluded from other categories to avoid duplication
 
 #### 🚀 **Runnable Projects**
 - **Purpose**: Main WinCC OA projects that can be executed
@@ -173,10 +183,14 @@ refreshProjects(): void
 
 ```typescript
 // Get projects by category
+getCurrentProjects(): WinCCOAProject[]
 getRunnableProjects(): WinCCOAProject[]
 getWinCCOASystemVersions(): WinCCOAProject[]
 getWinCCOADeliveredSubProjects(): WinCCOAProject[]
 getUserSubProjects(): WinCCOAProject[]
+
+// Get current project information
+getCurrentProjectsInfo(): CurrentProjectInfo[]
 
 // Get projects by version
 getSubProjectsByVersion(version: string): WinCCOAProject[]
@@ -195,7 +209,13 @@ const winccOAExt = extensions.getExtension('mPokornyETM.wincc-oa-projects');
 if (winccOAExt) {
     const api = winccOAExt.exports.getAPI();
     
-    // Get all runnable projects
+    // Get current active projects
+    const currentProjects = api.getCurrentProjects();
+    
+    // Get current project information with version details
+    const currentProjectsInfo = api.getCurrentProjectsInfo();
+    
+    // Get all runnable projects (excluding current to avoid duplication)
     const runnableProjects = api.getRunnableProjects();
     
     // Get WinCC OA delivered components
@@ -238,21 +258,95 @@ if (winccOAExt) {
 
 ## Development
 
-To set up the development environment:
+### For Contributors
 
-```bash
-# Install dependencies
-npm install
+If you want to contribute to this project:
 
-# Compile TypeScript
-npm run compile
+1. **Fork the Repository**
+   - Click the "Fork" button on GitHub to create your own copy
+   - Clone your fork: `git clone https://github.com/YOUR_USERNAME/vs-code-wincc-oa-projects-viewer.git`
 
-# Watch for changes
-npm run watch
+2. **Create a Feature Branch from Main**
+   ```bash
+   # Switch to main branch
+   git checkout main
+   
+   # Pull latest changes
+   git pull upstream main
+   
+   # Create and switch to feature branch
+   git checkout -b feature/your-feature-name
+   ```
 
-# Run tests
-npm test
-```
+3. **Set Up Development Environment**
+   ```bash
+   # Install dependencies
+   npm install
+
+   # Compile TypeScript
+   npm run compile
+
+   # Watch for changes during development
+   npm run watch
+
+   # Run tests
+   npm test
+   
+   # Run tests with coverage
+   npm run test:coverage
+   
+   # Generate coverage report only
+   npm run coverage
+   ```
+
+4. **Testing and Quality Assurance**
+
+   ```bash
+   # Run linting
+   npm run lint
+   
+   # Run all tests
+   npm test
+   
+   # Run tests with coverage report
+   npm run test:coverage
+   ```
+   
+   **Coverage Requirements:**
+   - All new code must maintain or improve the current coverage baseline (≥1.5%)
+   - The CI/CD pipeline enforces coverage thresholds - no regressions allowed
+   - Coverage reports are automatically generated and uploaded as artifacts
+   - View detailed coverage reports in the `coverage/lcov-report/` directory
+
+5. **Make Your Changes**
+   - Follow the coding standards
+   - Add tests for new functionality
+   - Update documentation as needed
+   - Ensure all tests pass and coverage requirements are met
+
+6. **Submit Your Contribution**
+   ```bash
+   # Commit your changes
+   git add .
+   git commit -m "feat: add your feature description"
+   
+   # Push to your fork
+   git push origin feature/your-feature-name
+   ```
+   
+7. **Create Pull Request**
+   - Go to your fork on GitHub
+   - Click "New Pull Request"
+   - Select `main` as the base branch
+   - Provide detailed description of your changes
+
+### 📋 **Contributor Resources**
+
+- **[Detailed Workflow Guide](docs/CONTRIBUTOR_WORKFLOW.md)**: Complete step-by-step contribution process
+- **[Contributing Guidelines](CONTRIBUTING.md)**: Code standards and project guidelines
+- **Quick Setup Scripts**: 
+  - **Linux/macOS**: `./scripts/create-feature-branch.sh feature/your-feature-name`
+  - **Windows**: `.\scripts\create-feature-branch.ps1 feature/your-feature-name`
 
 ### 🤖 Automated Dependency Management
 

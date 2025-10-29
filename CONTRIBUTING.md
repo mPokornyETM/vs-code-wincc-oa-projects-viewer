@@ -1,15 +1,72 @@
 # Contributing to WinCC OA Projects Extension
 
-Thank you for your interest in contributing to the WinCC OA Projects extension! This document provides guidelines for contributing.
+Thank you for your interest in contributing to the WinCC OA Projects extension! This document provides guidelines for contributing to help ensure a smooth collaboration process.
 
-## Getting Started
+## 🚀 Quick Start for Contributors
 
-1. Fork the repository
-2. Clone your fork
-3. Install dependencies: `npm install`
-4. Make your changes
-5. Test your changes: `npm test`
-6. Submit a pull request
+### 1. Fork & Clone
+1. **Fork the Repository**: Click "Fork" on the GitHub repository page
+2. **Clone Your Fork**: 
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/vs-code-wincc-oa-projects-viewer.git
+   cd vs-code-wincc-oa-projects-viewer
+   ```
+3. **Add Upstream Remote**:
+   ```bash
+   git remote add upstream https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer.git
+   ```
+
+### 2. Create Feature Branch from Main
+```bash
+# Ensure you're on main branch
+git checkout main
+
+# Pull latest changes from upstream
+git pull upstream main
+
+# Create and switch to your feature branch
+git checkout -b feature/your-feature-name
+
+# Or for bug fixes
+git checkout -b fix/issue-description
+
+# Or for documentation updates  
+git checkout -b docs/update-description
+```
+
+### 3. Development Workflow
+```bash
+# Install dependencies
+npm install
+
+# Start development mode (watches for changes)
+npm run watch
+
+# In another terminal, test your changes
+npm test
+
+# Compile to check for TypeScript errors
+npm run compile
+```
+
+### 4. Commit and Push
+```bash
+# Stage your changes
+git add .
+
+# Commit with descriptive message
+git commit -m "feat: add intelligent project classification"
+
+# Push to your fork
+git push origin feature/your-feature-name
+```
+
+### 5. Create Pull Request
+1. Go to your fork on GitHub
+2. Click "Compare & pull request"
+3. **Base branch**: `main` (important!)
+4. **Head branch**: `feature/your-feature-name`
+5. Fill in the PR template with detailed description
 
 ## Development Setup
 
