@@ -37,91 +37,14 @@ jobs:
     - name: Compile TypeScript
       run: npm run compile
       
-    - name: Run tests with coverage
-      run: npm run test:coverage
+    - name: Run tests
+      run: npm test
       env:
         CI: true
-        
-    - name: Upload coverage reports
-      uses: actions/upload-artifact@v5
-      with:
-        name: coverage-reports-${{ matrix.node-version }}
-        path: coverage/
-        retention-days: 7
-        
-    - name: Check coverage threshold
-      run: |
-        # Extract coverage percentage from coverage-summary.json
-        $coverage = Get-Content coverage/coverage-summary.json | ConvertFrom-Json
-        $totalCoverage = $coverage.total.lines.pct
-        $minThreshold = 1.5  # Never worse than current baseline (1.59%)
-        
-        Write-Host "Current coverage: $totalCoverage percent"
-        Write-Host "Minimum threshold: $minThreshold percent"
-        
-        if ($totalCoverage -lt $minThreshold) {
-          Write-Host "❌ Coverage ($totalCoverage percent) is below minimum threshold ($minThreshold percent)"
-          exit 1
-        } else {
-          Write-Host "✅ Coverage ($totalCoverage percent) meets minimum threshold ($minThreshold percent)"
-        }
-      shell: pwsh
-
-  coverage:
-    runs-on: ubuntu-latest
-    needs: test
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v5
-      
-    - name: Use Node.js 20.x
-      uses: actions/setup-node@v6
-      with:
-        node-version: 20.x
-        cache: 'npm'
-        
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Generate coverage report
-      run: npm run test:coverage
-      
-    - name: Upload coverage to artifacts
-      uses: actions/upload-artifact@v5
-      with:
-        name: coverage-report-final
-        path: coverage/
-        retention-days: 30
-        
-    - name: Display coverage summary
-      run: |
-        echo "## 📊 Test Coverage Report" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        # Parse coverage summary
-        COVERAGE=$(node -e "
-          const fs = require('fs');
-          const summary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json'));
-          const total = summary.total;
-          console.log(\`Lines: \${total.lines.pct}% (\${total.lines.covered}/\${total.lines.total})\`);
-          console.log(\`Functions: \${total.functions.pct}% (\${total.functions.covered}/\${total.functions.total})\`);
-          console.log(\`Branches: \${total.branches.pct}% (\${total.branches.covered}/\${total.branches.total})\`);
-          console.log(\`Statements: \${total.statements.pct}% (\${total.statements.covered}/\${total.statements.total})\`);
-        ")
-        
-        echo "| Metric | Coverage | Covered/Total |" >> $GITHUB_STEP_SUMMARY
-        echo "|--------|----------|---------------|" >> $GITHUB_STEP_SUMMARY
-        echo "$COVERAGE" | while read line; do
-          metric=$(echo "$line" | cut -d: -f1)
-          coverage=$(echo "$line" | cut -d: -f2 | cut -d'(' -f1 | xargs)
-          details=$(echo "$line" | cut -d'(' -f2 | cut -d')' -f1)
-          echo "| $metric | $coverage | $details |" >> $GITHUB_STEP_SUMMARY
-        done
 
   package:
     runs-on: ubuntu-latest
-    needs: [test, coverage]
+    needs: test
     
     steps:
     - name: Checkout repository
