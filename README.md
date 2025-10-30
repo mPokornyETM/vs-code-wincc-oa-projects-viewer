@@ -228,6 +228,34 @@ if (winccOAExt) {
 
 ---
 
+## 📊 Project View Interface
+
+When you select a project from the tree view, a comprehensive project details panel opens with tabbed interface for easy navigation:
+
+![Project View Documentation](docs/images/project-view-documentation.png)
+
+### 📚 **Documentation Support**
+- **📖 README**: Project overview and documentation (mandatory)
+- **📄 LICENSE**: Licensing information (mandatory) 
+- **🔒 SECURITY**: Security policy and guidelines (mandatory)
+- **🤝 CONTRIBUTING**: Contribution guidelines (optional)
+- **📝 CHANGELOG**: Version history and changes (optional)
+- **📋 RELEASE NOTES**: Release information (optional)
+
+### ⚙️ **Configuration Management**  
+- **Project Config File**: Main WinCC OA settings with [official documentation links](https://www.winccoa.com/documentation/WinCCOA/latest/en_US/Notes/project_config_file.html)
+- **config.level File**: CTRL library and logging settings
+- **config.http**: HTTP Server configuration
+- **config.redu**: Redundancy settings for high availability
+- **config.webclient**: Web client specific settings
+
+### 🔗 **Newcomer-Friendly Features**
+- **Official Documentation Links**: Direct access to WinCC OA documentation for each configuration file
+- **Missing File Indicators**: Shows "Sorry, the information is missing" for mandatory files
+- **Contextual Help**: Descriptions and purposes for each configuration type
+
+---
+
 ## 🎮 Commands
 
 - **WinCC OA: Refresh Projects**: Manually refresh the project list

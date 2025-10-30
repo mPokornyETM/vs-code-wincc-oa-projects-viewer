@@ -94,6 +94,19 @@ WinCC OA Projects
     └── 3.20 (2 projects)
 ```
 
+### Project View with Documentation Support
+
+When you select a project from the tree view, a detailed project view opens showing comprehensive information including project configuration and documentation:
+
+![Project View Documentation](images/project-view-documentation.png)
+
+The project view includes:
+- **📚 Project Documentation** - Tabbed interface for README, LICENSE, SECURITY files
+- **⚙️ Project Configuration** - Organized tabs for different config files (config, config.level, config.http, etc.)
+- **📖 Official WinCC OA Documentation Links** - Direct links to official documentation for each configuration file
+- **📋 Mandatory Documentation Validation** - Shows "Sorry, the information is missing" for required files not found
+- **🔗 Interactive Links** - Clickable links to official WinCC OA documentation for newcomers
+
 ### Context Menu Actions
 
 Right-click on any project to access these actions:
