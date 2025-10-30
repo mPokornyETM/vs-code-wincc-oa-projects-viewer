@@ -1,4 +1,4 @@
-# WinCC OA Projects
+# WinCC OA Projects Viewer
 
 [![GitHub release](https://img.shields.io/github/release/mPokornyETM/vs-code-wincc-oa-projects-viewer.svg?label=release)](https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/releases/latest)
 [![VS Code Marketplace](https://img.shields.io/vscode-marketplace/v/mPokornyETM.wincc-oa-projects.svg)](https://marketplace.visualstudio.com/items?itemName=mPokornyETM.wincc-oa-projects)
@@ -9,7 +9,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/blob/main/CONTRIBUTING.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 
-A Visual Studio Code extension for viewing and analyzing [SIMATIC WinCC Open Architecture](https://www.winccoa.com/index.html) projects.
+A comprehensive Visual Studio Code extension for viewing, managing, and organizing [SIMATIC WinCC Open Architecture](https://www.winccoa.com/index.html) projects with intelligent categorization and cross-platform support.
 
 **Keywords:** WinCC OA, scada, hmi, wincc-oa-project-admin, wincc-oa-engineering, wincc-oa-runtime
 
@@ -28,28 +28,102 @@ Thx very much for supporting us.
 
 ---
 
-## Features
+## ✨ Key Features
 
-- **Activity Bar Integration**: Adds a "WinCC OA Projects" item to the VS Code activity bar
-- **Project Tree View**: Shows all registered WinCC OA projects in a tree view called "Locale Projects"
-- **Project Information Display**: For each project, displays:
-  - **Name**: The project name (last part of the installation directory)
-  - **Visual Labels**: ⭐ Current, 📝 Version, ✅ Runnable status
-  - **Location**: The full installation directory path  
-  - **Created At**: Installation date
-  - **Current Status**: Reads `currentProject` property from pvssInst.conf
-  - **Version**: WinCC OA version for runnable projects (extracted from config file)
-  - **Company**: Optional company information
+### 🏗️ **Hierarchical Project Organization**
+- **Intelligent Categorization**: Projects automatically organized into logical categories
+- **Version-Based Grouping**: Sub-projects grouped by WinCC OA version (3.20, 3.21, etc.)
+- **Smart Separation**: Distinguishes between WinCC OA delivered and user-registered projects
+- **Expandable Tree Structure**: Nested categories with project counts and descriptions
+
+### 🚀 **Project Types Supported**
+- **Runnable Projects**: Active WinCC OA projects ready for execution
+- **WinCC OA System Versions**: Installed WinCC OA system versions (3.20, 3.21, etc.)
+- **WinCC OA Version Sub-Projects**: Components delivered with WinCC OA (BACnet, OPC UA, etc.)
+- **User Sub-Projects**: Manually registered custom projects and extensions
+- **Unregistered Projects**: Projects found but not properly registered
+
+### 🌍 **Cross-Platform Support**
+- **Windows**: Full support for standard Siemens installation paths
+- **Unix/Linux**: Support for common Unix installation locations
+- **Intelligent Path Detection**: Automatically detects WinCC OA installation directories
+
+### 📊 **Rich Project Information**
+- **Visual Status Indicators**: ⭐ Current, 🚀 Runnable, ⚙️ System, 🏷️ Version
+- **Detailed Metadata**: Name, location, version, creation date, company info
+- **Smart Tooltips**: Context-aware information and project counts
+- **Real-time Updates**: Auto-refresh when configuration files change
 
 ---
 
-## Project Organization
+## 🏗️ Project Organization & Tree Structure
 
-Projects are automatically sorted in the following order:
+The extension organizes projects into a hierarchical tree structure with intelligent categorization:
 
-1. **Current Projects** (marked with ⭐): Projects currently active/open
-2. **WinCC OA Projects** (🚀): Main runnable projects with valid config files
-3. **WinCC OA Extensions** (🧩): Extensions, plugins, add-ons, and sub-projects
+### 📂 **Root Categories**
+
+```
+📁 WinCC OA Projects Viewer
+├── ⭐ Current Project(s) (Currently active projects per WinCC OA version)
+│   ├── TfCustomized (v3.21)
+│   └── Bla_3.20 (v3.20)
+├── 🚀 Runnable Projects (Active WinCC OA projects)
+├── ⚙️ WinCC OA System Versions (Installed versions: 3.20, 3.21, etc.)
+├── 🏭 WinCC OA Version Sub-Projects (Delivered by WinCC OA installation)
+│   ├── 🏷️ Version 3.20
+│   │   ├── BACnet_3.20
+│   │   ├── OPC_UA_3.20
+│   │   └── Modbus_3.20
+│   └── 🏷️ Version 3.21
+│       ├── BACnet_3.21
+│       └── OPC_UA_3.21
+├── 👤 User Sub-Projects (Manually registered projects)
+│   ├── 🏷️ Version 3.20
+│   │   └── MyCustomProject
+│   └── 🏷️ Version Unknown
+│       └── LegacyProject
+└── ⚠️ Not Registered (Unregistered projects)
+```
+
+### 🎯 **Category Details**
+
+#### ⭐ **Current Project(s)**
+- **Purpose**: Shows the currently active project for each WinCC OA version
+- **Detection**: Read from `currentProject` entries in WinCC OA version sections of pvssInst.conf
+- **Example**: `[Software\ETM\PVSS II\3.21]` section with `currentProject = "TfCustomized"`
+- **Features**: One current project per WinCC OA version, priority display with star icon
+- **Behavior**: Projects marked as current are excluded from other categories to avoid duplication
+
+#### 🚀 **Runnable Projects**
+- **Purpose**: Main WinCC OA projects that can be executed
+- **Requirements**: Valid `config/config` file with `[general]` section
+- **Status**: Not marked as `notRunnable` in pvssInst.conf
+- **Features**: Shows version information, current project indicator
+
+#### ⚙️ **WinCC OA System Versions**  
+- **Purpose**: Installed WinCC OA system versions
+- **Examples**: 3.20, 3.21, 3.22
+- **Detection**: Project name matches version pattern
+- **Features**: System installation indicator, version-based sorting
+
+#### 🏭 **WinCC OA Version Sub-Projects**
+- **Purpose**: Sub-projects delivered with WinCC OA installation
+- **Location**: `C:\Siemens\Automation\WinCC_OA\{version}\`
+- **Examples**: BACnet_3.20, OPC_UA_3.21, Modbus_3.20
+- **Management**: Managed by WinCC OA installation/updates
+- **Organization**: Grouped by version with nested structure
+
+#### 👤 **User Sub-Projects**
+- **Purpose**: Manually registered sub-projects and custom extensions
+- **Location**: Any path outside WinCC OA installation directories
+- **Examples**: Custom projects, third-party extensions, user developments
+- **Management**: User-managed via API, manual registration, or tools
+- **Organization**: Grouped by detected or unknown version
+
+#### ⚠️ **Not Registered**
+- **Purpose**: Projects found but not properly registered in pvssInst.conf
+- **Issues**: Missing installation directory or invalid configuration
+- **Action Required**: Check project registration or configuration
 
 ---
 
@@ -82,7 +156,79 @@ The extension reads project information from:
 
 ---
 
-## Commands
+## 🔌 Extension API
+
+The extension provides a comprehensive API for other extensions to interact with WinCC OA projects:
+
+### **Core Functions**
+
+```typescript
+// Get all projects
+getProjects(): WinCCOAProject[]
+
+// Find project by path
+getProjectByPath(path: string): WinCCOAProject | undefined
+
+// Get project version
+getProjectVersion(installationDir: string): string | undefined
+
+// Get cross-platform config file path
+getPvssInstConfPath(): string
+
+// Refresh project list
+refreshProjects(): void
+```
+
+### **Category-Specific Functions**
+
+```typescript
+// Get projects by category
+getCurrentProjects(): WinCCOAProject[]
+getRunnableProjects(): WinCCOAProject[]
+getWinCCOASystemVersions(): WinCCOAProject[]
+getWinCCOADeliveredSubProjects(): WinCCOAProject[]
+getUserSubProjects(): WinCCOAProject[]
+
+// Get current project information
+getCurrentProjectsInfo(): CurrentProjectInfo[]
+
+// Get projects by version
+getSubProjectsByVersion(version: string): WinCCOAProject[]
+
+// Get category structure
+getProjectCategories(): ProjectCategory[]
+```
+
+### **Usage Example**
+
+```typescript
+// In your extension
+import { extensions } from 'vscode';
+
+const winccOAExt = extensions.getExtension('mPokornyETM.wincc-oa-projects');
+if (winccOAExt) {
+    const api = winccOAExt.exports.getAPI();
+    
+    // Get current active projects
+    const currentProjects = api.getCurrentProjects();
+    
+    // Get current project information with version details
+    const currentProjectsInfo = api.getCurrentProjectsInfo();
+    
+    // Get all runnable projects (excluding current to avoid duplication)
+    const runnableProjects = api.getRunnableProjects();
+    
+    // Get WinCC OA delivered components
+    const deliveredComponents = api.getWinCCOADeliveredSubProjects();
+    
+    // Get projects for specific version
+    const v320Projects = api.getSubProjectsByVersion('3.20');
+}
+```
+
+---
+
+## 🎮 Commands
 
 - **WinCC OA: Refresh Projects**: Manually refresh the project list
 - **WinCC OA: Open Project**: Open a project/extension folder in current VS Code window
@@ -112,21 +258,95 @@ The extension reads project information from:
 
 ## Development
 
-To set up the development environment:
+### For Contributors
 
-```bash
-# Install dependencies
-npm install
+If you want to contribute to this project:
 
-# Compile TypeScript
-npm run compile
+1. **Fork the Repository**
+   - Click the "Fork" button on GitHub to create your own copy
+   - Clone your fork: `git clone https://github.com/YOUR_USERNAME/vs-code-wincc-oa-projects-viewer.git`
 
-# Watch for changes
-npm run watch
+2. **Create a Feature Branch from Main**
+   ```bash
+   # Switch to main branch
+   git checkout main
+   
+   # Pull latest changes
+   git pull upstream main
+   
+   # Create and switch to feature branch
+   git checkout -b feature/your-feature-name
+   ```
 
-# Run tests
-npm test
-```
+3. **Set Up Development Environment**
+   ```bash
+   # Install dependencies
+   npm install
+
+   # Compile TypeScript
+   npm run compile
+
+   # Watch for changes during development
+   npm run watch
+
+   # Run tests
+   npm test
+   
+   # Run tests with coverage
+   npm run test:coverage
+   
+   # Generate coverage report only
+   npm run coverage
+   ```
+
+4. **Testing and Quality Assurance**
+
+   ```bash
+   # Run linting
+   npm run lint
+   
+   # Run all tests
+   npm test
+   
+   # Run tests with coverage report
+   npm run test:coverage
+   ```
+   
+   **Coverage Requirements:**
+   - All new code must maintain or improve the current coverage baseline (≥1.5%)
+   - The CI/CD pipeline enforces coverage thresholds - no regressions allowed
+   - Coverage reports are automatically generated and uploaded as artifacts
+   - View detailed coverage reports in the `coverage/lcov-report/` directory
+
+5. **Make Your Changes**
+   - Follow the coding standards
+   - Add tests for new functionality
+   - Update documentation as needed
+   - Ensure all tests pass and coverage requirements are met
+
+6. **Submit Your Contribution**
+   ```bash
+   # Commit your changes
+   git add .
+   git commit -m "feat: add your feature description"
+   
+   # Push to your fork
+   git push origin feature/your-feature-name
+   ```
+   
+7. **Create Pull Request**
+   - Go to your fork on GitHub
+   - Click "New Pull Request"
+   - Select `main` as the base branch
+   - Provide detailed description of your changes
+
+### 📋 **Contributor Resources**
+
+- **[Detailed Workflow Guide](docs/CONTRIBUTOR_WORKFLOW.md)**: Complete step-by-step contribution process
+- **[Contributing Guidelines](CONTRIBUTING.md)**: Code standards and project guidelines
+- **Quick Setup Scripts**: 
+  - **Linux/macOS**: `./scripts/create-feature-branch.sh feature/your-feature-name`
+  - **Windows**: `.\scripts\create-feature-branch.ps1 feature/your-feature-name`
 
 ### 🤖 Automated Dependency Management
 
