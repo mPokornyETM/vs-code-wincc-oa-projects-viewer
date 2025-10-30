@@ -1,0 +1,35 @@
+# WinCC OA Web Client Configuration
+# Specifies the web client specific settings
+
+[general]
+# Web client general settings
+enabled = true
+autoLogin = false
+sessionTimeout = 1800
+
+[ui]
+# User interface settings for web client
+theme = "winccoa-light"
+language = "en_US.utf8" 
+dateFormat = "DD.MM.YYYY"
+timeFormat = "HH:mm:ss"
+
+[security]
+# Web client security settings
+httpsOnly = true
+sameSitePolicy = "Strict"
+cookieSecure = true
+frameOptions = "DENY"
+
+[performance]
+# Performance optimization for web client
+cacheTimeout = 3600
+compressionLevel = 6
+maxConcurrentUsers = 50
+
+[features]
+# Enable/disable web client features
+enablePanelNavigation = true
+enableDataPointBrowser = true
+enableAlarmScreen = true
+enableTrendViewer = true

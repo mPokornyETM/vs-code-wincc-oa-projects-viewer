@@ -1,0 +1,30 @@
+# WinCC OA Logging Configuration
+# Controls debug levels and log output settings
+
+[general]
+# Global debug level (0=none, 1=errors, 2=warnings, 3=info, 4=debug)
+debugLevel = 2
+logToFile = true
+logToConsole = false
+
+[managers]
+# Individual manager debug levels
+ui1 = 3
+data1 = 2
+event1 = 1
+dist1 = 2
+ctrl1 = 3
+
+[files]
+# Log file settings
+maxFileSize = 10MB
+maxFiles = 5
+logPath = "log/"
+fileNamePattern = "PVSS_%Y%m%d_%H%M%S.log"
+
+[performance]
+# Performance monitoring
+enablePerfMon = true
+perfLogInterval = 60
+memoryWarningLevel = 80
+cpuWarningLevel = 85

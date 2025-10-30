@@ -1084,8 +1084,10 @@ class ProjectViewPanel {
         }
         .tab-nav {
             display: flex;
+            flex-wrap: wrap;
             border-bottom: 1px solid var(--vscode-panel-border);
             margin-bottom: 0;
+            gap: 2px;
         }
         .tab-button {
             background: transparent;
@@ -1097,6 +1099,8 @@ class ProjectViewPanel {
             font-size: 14px;
             transition: all 0.2s ease;
             opacity: 0.7;
+            white-space: nowrap;
+            border-radius: 4px 4px 0 0;
         }
         .tab-button:hover {
             opacity: 1;
@@ -1106,10 +1110,12 @@ class ProjectViewPanel {
             opacity: 1;
             border-bottom-color: var(--vscode-textLink-foreground);
             color: var(--vscode-textLink-foreground);
+            background-color: var(--vscode-editor-background);
         }
         .tab-content {
             display: none;
             padding: 20px 0;
+            animation: fadeIn 0.2s ease-in;
         }
         .tab-content.active {
             display: block;
@@ -1121,6 +1127,24 @@ class ProjectViewPanel {
             padding: 2px 6px;
             font-size: 11px;
             margin-left: 6px;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        /* Config-specific styling */
+        .config-section {
+            background-color: var(--vscode-editor-inactiveSelectionBackground);
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            border-left: 3px solid var(--vscode-textLink-foreground);
+        }
+        .config-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: var(--vscode-textLink-foreground);
+            font-size: 1.1em;
         }
     </style>
 </head>
@@ -1465,21 +1489,75 @@ class ProjectViewPanel {
 			return '';
 		}
 
-		const configFiles = ['config', 'config.level', 'config.http', 'config.redu'];
-		let configSections = '';
+		const configFiles = [
+			{
+				filename: 'config',
+				title: 'Project Config File',
+				description: 'The settings for WinCC OA are defined in different sections in the config file.',
+				officialLink: 'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/Notes/project_config_file.html',
+				icon: '⚙️',
+				tabId: 'config-main'
+			},
+			{
+				filename: 'config.level',
+				title: 'config.level File',
+				description: 'Specifies which CTRL library each manager should load. Contains the default settings for the different WinCC OA managers.',
+				officialLink: 'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/Control_Grundlagen/Control_Grundlagen-17.html',
+				icon: '�',
+				tabId: 'config-level'
+			},
+			{
+				filename: 'config.http',
+				title: 'config.http',
+				description: 'Specifies the basic settings for the HTTP Server.',
+				officialLink: 'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/HTTP_Server/http1-10.html',
+				icon: '🌐',
+				tabId: 'config-http'
+			},
+			{
+				filename: 'config.redu',
+				title: 'config.redu',
+				description: 'Contains the redundancy relevant settings for forward and copy DPs.',
+				officialLink: 'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/Redundancy/Redundancy-11.html',
+				icon: '🔄',
+				tabId: 'config-redu'
+			},
+			{
+				filename: 'config.webclient',
+				title: 'config.webclient',
+				description: 'Specifies the web client specific settings.',
+				officialLink: 'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/Notes/config_webclient.html',
+				icon: '�',
+				tabId: 'config-webclient'
+			}
+		];
+
+		// Build tab navigation and content for config files
+		let configTabNavigation = '<div class="tab-nav">';
+		let configTabContent = '';
+		let configActiveTabSet = false;
+		let hasAnyConfigFiles = false;
 
 		for (const configFile of configFiles) {
-			const configPath = path.join(project.config.installationDir, 'config', configFile);
+			const configPath = path.join(project.config.installationDir, 'config', configFile.filename);
 			
 			if (fs.existsSync(configPath)) {
+				hasAnyConfigFiles = true;
+				const activeClass = !configActiveTabSet ? ' active' : '';
+				
+				configTabNavigation += `
+					<button class="tab-button${activeClass}" data-tab="${configFile.tabId}" title="${configFile.description}">
+						${configFile.icon} ${configFile.title}
+					</button>`;
+
+				const contentActiveClass = !configActiveTabSet ? ' active' : '';
+				
 				try {
 					const content = fs.readFileSync(configPath, 'utf-8');
 					const sections = this._parseProjectConfigFile(content);
 					
-					configSections += `
-					<div class="section">
-						<div class="section-title">Configuration File: ${configFile}</div>
-						${Object.entries(sections).map(([sectionName, entries]) => `
+					const configContent = Object.entries(sections).length > 0 ? 
+						Object.entries(sections).map(([sectionName, entries]) => `
 						<div class="config-section">
 							<div class="config-title">[${sectionName}]</div>
 							${Object.entries(entries as Record<string, string>).map(([key, value]) => `
@@ -1489,15 +1567,134 @@ class ProjectViewPanel {
 							</div>
 							`).join('')}
 						</div>
-						`).join('')}
-					</div>`;
+						`).join('') : 
+						`<div class="config-section">
+							<div class="comment" style="text-align: center; padding: 20px; opacity: 0.7;">
+								Configuration file exists but contains no readable sections.
+							</div>
+						</div>`;
+
+					configTabContent += `
+						<div id="${configFile.tabId}" class="tab-content${contentActiveClass}">
+							<div class="section-title" style="margin-bottom: 15px;">
+								${configFile.icon} ${configFile.title}
+								<span class="comment" style="font-size: 0.9em; font-weight: normal; margin-left: 10px;">
+									(${configFile.filename})
+								</span>
+							</div>
+							<div class="config-official-info" style="background-color: var(--vscode-textBlockQuote-background); border-left: 3px solid var(--vscode-textLink-foreground); padding: 12px; margin-bottom: 20px; border-radius: 4px;">
+								<div style="margin-bottom: 8px; font-weight: bold; color: var(--vscode-textLink-foreground);">
+									📖 Official WinCC OA Documentation
+								</div>
+								<div style="margin-bottom: 10px; line-height: 1.4;">
+									${configFile.description}
+								</div>
+								<div style="font-size: 0.9em;">
+									<a href="${configFile.officialLink}" style="color: var(--vscode-textLink-foreground); text-decoration: none;" 
+									   onmouseover="this.style.textDecoration='underline'" 
+									   onmouseout="this.style.textDecoration='none'">
+										🔗 View Official Documentation →
+									</a>
+								</div>
+							</div>
+							<div class="documentation-section">
+								${configContent}
+							</div>
+						</div>`;
+
+					if (!configActiveTabSet) {
+						configActiveTabSet = true;
+					}
 				} catch (error) {
 					console.error(`Error reading config file ${configPath}:`, error);
+					
+					configTabContent += `
+						<div id="${configFile.tabId}" class="tab-content${contentActiveClass}">
+							<div class="section-title" style="margin-bottom: 15px;">
+								${configFile.icon} ${configFile.title}
+								<span class="comment" style="font-size: 0.9em; font-weight: normal; margin-left: 10px;">
+									(${configFile.filename})
+								</span>
+							</div>
+							<div class="config-official-info" style="background-color: var(--vscode-textBlockQuote-background); border-left: 3px solid var(--vscode-textLink-foreground); padding: 12px; margin-bottom: 20px; border-radius: 4px;">
+								<div style="margin-bottom: 8px; font-weight: bold; color: var(--vscode-textLink-foreground);">
+									📖 Official WinCC OA Documentation
+								</div>
+								<div style="margin-bottom: 10px; line-height: 1.4;">
+									${configFile.description}
+								</div>
+								<div style="font-size: 0.9em;">
+									<a href="${configFile.officialLink}" style="color: var(--vscode-textLink-foreground); text-decoration: none;" 
+									   onmouseover="this.style.textDecoration='underline'" 
+									   onmouseout="this.style.textDecoration='none'">
+										🔗 View Official Documentation →
+									</a>
+								</div>
+							</div>
+							<div class="documentation-section">
+								<div class="config-section">
+									<div class="comment" style="text-align: center; padding: 20px; color: var(--vscode-errorForeground);">
+										⚠️ Error reading configuration file: ${error}
+									</div>
+								</div>
+							</div>
+						</div>`;
+
+					if (!configActiveTabSet) {
+						configActiveTabSet = true;
+					}
 				}
 			}
 		}
 
-		return configSections;
+		configTabNavigation += '</div>';
+
+		if (!hasAnyConfigFiles) {
+			return ''; // No configuration files found
+		}
+
+		return `
+		<div class="section">
+			<div class="section-title">⚙️ Project Configuration</div>
+			<div class="tab-container">
+				${configTabNavigation}
+				${configTabContent}
+			</div>
+		</div>
+		<script>
+			document.addEventListener('DOMContentLoaded', function() {
+				// Add click event listeners to config tab buttons
+				const configButtons = document.querySelectorAll('[data-tab^="config-"]');
+				configButtons.forEach(button => {
+					button.addEventListener('click', function() {
+						const tabId = this.getAttribute('data-tab');
+						showConfigTab(tabId);
+					});
+				});
+			});
+
+			function showConfigTab(tabId) {
+				// Hide all config tab contents
+				const configContents = document.querySelectorAll('[id^="config-"]');
+				configContents.forEach(content => content.classList.remove('active'));
+				
+				// Remove active class from all config buttons
+				const configButtons = document.querySelectorAll('[data-tab^="config-"]');
+				configButtons.forEach(button => button.classList.remove('active'));
+				
+				// Show selected config tab content
+				const selectedContent = document.getElementById(tabId);
+				if (selectedContent) {
+					selectedContent.classList.add('active');
+				}
+				
+				// Activate selected config button
+				const selectedButton = document.querySelector(\`[data-tab="\${tabId}"]\`);
+				if (selectedButton) {
+					selectedButton.classList.add('active');
+				}
+			}
+		</script>`;
 	}
 
 	private _parseConfigFile(content: string): Record<string, Record<string, string>> {
