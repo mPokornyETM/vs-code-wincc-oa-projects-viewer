@@ -19,6 +19,9 @@ permissions:
   contents: write
   pull-requests: write
   packages: write
+  actions: write
+  checks: write
+  issues: write
 
 jobs:
   test:
@@ -68,7 +71,7 @@ jobs:
       uses: actions/checkout@v5
       with:
         fetch-depth: 0
-        token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}
         
     - name: Use Node.js 20.x
       uses: actions/setup-node@v6
@@ -83,6 +86,8 @@ jobs:
       run: |
         git config --global user.name 'github-actions[bot]'
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+        # Configure authentication for tag pushing
+        git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
         
     - name: Install standard-version
       run: npm install -g standard-version
@@ -267,12 +272,12 @@ jobs:
         NEW_TAG="v${{ steps.release.outputs.version }}"
         echo "📌 Pushing tag: $NEW_TAG"
         
-        if git push origin "$NEW_TAG"; then
-          echo "✅ Successfully pushed tag: $NEW_TAG"
-        else
-          echo "⚠️ Failed to push tag, but continuing with release creation"
+        # Use GITHUB_TOKEN with proper authentication
+        git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "$NEW_TAG" || {
+          echo "⚠️ Failed to push tag with git, trying with gh CLI"
+          gh auth status || echo "GitHub CLI not authenticated"
           echo "The tag will be created as part of the GitHub release"
-        fi
+        }
         
     - name: Package Extension
       run: |
