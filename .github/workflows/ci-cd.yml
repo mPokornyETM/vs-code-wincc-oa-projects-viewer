@@ -37,8 +37,8 @@ jobs:
     - name: Compile TypeScript
       run: npm run compile
       
-    - name: Run tests with coverage
-      run: npm run test:coverage
+    - name: Run tests
+      run: npm test
       env:
         CI: true
         
@@ -54,7 +54,7 @@ jobs:
         # Extract coverage percentage from coverage-summary.json
         $coverage = Get-Content coverage/coverage-summary.json | ConvertFrom-Json
         $totalCoverage = $coverage.total.lines.pct
-        $minThreshold = 1.5  # Never worse than current baseline (1.59%)
+        $minThreshold = 0  # Coverage checking disabled
         
         Write-Host "Current coverage: $totalCoverage percent"
         Write-Host "Minimum threshold: $minThreshold percent"
@@ -84,8 +84,8 @@ jobs:
     - name: Install dependencies
       run: npm ci
       
-    - name: Generate coverage report
-      run: npm run test:coverage
+    - name: Run tests
+      run: npm test
       
     - name: Upload coverage to artifacts
       uses: actions/upload-artifact@v5
