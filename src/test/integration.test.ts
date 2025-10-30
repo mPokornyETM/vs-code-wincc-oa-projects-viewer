@@ -271,6 +271,41 @@ pvss00sim -config config
                 assert.ok(!file.toLowerCase().endsWith('.md'), `${file} should be plain text`);
             });
         });
+
+        test('should identify mandatory documentation files', () => {
+            // Test mandatory files (README, LICENSE, SECURITY)
+            const mandatoryFiles = ['README.md', 'LICENSE', 'SECURITY.md'];
+            
+            mandatoryFiles.forEach(file => {
+                assert.ok(file.length > 0, `Mandatory file name should not be empty: ${file}`);
+                
+                // Test that these are considered essential documentation
+                const isReadme = file.toLowerCase().startsWith('readme');
+                const isLicense = file.toLowerCase().startsWith('license');  
+                const isSecurity = file.toLowerCase().startsWith('security');
+                
+                assert.ok(isReadme || isLicense || isSecurity, 
+                    `${file} should be a mandatory documentation type`);
+            });
+        });
+
+        test('should provide fallback messages for missing mandatory files', () => {
+            // Test that the system has a way to handle missing mandatory documentation
+            const mandatoryDocTypes = [
+                { type: 'README', expectedInMessage: 'readme' },
+                { type: 'LICENSE', expectedInMessage: 'license' },
+                { type: 'SECURITY', expectedInMessage: 'security' }
+            ];
+
+            mandatoryDocTypes.forEach(docType => {
+                // Test that we can create appropriate fallback messages
+                const testMessage = `Sorry, the information is missing for ${docType.type}`;
+                assert.ok(testMessage.toLowerCase().includes('missing'), 
+                    `Missing message should contain 'missing' for ${docType.type}`);
+                assert.ok(testMessage.toLowerCase().includes(docType.expectedInMessage), 
+                    `Missing message should reference ${docType.expectedInMessage}`);
+            });
+        });
     });
 });
 

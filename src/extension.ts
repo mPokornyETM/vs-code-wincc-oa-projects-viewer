@@ -1224,48 +1224,145 @@ class ProjectViewPanel {
 			{
 				filenames: ['README.md', 'readme.md', 'Readme.md'],
 				title: '📖 Project README',
-				icon: '📖'
+				icon: '📖',
+				mandatory: true,
+				tabId: 'readme'
 			},
 			{
 				filenames: ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'license', 'license.md'],
 				title: '📄 License',
-				icon: '📄'
+				icon: '📄',
+				mandatory: true,
+				tabId: 'license'
 			},
 			{
 				filenames: ['SECURITY.md', 'security.md', 'Security.md'],
 				title: '🔒 Security Policy',
-				icon: '🔒'
+				icon: '🔒',
+				mandatory: true,
+				tabId: 'security'
 			},
 			{
 				filenames: ['CONTRIBUTING.md', 'contributing.md', 'Contributing.md'],
 				title: '🤝 Contributing Guidelines',
-				icon: '🤝'
+				icon: '🤝',
+				mandatory: false,
+				tabId: 'contributing'
 			},
 			{
 				filenames: ['CHANGELOG.md', 'changelog.md', 'Changelog.md', 'HISTORY.md', 'RELEASES.md'],
 				title: '📝 Changelog',
-				icon: '📝'
+				icon: '📝',
+				mandatory: false,
+				tabId: 'changelog'
 			},
 			{
 				filenames: ['RELEASENOTES.md', 'ReleaseNotes.md', 'releasenotes.md', 'RELEASE-NOTES.md', 'release-notes.md'],
 				title: '📋 Release Notes',
-				icon: '📋'
+				icon: '📋',
+				mandatory: false,
+				tabId: 'releasenotes'
 			}
 		];
 
-		let documentationSections = '';
+		// Build tab navigation and content
+		let tabNavigation = '<div class="tab-nav">';
+		let tabContent = '';
+		let activeTabSet = false;
 
 		for (const docType of documentationFiles) {
 			const section = await this._getDocumentFileSection(project, docType);
-			if (section) {
-				documentationSections += section;
+			const hasContent = section !== '';
+			
+			// Show tab even if content is missing for mandatory documents
+			if (hasContent || docType.mandatory) {
+				const activeClass = !activeTabSet ? ' active' : '';
+				const badge = docType.mandatory && !hasContent ? '<span class="tab-badge">Missing</span>' : '';
+				
+				tabNavigation += `
+					<button class="tab-button${activeClass}" data-tab="${docType.tabId}">
+						${docType.icon} ${docType.title.replace(/📖|📄|🔒|🤝|📝|📋/, '').trim()}${badge}
+					</button>`;
+
+				const contentActiveClass = !activeTabSet ? ' active' : '';
+				const contentHtml = hasContent ? section : this._getMissingDocumentationMessage(docType.title);
+				
+				tabContent += `
+					<div id="${docType.tabId}" class="tab-content${contentActiveClass}">
+						${contentHtml}
+					</div>`;
+
+				if (!activeTabSet) {
+					activeTabSet = true;
+				}
 			}
 		}
 
-		return documentationSections;
+		tabNavigation += '</div>';
+
+		if (tabNavigation === '<div class="tab-nav"></div>') {
+			return ''; // No documentation at all
+		}
+
+		return `
+		<div class="section">
+			<div class="section-title">📚 Project Documentation</div>
+			<div class="tab-container">
+				${tabNavigation}
+				${tabContent}
+			</div>
+		</div>
+		<script>
+			document.addEventListener('DOMContentLoaded', function() {
+				// Add click event listeners to tab buttons
+				const buttons = document.querySelectorAll('.tab-button');
+				buttons.forEach(button => {
+					button.addEventListener('click', function() {
+						const tabId = this.getAttribute('data-tab');
+						showTab(tabId);
+					});
+				});
+			});
+
+			function showTab(tabId) {
+				// Hide all tab contents
+				const contents = document.querySelectorAll('.tab-content');
+				contents.forEach(content => content.classList.remove('active'));
+				
+				// Remove active class from all buttons
+				const buttons = document.querySelectorAll('.tab-button');
+				buttons.forEach(button => button.classList.remove('active'));
+				
+				// Show selected tab content
+				const selectedContent = document.getElementById(tabId);
+				if (selectedContent) {
+					selectedContent.classList.add('active');
+				}
+				
+				// Activate selected button
+				const selectedButton = document.querySelector(\`[data-tab="\${tabId}"]\`);
+				if (selectedButton) {
+					selectedButton.classList.add('active');
+				}
+			}
+		</script>`;
 	}
 
-	private async _getDocumentFileSection(project: WinCCOAProject, docType: { filenames: string[], title: string, icon: string }): Promise<string> {
+	private _getMissingDocumentationMessage(title: string): string {
+		return `
+		<div class="documentation-section">
+			<div style="text-align: center; padding: 40px 20px; color: var(--vscode-descriptionForeground);">
+				<div style="font-size: 48px; margin-bottom: 20px; opacity: 0.5;">📝</div>
+				<h3 style="color: var(--vscode-descriptionForeground); margin-bottom: 10px;">Sorry, the information is missing</h3>
+				<p style="margin: 0; opacity: 0.8;">The ${title.replace(/📖|📄|🔒|🤝|📝|📋/, '').trim()} file could not be found in this project.</p>
+				<p style="margin: 10px 0 0 0; font-size: 0.9em; opacity: 0.6;">
+					This document is required for proper project documentation.
+				</p>
+			</div>
+		</div>`;
+	}
+
+	private async _getDocumentFileSection(project: WinCCOAProject, docType: { filenames: string[], title: string, icon: string, mandatory?: boolean, tabId?: string }): Promise<string> {
 		for (const filename of docType.filenames) {
 			const filePath = path.join(project.config.installationDir, filename);
 			
