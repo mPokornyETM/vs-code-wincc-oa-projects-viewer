@@ -41,7 +41,7 @@ jobs:
       run: npm test
       env:
         CI: true
-        
+
   package:
     runs-on: ubuntu-latest
     needs: test

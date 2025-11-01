@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { JSDOM } from 'jsdom';
+import * as DOMPurify from 'dompurify';
 
 /**
  * Gets the platform-specific path to the pvssInst.conf file
@@ -880,7 +882,7 @@ class ProjectViewPanel {
 		// If we already have a panel, show it.
 		if (ProjectViewPanel.currentPanel) {
 			ProjectViewPanel.currentPanel._panel.reveal(column);
-			ProjectViewPanel.currentPanel._update(project);
+			ProjectViewPanel.currentPanel._update(project).catch(console.error);
 			return;
 		}
 
@@ -907,7 +909,7 @@ class ProjectViewPanel {
 		this._extensionUri = extensionUri;
 
 		// Set the webview's initial html content
-		this._update(project);
+		this._update(project).catch(console.error);
 
 		// Listen for when the panel is disposed
 		this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
@@ -927,15 +929,15 @@ class ProjectViewPanel {
 		}
 	}
 
-	private _update(project: WinCCOAProject) {
+	private async _update(project: WinCCOAProject) {
 		this.project = project;
 		this._panel.title = `WinCC OA Project: ${project.config.name}`;
-		this._panel.webview.html = this._getHtmlForWebview(project);
+		this._panel.webview.html = await this._getHtmlForWebview(project);
 	}
 
-	private _getHtmlForWebview(project: WinCCOAProject): string {
+	private async _getHtmlForWebview(project: WinCCOAProject): Promise<string> {
 		const configDetails = this._getConfigDetails(project);
-		const projectDetails = this._getProjectDetails(project);
+		const projectDetails = await this._getProjectDetails(project);
 
 		return `<!DOCTYPE html>
 <html lang="en">
@@ -1015,6 +1017,135 @@ class ProjectViewPanel {
             font-style: italic;
             opacity: 0.8;
         }
+        .documentation-section {
+            background-color: var(--vscode-editor-inactiveSelectionBackground);
+            padding: 15px;
+            border-radius: 4px;
+            line-height: 1.6;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .documentation-section h1, .documentation-section h2, .documentation-section h3 {
+            color: var(--vscode-textLink-foreground);
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        .documentation-section h1 {
+            font-size: 1.8em;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            padding-bottom: 5px;
+        }
+        .documentation-section h2 {
+            font-size: 1.5em;
+        }
+        .documentation-section h3 {
+            font-size: 1.3em;
+        }
+        .documentation-section code {
+            background-color: var(--vscode-textCodeBlock-background);
+            padding: 2px 4px;
+            border-radius: 2px;
+            font-family: var(--vscode-editor-font-family);
+        }
+        .documentation-section pre {
+            background-color: var(--vscode-textCodeBlock-background);
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            border-left: 3px solid var(--vscode-textLink-foreground);
+        }
+        .documentation-section pre code {
+            background: none;
+            padding: 0;
+        }
+        .documentation-section a {
+            color: var(--vscode-textLink-foreground);
+            text-decoration: none;
+        }
+        .documentation-section a:hover {
+            text-decoration: underline;
+        }
+        .documentation-section ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .documentation-section li {
+            margin: 5px 0;
+        }
+        .plain-text-content {
+            font-family: var(--vscode-editor-font-family);
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        /* Tab Navigation */
+        .tab-container {
+            margin-top: 20px;
+        }
+        .tab-nav {
+            display: flex;
+            flex-wrap: wrap;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            margin-bottom: 0;
+            gap: 2px;
+        }
+        .tab-button {
+            background: transparent;
+            border: none;
+            color: var(--vscode-foreground);
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            opacity: 0.7;
+            white-space: nowrap;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab-button:hover {
+            opacity: 1;
+            background-color: var(--vscode-toolbar-hoverBackground);
+        }
+        .tab-button.active {
+            opacity: 1;
+            border-bottom-color: var(--vscode-textLink-foreground);
+            color: var(--vscode-textLink-foreground);
+            background-color: var(--vscode-editor-background);
+        }
+        .tab-content {
+            display: none;
+            padding: 20px 0;
+            animation: fadeIn 0.2s ease-in;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .tab-badge {
+            background-color: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+            border-radius: 10px;
+            padding: 2px 6px;
+            font-size: 11px;
+            margin-left: 6px;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        /* Config-specific styling */
+        .config-section {
+            background-color: var(--vscode-editor-inactiveSelectionBackground);
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            border-left: 3px solid var(--vscode-textLink-foreground);
+        }
+        .config-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: var(--vscode-textLink-foreground);
+            font-size: 1.1em;
+        }
     </style>
 </head>
 <body>
@@ -1052,7 +1183,10 @@ class ProjectViewPanel {
 </html>`;
 	}
 
-	private _getProjectDetails(project: WinCCOAProject): string {
+	private async _getProjectDetails(project: WinCCOAProject): Promise<string> {
+		// Read documentation files if they exist
+		const documentationSection = await this._getDocumentationSection(project);
+		
 		// Read additional project details from pvssInst.conf
 		const configPath = getPvssInstConfPath();
 		let projectSection = '';
@@ -1106,7 +1240,248 @@ class ProjectViewPanel {
 			console.error('Error reading project details:', error);
 		}
 
-		return projectSection;
+		return documentationSection + projectSection;
+	}
+
+	private async _getDocumentationSection(project: WinCCOAProject): Promise<string> {
+		const documentationFiles = [
+			{
+				filenames: ['README.md', 'readme.md', 'Readme.md'],
+				title: '📖 Project README',
+				icon: '📖',
+				mandatory: true,
+				tabId: 'readme'
+			},
+			{
+				filenames: ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'license', 'license.md'],
+				title: '📄 License',
+				icon: '📄',
+				mandatory: true,
+				tabId: 'license'
+			},
+			{
+				filenames: ['SECURITY.md', 'security.md', 'Security.md'],
+				title: '🔒 Security Policy',
+				icon: '🔒',
+				mandatory: true,
+				tabId: 'security'
+			},
+			{
+				filenames: ['CONTRIBUTING.md', 'contributing.md', 'Contributing.md'],
+				title: '🤝 Contributing Guidelines',
+				icon: '🤝',
+				mandatory: false,
+				tabId: 'contributing'
+			},
+			{
+				filenames: ['CHANGELOG.md', 'changelog.md', 'Changelog.md', 'HISTORY.md', 'RELEASES.md'],
+				title: '📝 Changelog',
+				icon: '📝',
+				mandatory: false,
+				tabId: 'changelog'
+			},
+			{
+				filenames: ['RELEASENOTES.md', 'ReleaseNotes.md', 'releasenotes.md', 'RELEASE-NOTES.md', 'release-notes.md'],
+				title: '📋 Release Notes',
+				icon: '📋',
+				mandatory: false,
+				tabId: 'releasenotes'
+			}
+		];
+
+		// Build tab navigation and content
+		let tabNavigation = '<div class="tab-nav">';
+		let tabContent = '';
+		let activeTabSet = false;
+
+		for (const docType of documentationFiles) {
+			const section = await this._getDocumentFileSection(project, docType);
+			const hasContent = section !== '';
+			
+			// Show tab even if content is missing for mandatory documents
+			if (hasContent || docType.mandatory) {
+				const activeClass = !activeTabSet ? ' active' : '';
+				const badge = docType.mandatory && !hasContent ? '<span class="tab-badge">Missing</span>' : '';
+				
+				tabNavigation += `
+					<button class="tab-button${activeClass}" data-tab="${docType.tabId}">
+						${docType.icon} ${docType.title.replace(/📖|📄|🔒|🤝|📝|📋/, '').trim()}${badge}
+					</button>`;
+
+				const contentActiveClass = !activeTabSet ? ' active' : '';
+				const contentHtml = hasContent ? section : this._getMissingDocumentationMessage(docType.title);
+				
+				tabContent += `
+					<div id="${docType.tabId}" class="tab-content${contentActiveClass}">
+						${contentHtml}
+					</div>`;
+
+				if (!activeTabSet) {
+					activeTabSet = true;
+				}
+			}
+		}
+
+		tabNavigation += '</div>';
+
+		if (tabNavigation === '<div class="tab-nav"></div>') {
+			return ''; // No documentation at all
+		}
+
+		return `
+		<div class="section">
+			<div class="section-title">📚 Project Documentation</div>
+			<div class="tab-container">
+				${tabNavigation}
+				${tabContent}
+			</div>
+		</div>
+		<script>
+			document.addEventListener('DOMContentLoaded', function() {
+				// Add click event listeners to tab buttons
+				const buttons = document.querySelectorAll('.tab-button');
+				buttons.forEach(button => {
+					button.addEventListener('click', function() {
+						const tabId = this.getAttribute('data-tab');
+						showTab(tabId);
+					});
+				});
+			});
+
+			function showTab(tabId) {
+				// Hide all tab contents
+				const contents = document.querySelectorAll('.tab-content');
+				contents.forEach(content => content.classList.remove('active'));
+				
+				// Remove active class from all buttons
+				const buttons = document.querySelectorAll('.tab-button');
+				buttons.forEach(button => button.classList.remove('active'));
+				
+				// Show selected tab content
+				const selectedContent = document.getElementById(tabId);
+				if (selectedContent) {
+					selectedContent.classList.add('active');
+				}
+				
+				// Activate selected button
+				const selectedButton = document.querySelector(\`[data-tab="\${tabId}"]\`);
+				if (selectedButton) {
+					selectedButton.classList.add('active');
+				}
+			}
+		</script>`;
+	}
+
+	private _getMissingDocumentationMessage(title: string): string {
+		return `
+		<div class="documentation-section">
+			<div style="text-align: center; padding: 40px 20px; color: var(--vscode-descriptionForeground);">
+				<div style="font-size: 48px; margin-bottom: 20px; opacity: 0.5;">📝</div>
+				<h3 style="color: var(--vscode-descriptionForeground); margin-bottom: 10px;">Sorry, the information is missing</h3>
+				<p style="margin: 0; opacity: 0.8;">The ${title.replace(/📖|📄|🔒|🤝|📝|📋/, '').trim()} file could not be found in this project.</p>
+				<p style="margin: 10px 0 0 0; font-size: 0.9em; opacity: 0.6;">
+					This document is required for proper project documentation.
+				</p>
+			</div>
+		</div>`;
+	}
+
+	private async _getDocumentFileSection(project: WinCCOAProject, docType: { filenames: string[], title: string, icon: string, mandatory?: boolean, tabId?: string }): Promise<string> {
+		for (const filename of docType.filenames) {
+			const filePath = path.join(project.config.installationDir, filename);
+			
+			if (fs.existsSync(filePath)) {
+				try {
+					const content = fs.readFileSync(filePath, 'utf-8');
+					const htmlContent = await this._convertDocumentToHtml(content, filename);
+					
+					return `
+					<div class="section">
+						<div class="section-title">${docType.title}</div>
+						<div class="documentation-section">
+							${htmlContent}
+						</div>
+					</div>`;
+				} catch (error) {
+					console.error(`Error reading documentation file ${filePath}:`, error);
+				}
+			}
+		}
+		
+		return ''; // No file found for this document type
+	}
+
+	private async _convertDocumentToHtml(content: string, filename: string): Promise<string> {
+		const isMarkdown = filename.toLowerCase().endsWith('.md');
+		
+		if (isMarkdown) {
+			return await this._convertMarkdownToHtml(content);
+		} else {
+			// For plain text files (LICENSE, etc.), preserve formatting
+			return this._convertPlainTextToHtml(content);
+		}
+	}
+
+	private async _convertMarkdownToHtml(markdown: string): Promise<string> {
+		try {
+			// Dynamically import marked since it's an ES module
+			const { marked } = await import('marked');
+			
+			// Configure marked options
+			marked.setOptions({
+				gfm: true, // GitHub Flavored Markdown
+				breaks: true, // Convert line breaks to <br>
+			});
+
+			// Convert markdown to HTML
+			const rawHtml = await marked.parse(markdown);
+			
+			// Sanitize HTML to prevent XSS attacks
+			const window = new JSDOM('').window;
+			const purify = DOMPurify.default(window as any);
+			
+			// Configure DOMPurify to allow safe HTML elements
+			const cleanHtml = purify.sanitize(rawHtml, {
+				ALLOWED_TAGS: [
+					'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+					'p', 'br', 'strong', 'em', 'u', 's', 'code', 'pre',
+					'ul', 'ol', 'li', 'blockquote',
+					'a', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
+					'hr', 'div', 'span'
+				],
+				ALLOWED_ATTR: [
+					'href', 'title', 'alt', 'src', 'width', 'height',
+					'class', 'id', 'style'
+				],
+				ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|ftp):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i
+			});
+
+			return cleanHtml;
+		} catch (error) {
+			console.error('Error converting markdown to HTML:', error);
+			// Fall back to simple text conversion
+			return this._convertPlainTextToHtml(markdown);
+		}
+	}
+
+	private _convertPlainTextToHtml(text: string): string {
+		// For plain text files like LICENSE, preserve formatting and make it readable
+		let html = text;
+		
+		// Escape HTML characters
+		html = html.replace(/&/g, '&amp;')
+					.replace(/</g, '&lt;')
+					.replace(/>/g, '&gt;')
+					.replace(/"/g, '&quot;')
+					.replace(/'/g, '&#39;');
+		
+		// Preserve line breaks and spacing
+		html = html.replace(/\n/g, '<br>');
+		
+		// Handle multiple spaces
+		html = html.replace(/ {2,}/g, (match) => '&nbsp;'.repeat(match.length));
+		
+		return `<div class="plain-text-content">${html}</div>`;
 	}
 
 	private _getConfigDetails(project: WinCCOAProject): string {
@@ -1114,21 +1489,75 @@ class ProjectViewPanel {
 			return '';
 		}
 
-		const configFiles = ['config', 'config.level', 'config.http', 'config.redu'];
-		let configSections = '';
+		const configFiles = [
+			{
+				filename: 'config',
+				title: 'Project Config File',
+				description: 'The settings for WinCC OA are defined in different sections in the config file.',
+				officialLink: 'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/Notes/project_config_file.html',
+				icon: '⚙️',
+				tabId: 'config-main'
+			},
+			{
+				filename: 'config.level',
+				title: 'config.level File',
+				description: 'Specifies which CTRL library each manager should load. Contains the default settings for the different WinCC OA managers.',
+				officialLink: 'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/Control_Grundlagen/Control_Grundlagen-17.html',
+				icon: '�',
+				tabId: 'config-level'
+			},
+			{
+				filename: 'config.http',
+				title: 'config.http',
+				description: 'Specifies the basic settings for the HTTP Server.',
+				officialLink: 'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/HTTP_Server/http1-10.html',
+				icon: '🌐',
+				tabId: 'config-http'
+			},
+			{
+				filename: 'config.redu',
+				title: 'config.redu',
+				description: 'Contains the redundancy relevant settings for forward and copy DPs.',
+				officialLink: 'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/Redundancy/Redundancy-11.html',
+				icon: '🔄',
+				tabId: 'config-redu'
+			},
+			{
+				filename: 'config.webclient',
+				title: 'config.webclient',
+				description: 'Specifies the web client specific settings.',
+				officialLink: 'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/Notes/config_webclient.html',
+				icon: '�',
+				tabId: 'config-webclient'
+			}
+		];
+
+		// Build tab navigation and content for config files
+		let configTabNavigation = '<div class="tab-nav">';
+		let configTabContent = '';
+		let configActiveTabSet = false;
+		let hasAnyConfigFiles = false;
 
 		for (const configFile of configFiles) {
-			const configPath = path.join(project.config.installationDir, 'config', configFile);
+			const configPath = path.join(project.config.installationDir, 'config', configFile.filename);
 			
 			if (fs.existsSync(configPath)) {
+				hasAnyConfigFiles = true;
+				const activeClass = !configActiveTabSet ? ' active' : '';
+				
+				configTabNavigation += `
+					<button class="tab-button${activeClass}" data-tab="${configFile.tabId}" title="${configFile.description}">
+						${configFile.icon} ${configFile.title}
+					</button>`;
+
+				const contentActiveClass = !configActiveTabSet ? ' active' : '';
+				
 				try {
 					const content = fs.readFileSync(configPath, 'utf-8');
 					const sections = this._parseProjectConfigFile(content);
 					
-					configSections += `
-					<div class="section">
-						<div class="section-title">Configuration File: ${configFile}</div>
-						${Object.entries(sections).map(([sectionName, entries]) => `
+					const configContent = Object.entries(sections).length > 0 ? 
+						Object.entries(sections).map(([sectionName, entries]) => `
 						<div class="config-section">
 							<div class="config-title">[${sectionName}]</div>
 							${Object.entries(entries as Record<string, string>).map(([key, value]) => `
@@ -1138,15 +1567,134 @@ class ProjectViewPanel {
 							</div>
 							`).join('')}
 						</div>
-						`).join('')}
-					</div>`;
+						`).join('') : 
+						`<div class="config-section">
+							<div class="comment" style="text-align: center; padding: 20px; opacity: 0.7;">
+								Configuration file exists but contains no readable sections.
+							</div>
+						</div>`;
+
+					configTabContent += `
+						<div id="${configFile.tabId}" class="tab-content${contentActiveClass}">
+							<div class="section-title" style="margin-bottom: 15px;">
+								${configFile.icon} ${configFile.title}
+								<span class="comment" style="font-size: 0.9em; font-weight: normal; margin-left: 10px;">
+									(${configFile.filename})
+								</span>
+							</div>
+							<div class="config-official-info" style="background-color: var(--vscode-textBlockQuote-background); border-left: 3px solid var(--vscode-textLink-foreground); padding: 12px; margin-bottom: 20px; border-radius: 4px;">
+								<div style="margin-bottom: 8px; font-weight: bold; color: var(--vscode-textLink-foreground);">
+									📖 Official WinCC OA Documentation
+								</div>
+								<div style="margin-bottom: 10px; line-height: 1.4;">
+									${configFile.description}
+								</div>
+								<div style="font-size: 0.9em;">
+									<a href="${configFile.officialLink}" style="color: var(--vscode-textLink-foreground); text-decoration: none;" 
+									   onmouseover="this.style.textDecoration='underline'" 
+									   onmouseout="this.style.textDecoration='none'">
+										🔗 View Official Documentation →
+									</a>
+								</div>
+							</div>
+							<div class="documentation-section">
+								${configContent}
+							</div>
+						</div>`;
+
+					if (!configActiveTabSet) {
+						configActiveTabSet = true;
+					}
 				} catch (error) {
 					console.error(`Error reading config file ${configPath}:`, error);
+					
+					configTabContent += `
+						<div id="${configFile.tabId}" class="tab-content${contentActiveClass}">
+							<div class="section-title" style="margin-bottom: 15px;">
+								${configFile.icon} ${configFile.title}
+								<span class="comment" style="font-size: 0.9em; font-weight: normal; margin-left: 10px;">
+									(${configFile.filename})
+								</span>
+							</div>
+							<div class="config-official-info" style="background-color: var(--vscode-textBlockQuote-background); border-left: 3px solid var(--vscode-textLink-foreground); padding: 12px; margin-bottom: 20px; border-radius: 4px;">
+								<div style="margin-bottom: 8px; font-weight: bold; color: var(--vscode-textLink-foreground);">
+									📖 Official WinCC OA Documentation
+								</div>
+								<div style="margin-bottom: 10px; line-height: 1.4;">
+									${configFile.description}
+								</div>
+								<div style="font-size: 0.9em;">
+									<a href="${configFile.officialLink}" style="color: var(--vscode-textLink-foreground); text-decoration: none;" 
+									   onmouseover="this.style.textDecoration='underline'" 
+									   onmouseout="this.style.textDecoration='none'">
+										🔗 View Official Documentation →
+									</a>
+								</div>
+							</div>
+							<div class="documentation-section">
+								<div class="config-section">
+									<div class="comment" style="text-align: center; padding: 20px; color: var(--vscode-errorForeground);">
+										⚠️ Error reading configuration file: ${error}
+									</div>
+								</div>
+							</div>
+						</div>`;
+
+					if (!configActiveTabSet) {
+						configActiveTabSet = true;
+					}
 				}
 			}
 		}
 
-		return configSections;
+		configTabNavigation += '</div>';
+
+		if (!hasAnyConfigFiles) {
+			return ''; // No configuration files found
+		}
+
+		return `
+		<div class="section">
+			<div class="section-title">⚙️ Project Configuration</div>
+			<div class="tab-container">
+				${configTabNavigation}
+				${configTabContent}
+			</div>
+		</div>
+		<script>
+			document.addEventListener('DOMContentLoaded', function() {
+				// Add click event listeners to config tab buttons
+				const configButtons = document.querySelectorAll('[data-tab^="config-"]');
+				configButtons.forEach(button => {
+					button.addEventListener('click', function() {
+						const tabId = this.getAttribute('data-tab');
+						showConfigTab(tabId);
+					});
+				});
+			});
+
+			function showConfigTab(tabId) {
+				// Hide all config tab contents
+				const configContents = document.querySelectorAll('[id^="config-"]');
+				configContents.forEach(content => content.classList.remove('active'));
+				
+				// Remove active class from all config buttons
+				const configButtons = document.querySelectorAll('[data-tab^="config-"]');
+				configButtons.forEach(button => button.classList.remove('active'));
+				
+				// Show selected config tab content
+				const selectedContent = document.getElementById(tabId);
+				if (selectedContent) {
+					selectedContent.classList.add('active');
+				}
+				
+				// Activate selected config button
+				const selectedButton = document.querySelector(\`[data-tab="\${tabId}"]\`);
+				if (selectedButton) {
+					selectedButton.classList.add('active');
+				}
+			}
+		</script>`;
 	}
 
 	private _parseConfigFile(content: string): Record<string, Record<string, string>> {

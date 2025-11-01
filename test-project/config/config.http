@@ -1,0 +1,37 @@
+# WinCC OA HTTP Server Configuration
+# Web server and HTTP protocol settings
+
+[httpServer]
+# HTTP Server basic settings
+enabled = true
+port = 8080
+bindAddress = "0.0.0.0"
+documentRoot = "www/"
+
+[ssl]
+# HTTPS/SSL Configuration
+enabled = true
+port = 8443
+certificate = "certificates/server.crt"
+privateKey = "certificates/server.key"
+protocol = "TLSv1.2"
+
+[authentication]
+# Web authentication
+method = "basic"
+realm = "WinCC OA Web Interface"
+userDatabase = "config/webusers.conf"
+
+[performance]
+# HTTP Performance settings
+maxConnections = 100
+connectionTimeout = 30
+keepAliveTimeout = 15
+compressionEnabled = true
+
+[cors]
+# Cross-Origin Resource Sharing
+enabled = true
+allowedOrigins = "*"
+allowedMethods = "GET,POST,PUT,DELETE"
+allowedHeaders = "Content-Type,Authorization"

@@ -1,0 +1,38 @@
+# WinCC OA Main Configuration File
+# This file contains the primary project settings
+
+[general]
+proj_version = "3.20"
+proj_name = "TestProject"
+debug_level = 2
+startup_managers = ui1,data1
+
+[ui]
+lang = "en_US.utf8"
+theme = "modern"
+maximize = 1
+fontName = "Arial"
+fontSize = 10
+
+[data]
+dataConnectionTimeout = 30
+maxDataPoints = 10000
+archiveRetention = 30
+
+[database] 
+driver = "oracle"
+server = "localhost"
+port = 1521
+database = "winccoa"
+username = "pvss_user"
+
+[paths]
+log_dir = "log/"
+data_dir = "data/"
+panels_dir = "panels/"
+scripts_dir = "scripts/"
+
+[security]
+userAuthentication = true
+sessionTimeout = 3600
+passwordPolicy = "strict"
