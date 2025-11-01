@@ -2,7 +2,7 @@
   "name": "wincc-oa-projects",
   "displayName": "WinCC OA Projects",
   "description": "View and manage WinCC OA projects in VS Code",
-  "version": "0.0.2",
+  "version": "1.0.0",
   "publisher": "mPokornyETM",
   "repository": {
     "type": "git",
