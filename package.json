@@ -81,6 +81,46 @@
         "command": "winccOAProjects.showProjectView",
         "title": "WinCC OA: Show Project Details",
         "icon": "$(info)"
+      },
+      {
+        "command": "winccOAProjects.registerProject",
+        "title": "WinCC OA: Register Project",
+        "icon": "$(plus)"
+      },
+      {
+        "command": "winccOAProjects.scanForProjects",
+        "title": "WinCC OA: Scan for Unregistered Projects",
+        "icon": "$(search)"
+      },
+      {
+        "command": "winccOAProjects.registerAllUnregistered",
+        "title": "WinCC OA: Register All Unregistered Projects",
+        "icon": "$(add)"
+      },
+      {
+        "command": "winccOAProjects.unregisterProject",
+        "title": "WinCC OA: Unregister Project",
+        "icon": "$(remove)"
+      },
+      {
+        "command": "winccOAProjects.filterProjects",
+        "title": "WinCC OA: Filter Projects",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "winccOAProjects.clearFilter",
+        "title": "WinCC OA: Clear Filter",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "winccOAProjects.registerSubProject",
+        "title": "WinCC OA: Register Sub Project",
+        "icon": "$(add)"
+      },
+      {
+        "command": "winccOAProjects.registerRunnableProject",
+        "title": "WinCC OA: Register Runnable Project",
+        "icon": "$(play)"
       }
     ],
     "menus": {
@@ -88,7 +128,22 @@
         {
           "command": "winccOAProjects.refresh",
           "when": "view == winccOAProjects",
-          "group": "navigation"
+          "group": "navigation@1"
+        },
+        {
+          "command": "winccOAProjects.scanForProjects",
+          "when": "view == winccOAProjects",
+          "group": "navigation@2"
+        },
+        {
+          "command": "winccOAProjects.filterProjects",
+          "when": "view == winccOAProjects",
+          "group": "navigation@3"
+        },
+        {
+          "command": "winccOAProjects.clearFilter",
+          "when": "view == winccOAProjects",
+          "group": "navigation@4"
         }
       ],
       "view/item/context": [
@@ -106,6 +161,45 @@
           "command": "winccOAProjects.openInExplorer",
           "when": "view == winccOAProjects && viewItem == winccOAProject",
           "group": "navigation@1"
+        },
+        {
+          "command": "winccOAProjects.registerProject",
+          "when": "view == winccOAProjects && viewItem == winccOAProjectUnregistered",
+          "group": "inline@1"
+        },
+        {
+          "command": "winccOAProjects.unregisterProject",
+          "when": "view == winccOAProjects && viewItem == winccOAProject",
+          "group": "navigation@2"
+        },
+        {
+          "command": "winccOAProjects.registerAllUnregistered",
+          "when": "view == winccOAProjects && viewItem == projectCategory",
+          "group": "navigation@1"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "winccOAProjects.registerSubProject",
+          "when": "explorerResourceIsFolder",
+          "group": "2_workspace@1"
+        },
+        {
+          "command": "winccOAProjects.registerRunnableProject",
+          "when": "explorerResourceIsFolder",
+          "group": "2_workspace@2"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "winccOAProjects.registerSubProject",
+          "when": "resourceScheme == file && explorerResourceIsFolder",
+          "group": "2_workspace@1"
+        },
+        {
+          "command": "winccOAProjects.registerRunnableProject",
+          "when": "resourceScheme == file && explorerResourceIsFolder",
+          "group": "2_workspace@2"
         }
       ],
       "commandPalette": [
@@ -123,9 +217,50 @@
         },
         {
           "command": "winccOAProjects.openInExplorer"
+        },
+        {
+          "command": "winccOAProjects.registerProject"
+        },
+        {
+          "command": "winccOAProjects.scanForProjects"
+        },
+        {
+          "command": "winccOAProjects.registerAllUnregistered"
+        },
+        {
+          "command": "winccOAProjects.unregisterProject"
+        },
+        {
+          "command": "winccOAProjects.filterProjects"
+        },
+        {
+          "command": "winccOAProjects.clearFilter"
+        },
+        {
+          "command": "winccOAProjects.registerSubProject"
+        },
+        {
+          "command": "winccOAProjects.registerRunnableProject"
         }
       ]
     },
+    "keybindings": [
+      {
+        "command": "winccOAProjects.filterProjects",
+        "key": "ctrl+shift+f",
+        "when": "view == winccOAProjects && focusedView == winccOAProjects"
+      },
+      {
+        "command": "winccOAProjects.registerSubProject",
+        "key": "ctrl+shift+r",
+        "when": "explorerResourceIsFolder"
+      },
+      {
+        "command": "winccOAProjects.registerRunnableProject",
+        "key": "ctrl+shift+p",
+        "when": "explorerResourceIsFolder"
+      }
+    ],
     "extensionPoints": [
       {
         "name": "winccOAProjectActions",

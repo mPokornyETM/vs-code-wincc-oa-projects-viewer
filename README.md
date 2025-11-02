@@ -258,11 +258,28 @@ When you select a project from the tree view, a comprehensive project details pa
 
 ## 🎮 Commands
 
+### Core Project Management
+
 - **WinCC OA: Refresh Projects**: Manually refresh the project list
 - **WinCC OA: Open Project**: Open a project/extension folder in current VS Code window
 - **WinCC OA: Open Project in New Window**: Open a project/extension folder in new VS Code instance
 - **WinCC OA: Open in Explorer**: Open project/extension location in Windows Explorer
 - **WinCC OA: Show Project Details**: Select and display detailed project/extension information
+
+### Project Registration
+
+- **WinCC OA: Register Runnable Project**: Register a runnable WinCC OA project from directory
+  - **Context Menu**: Available when right-clicking on directories in the file explorer
+  - **Command Palette**: Use folder selection dialog to browse and select project directory
+  - **Validation**: Automatically validates project structure (requires `config/config` file)
+  - **Version Detection**: Extracts WinCC OA version from project configuration files
+  - **Duplicate Check**: Prevents registering already registered projects
+
+- **WinCC OA: Register Sub-Project**: Register a WinCC OA sub-project or extension from directory
+  - **Context Menu**: Available when right-clicking on directories in the file explorer
+  - **Command Palette**: Use folder selection dialog to browse and select project directory
+  - **Structure Validation**: Validates that directory does not contain runnable project structure
+  - **Error Prevention**: Suggests using "Register Runnable Project" if config/config file is detected
 
 ---
 
@@ -295,6 +312,7 @@ If you want to contribute to this project:
    - Clone your fork: `git clone https://github.com/YOUR_USERNAME/vs-code-wincc-oa-projects-viewer.git`
 
 2. **Create a Feature Branch from Main**
+
    ```bash
    # Switch to main branch
    git checkout main
@@ -307,6 +325,7 @@ If you want to contribute to this project:
    ```
 
 3. **Set Up Development Environment**
+
    ```bash
    # Install dependencies
    npm install
@@ -353,6 +372,7 @@ If you want to contribute to this project:
    - Ensure all tests pass and coverage requirements are met
 
 6. **Submit Your Contribution**
+
    ```bash
    # Commit your changes
    git add .
@@ -372,7 +392,7 @@ If you want to contribute to this project:
 
 - **[Detailed Workflow Guide](docs/CONTRIBUTOR_WORKFLOW.md)**: Complete step-by-step contribution process
 - **[Contributing Guidelines](CONTRIBUTING.md)**: Code standards and project guidelines
-- **Quick Setup Scripts**: 
+- **Quick Setup Scripts**:
   - **Linux/macOS**: `./scripts/create-feature-branch.sh feature/your-feature-name`
   - **Windows**: `.\scripts\create-feature-branch.ps1 feature/your-feature-name`
 
