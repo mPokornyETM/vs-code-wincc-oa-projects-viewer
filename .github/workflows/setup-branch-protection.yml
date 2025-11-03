@@ -1,0 +1,57 @@
+name: Setup Branch Protection
+
+on:
+  workflow_dispatch:  # Allow manual trigger
+  push:
+    branches: 
+      - main
+    paths:
+      - '.github/workflows/setup-branch-protection.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  setup-protection:
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'mPokornyETM'
+    
+    steps:
+    - name: Setup Branch Protection
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const owner = context.repo.owner;
+          const repo = context.repo.repo;
+          const branch = 'main';
+          
+          try {
+            await github.rest.repos.updateBranchProtection({
+              owner,
+              repo,
+              branch,
+              required_status_checks: {
+                strict: true,
+                contexts: [
+                  'test (18.x)',
+                  'test (20.x)', 
+                  'package'
+                ]
+              },
+              enforce_admins: false,
+              required_pull_request_reviews: {
+                required_approving_review_count: 1,
+                dismiss_stale_reviews: true,
+                require_code_owner_reviews: false
+              },
+              restrictions: null, // No restrictions on who can push
+              allow_force_pushes: false,
+              allow_deletions: false
+            });
+            
+            console.log('Branch protection rules updated successfully');
+          } catch (error) {
+            console.error('Failed to update branch protection:', error);
+            // Don't fail the job if branch protection fails
+          }
