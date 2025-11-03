@@ -50,6 +50,7 @@ Thx very much for supporting us.
 - **Project Registration**: Register new runnable projects and sub-projects directly from VS Code
 - **Bulk Operations**: Register all unregistered projects with a single command
 - **Project Unregistration**: Remove projects from WinCC OA configuration safely
+- **WinCC OA Version Information**: Get detailed version information using WCCILpmon -version command
 
 ### 🌍 **Cross-Platform Support**
 - **Windows**: Full support for standard Siemens installation paths
@@ -265,6 +266,48 @@ When you select a project from the tree view, a comprehensive project details pa
 
 ---
 
+## 🔧 WinCC OA Version Information
+
+Get comprehensive WinCC OA version information directly from VS Code using the `WCCILpmon.exe -version` command:
+
+![WinCC OA Version Detail View](docs/images/oa-view-version-detail.png)
+
+### 🎯 **Key Features**
+
+- **Detailed Build Information**: Version number, platform, architecture, build date, and commit hash
+- **Multiple Access Points**: Command palette, context menu, and integrated project view display
+- **Interactive Elements**: One-click copy to clipboard and output channel integration
+- **Error Handling**: User-friendly error messages with retry functionality
+- **Cross-Platform**: Support for Windows and Linux WinCC OA installations
+
+### 📋 **Information Displayed**
+
+- **Version**: Complete version number (e.g., 3.20.5, 3.21.0)
+- **Platform**: Operating system (Windows, Linux)
+- **Architecture**: System architecture (AMD64, x86_64, x86)
+- **Build Date**: When the WinCC OA version was compiled
+- **Commit Hash**: Git commit identifier for the build
+- **Executable Path**: Location of the WCCILpmon.exe file
+
+### 🚀 **How to Access**
+
+1. **Project View Integration**: Automatically displayed when viewing WinCC OA system installations
+2. **Context Menu**: Right-click on WinCC OA system projects → "WinCC OA: Show Detailed Version Information"
+3. **Command Palette**: `Ctrl+Shift+P` → "WinCC OA: Show Detailed Version Information"
+
+### 💡 **Interactive Features**
+
+- **📋 Copy to Clipboard**: One-click copy of all version information
+- **📄 Show in Output Channel**: Display detailed info in VS Code output panel  
+- **🔄 Retry**: Refresh version information if initial retrieval fails
+- **📖 Formatted Display**: Clean, readable markdown format with all details
+
+### ⚙️ **Technical Details**
+
+This feature executes the `WCCILpmon.exe -version` command for WinCC OA system installations and parses the output to extract structured information. It only works with proper WinCC OA system installations where the WCCILpmon executable is available.
+
+---
+
 ## 🔍 Smart Filtering
 
 The extension provides powerful real-time filtering to quickly find projects across all categories:
@@ -354,6 +397,7 @@ Remove projects from WinCC OA configuration safely:
 - **WinCC OA: Open Project in New Window**: Open a project/extension folder in new VS Code instance
 - **WinCC OA: Open in Explorer**: Open project/extension location in Windows Explorer
 - **WinCC OA: Show Project Details**: Select and display detailed project/extension information
+- **WinCC OA: Show Detailed Version Information**: Get comprehensive WinCC OA version information using WCCILpmon -version command
 
 ### Project Registration Commands
 
@@ -405,6 +449,7 @@ Remove projects from WinCC OA configuration safely:
 ## Requirements
 
 ### System Requirements
+
 - **Operating System**: Windows (primary), Linux/Unix (supported)
 - **WinCC OA Installation**: Properly configured WinCC OA projects
 - **File Access**: Access to `C:\ProgramData\Siemens\WinCC_OA\pvssInst.conf` (Windows) or `/etc/opt/pvss/pvssInst.conf` (Unix)
@@ -412,16 +457,20 @@ Remove projects from WinCC OA configuration safely:
 ### Supported WinCC OA Versions
 
 #### ✅ **Fully Supported Versions**
+
 - **WinCC OA 3.20** - Latest stable version with complete feature support and optimization
 - **WinCC OA 3.19** - Stable version with full compatibility and testing
 - **WinCC OA 3.18** - Legacy support with core functionality maintained
 - **WinCC OA 3.17** - Legacy support with essential features available
 
 #### 🚀 **Upcoming Versions**
+
 - **WinCC OA 3.21** - Coming soon! Extension prepared for future compatibility
 
 #### 🔍 **Intelligent Version Detection**
+
 The extension provides smart version detection through multiple methods:
+
 - **Configuration Files**: Automatic version extraction from `config/config` files
 - **Installation Paths**: Pattern matching in directory structures (`/3.20/`, `/3.19/`)
 - **Project Naming**: Version detection from project names (`Project_v3.20`, `Demo_3.19`)
@@ -429,6 +478,7 @@ The extension provides smart version detection through multiple methods:
 - **System Scanning**: Detection of installed WinCC OA system versions
 
 #### 📊 **Version-Aware Features**
+
 - **Smart Categorization**: Automatic grouping by detected WinCC OA version
 - **Multi-Version Support**: Handle multiple WinCC OA versions simultaneously
 - **Version-Specific Validation**: Compatibility checks based on detected versions
@@ -447,7 +497,7 @@ If you want to contribute to this project:
    - Click the "Fork" button on GitHub to create your own copy
    - Clone your fork: `git clone https://github.com/YOUR_USERNAME/vs-code-wincc-oa-projects-viewer.git`
 
-2. **Follow Git Flow Workflow** 
+2. **Follow Git Flow Workflow**
 
    **🌳 This project uses [Git Flow](docs/GITFLOW_WORKFLOW.md) branching model:**
 
@@ -515,6 +565,7 @@ If you want to contribute to this project:
 6. **Verify CI/CD Requirements**
    
    All PRs must pass mandatory automated checks:
+
    ```bash
    # ✅ Required local verification before PR
    npm run lint      # Linting must pass
@@ -587,6 +638,7 @@ Press `F5` to launch a new VS Code window with the extension loaded for testing.
 The extension includes comprehensive visual documentation with screenshots showing all major features:
 
 ### Available Screenshots
+
 - **Project Tree Filter** (`docs/images/proj-tree-filter.png`) - Smart filtering interface
 - **Unregistered Projects** (`docs/images/proj-tree-unregistered-projects-.png`) - Auto-discovery of unregistered projects  
 - **Register Runnable Project** (`docs/images/proj-tree-register-runnable-project.png`) - Project registration interface
