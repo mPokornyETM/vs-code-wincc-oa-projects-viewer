@@ -5,7 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.0](https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/compare/v1.1.1...v1.2.0) (2025-11-03)
+
+
+### 👷 CI/CD
+
+* **deps:** bump actions/checkout from 4 to 5 ([#21](https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/issues/21)) ([ad10f53](https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/commit/ad10f53613a08c79b40fc9f20b236435605f52f9))
+
+
+### 📚 Documentation
+
+* update contributing guidelines and add CI/CD requirements ([#25](https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/issues/25)) ([c42e562](https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/commit/c42e5622d2cfb2b37f740e0475ae8e3dd10cb3b1))
+
+
+### 🚀 Features
+
+* implement standard Git Flow workflow ([7aa69c3](https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/commit/7aa69c3dcdf99a716e7322d641e8f4591d46b00e))
 
 ## [1.1.0] - 2025-11-03
 
