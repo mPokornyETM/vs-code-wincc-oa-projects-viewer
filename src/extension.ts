@@ -484,6 +484,48 @@ export function activate(context: vscode.ExtensionContext) {
 		provider.refresh();
 	});
 
+	const getVersionInfoCommand = vscode.commands.registerCommand('winccOAProjects.getVersionInfo', async (project?: WinCCOAProject) => {
+		let targetProject: WinCCOAProject | undefined = project;
+
+		if (!targetProject) {
+			// Show selection dialog for WinCC OA system projects
+			const systemProjects = provider.getProjects().filter(p => p.isWinCCOASystem);
+			
+			if (systemProjects.length === 0) {
+				vscode.window.showErrorMessage('No WinCC OA system installations found.');
+				return;
+			}
+
+			const projectItems = systemProjects.map((p: WinCCOAProject) => ({
+				label: p.config.name,
+				description: p.config.installationDir,
+				detail: `WinCC OA v${p.version} System Installation`,
+				project: p
+			}));
+
+			const selected = await vscode.window.showQuickPick(projectItems, {
+				placeHolder: 'Select WinCC OA version to get detailed information...',
+				matchOnDescription: true,
+				matchOnDetail: true
+			});
+
+			if (!selected) {
+				return; // User cancelled
+			}
+
+			targetProject = selected.project;
+		}
+
+		if (targetProject) {
+			try {
+				const versionInfo = await getDetailedVersionInfo(targetProject);
+				await showVersionInfoDialog(versionInfo);
+			} catch (error) {
+				vscode.window.showErrorMessage(`Failed to get version information: ${error}`);
+			}
+		}
+	});
+
 	context.subscriptions.push(
 		treeView, 
 		watcher,
@@ -499,7 +541,8 @@ export function activate(context: vscode.ExtensionContext) {
 		filterProjectsCommand,
 		clearFilterCommand,
 		registerSubProjectCommand,
-		registerRunnableProjectCommand
+		registerRunnableProjectCommand,
+		getVersionInfoCommand
 	);
 
 	// Auto-refresh when extension starts
@@ -700,8 +743,13 @@ class WinCCOAProject extends vscode.TreeItem {
 		// Check if project can be unregistered to determine context value
 		const canUnregisterResult = canUnregisterProject(this);
 		
+		// Special context for WinCC OA system installations (to show version info)
+		if (this.isWinCCOASystem) {
+			return 'winccOASystemProject';
+		}
+		
 		if (!canUnregisterResult.canUnregister) {
-			// Protected projects (WinCC OA systems and delivered sub-projects) get a special context
+			// Protected projects (delivered sub-projects) get a special context
 			return 'winccOAProjectProtected';
 		}
 		
@@ -1532,6 +1580,31 @@ class ProjectViewPanel {
 
 		// Listen for when the panel is disposed
 		this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+
+		// Handle messages from the webview
+		this._panel.webview.onDidReceiveMessage(
+			async (message) => {
+				switch (message.command) {
+					case 'copyToClipboard':
+						if (message.text) {
+							await vscode.env.clipboard.writeText(message.text);
+							vscode.window.showInformationMessage('Version information copied to clipboard');
+						}
+						break;
+					case 'showInOutput':
+						if (message.versionInfo) {
+							this._showVersionInOutput(message.versionInfo);
+						}
+						break;
+					case 'retryVersionInfo':
+						// Refresh the panel to retry getting version info
+						this._update(this.project).catch(console.error);
+						break;
+				}
+			},
+			undefined,
+			this._disposables
+		);
 	}
 
 	public dispose() {
@@ -1557,6 +1630,7 @@ class ProjectViewPanel {
 	private async _getHtmlForWebview(project: WinCCOAProject): Promise<string> {
 		const configDetails = this._getConfigDetails(project);
 		const projectDetails = await this._getProjectDetails(project);
+		const versionInfoSection = project.isWinCCOASystem ? await this._getVersionInfoSection(project) : '';
 
 		return `<!DOCTYPE html>
 <html lang="en">
@@ -1796,6 +1870,7 @@ class ProjectViewPanel {
         </div>
     </div>
 
+    ${versionInfoSection}
     ${projectDetails}
     ${configDetails}
 </body>
@@ -1860,6 +1935,87 @@ class ProjectViewPanel {
 		}
 
 		return documentationSection + projectSection;
+	}
+
+	private async _getVersionInfoSection(project: WinCCOAProject): Promise<string> {
+		if (!project.isWinCCOASystem) {
+			return '';
+		}
+
+		try {
+			const versionInfo = await getDetailedVersionInfo(project);
+			
+			return `
+			<div class="section">
+				<div class="section-title">🔧 Detailed Version Information</div>
+				<div class="config-section">
+					<div class="info-grid">
+						<div class="info-label">Version:</div>
+						<div class="info-value">${versionInfo.version}</div>
+						<div class="info-label">Platform:</div>
+						<div class="info-value">${versionInfo.platform} ${versionInfo.architecture}</div>
+						<div class="info-label">Build Date:</div>
+						<div class="info-value">${versionInfo.buildDate}</div>
+						<div class="info-label">Commit Hash:</div>
+						<div class="info-value"><code>${versionInfo.commitHash}</code></div>
+						<div class="info-label">Executable:</div>
+						<div class="info-value">${versionInfo.executablePath}</div>
+					</div>
+					<div style="margin-top: 15px;">
+						<div class="config-title">Raw Output</div>
+						<pre style="background-color: var(--vscode-textCodeBlock-background); padding: 10px; border-radius: 4px; font-size: 0.9em; overflow-x: auto; margin: 5px 0;">${versionInfo.rawOutput.trim()}</pre>
+						<div style="margin-top: 10px;">
+							<button onclick="copyVersionInfo()" style="background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; margin-right: 8px;">📋 Copy to Clipboard</button>
+							<button onclick="showInOutput()" style="background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer;">📄 Show in Output</button>
+						</div>
+					</div>
+				</div>
+				
+				<script>
+					const vscodeApi = acquireVsCodeApi();
+					
+					function copyVersionInfo() {
+						const versionText = \`${versionInfo.rawOutput.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`;
+						vscodeApi.postMessage({
+							command: 'copyToClipboard',
+							text: versionText
+						});
+					}
+					
+					function showInOutput() {
+						vscodeApi.postMessage({
+							command: 'showInOutput',
+							versionInfo: ${JSON.stringify(versionInfo)}
+						});
+					}
+				</script>
+			</div>`;
+		} catch (error) {
+			return `
+			<div class="section">
+				<div class="section-title">🔧 Detailed Version Information</div>
+				<div class="config-section" style="background-color: var(--vscode-inputValidation-errorBackground); border-left: 3px solid var(--vscode-inputValidation-errorBorder);">
+					<div style="color: var(--vscode-inputValidation-errorForeground);">
+						<strong>⚠️ Unable to retrieve version information</strong><br>
+						Error: ${error}<br><br>
+						<em>This feature requires WCCILpmon.exe to be accessible for this WinCC OA installation.</em>
+					</div>
+					<div style="margin-top: 10px;">
+						<button onclick="retryVersionInfo()" style="background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer;">🔄 Retry</button>
+					</div>
+				</div>
+				
+				<script>
+					const vscodeApi = acquireVsCodeApi();
+					
+					function retryVersionInfo() {
+						vscodeApi.postMessage({
+							command: 'retryVersionInfo'
+						});
+					}
+				</script>
+			</div>`;
+		}
 	}
 
 	private async _getDocumentationSection(project: WinCCOAProject): Promise<string> {
@@ -2381,6 +2537,21 @@ class ProjectViewPanel {
 		}
 
 		return sections;
+	}
+
+	private _showVersionInOutput(versionInfo: DetailedVersionInfo): void {
+		outputChannel.clear();
+		outputChannel.appendLine('WinCC OA Detailed Version Information');
+		outputChannel.appendLine('=====================================');
+		outputChannel.appendLine(`Version: ${versionInfo.version}`);
+		outputChannel.appendLine(`Platform: ${versionInfo.platform} ${versionInfo.architecture}`);
+		outputChannel.appendLine(`Build Date: ${versionInfo.buildDate}`);
+		outputChannel.appendLine(`Commit Hash: ${versionInfo.commitHash}`);
+		outputChannel.appendLine(`Executable: ${versionInfo.executablePath}`);
+		outputChannel.appendLine('');
+		outputChannel.appendLine('Raw Output:');
+		outputChannel.appendLine(versionInfo.rawOutput);
+		outputChannel.show(true);
 	}
 }
 
@@ -2931,8 +3102,206 @@ export function getCurrentProjectsInfo(): CurrentProjectInfo[] {
     return [];
 }
 
+/**
+ * Interface for detailed WinCC OA version information
+ */
+export interface DetailedVersionInfo {
+	version: string;
+	platform: string;
+	architecture: string;
+	buildDate: string;
+	commitHash: string;
+	rawOutput: string;
+	executablePath: string;
+}
+
+/**
+ * Gets detailed version information using WCCILpmon -version command
+ * @param project The WinCC OA system project to get version info for
+ * @returns Promise with detailed version information
+ */
+export async function getDetailedVersionInfo(project: WinCCOAProject): Promise<DetailedVersionInfo> {
+	if (!project.isWinCCOASystem || !project.version) {
+		throw new Error('Can only get version information for WinCC OA system installations');
+	}
+
+	const pmonPath = getWCCILpmonPath(project.version);
+	if (!pmonPath || !fs.existsSync(pmonPath)) {
+		throw new Error(`WCCILpmon not found for WinCC OA version ${project.version}`);
+	}
+
+	return new Promise<DetailedVersionInfo>((resolve, reject) => {
+		outputChannel.appendLine(`[Version Info] Executing: "${pmonPath}" -version`);
+		outputChannel.show(true);
+
+		const child = childProcess.spawn(`"${pmonPath}"`, ['-version'], {
+			stdio: ['pipe', 'pipe', 'pipe'],
+			shell: true
+		});
+
+		let stdout = '';
+		let stderr = '';
+
+		child.stdout.on('data', (data: Buffer) => {
+			const text = data.toString();
+			stdout += text;
+			outputChannel.append(text);
+		});
+
+		child.stderr.on('data', (data: Buffer) => {
+			const text = data.toString();
+			stderr += text;
+			outputChannel.append(text);
+		});
+
+		child.on('close', (code: number | null) => {
+			if (code === 0 || code === 1) { // WCCILpmon -version exits with code 1
+				try {
+					const versionInfo = parseVersionOutput(stdout + stderr, pmonPath);
+					outputChannel.appendLine(`[Version Info] ✅ Successfully retrieved version information`);
+					resolve(versionInfo);
+				} catch (error) {
+					outputChannel.appendLine(`[Version Info] ❌ Failed to parse version output: ${error}`);
+					reject(error);
+				}
+			} else {
+				const errorMsg = `WCCILpmon exited with code ${code}. Output: ${stdout + stderr}`;
+				outputChannel.appendLine(`[Version Info] ❌ ${errorMsg}`);
+				reject(new Error(errorMsg));
+			}
+		});
+
+		child.on('error', (error: Error) => {
+			outputChannel.appendLine(`[Version Info] ❌ Failed to execute WCCILpmon: ${error.message}`);
+			reject(new Error(`Failed to execute WCCILpmon: ${error.message}`));
+		});
+	});
+}
+
+/**
+ * Parses the output from WCCILpmon -version command
+ * @param output The raw output from the command
+ * @param executablePath The path to the WCCILpmon executable
+ * @returns Parsed version information
+ */
+export function parseVersionOutput(output: string, executablePath: string): DetailedVersionInfo {
+	// Example output:
+	// WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.20.5 platform Windows AMD64 linked at Mar  2 2025 09:51:08 (faf9f4332a)
+	// WCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!
+
+	const lines = output.split('\n').filter(line => line.trim());
+	
+	for (const line of lines) {
+		// Look for the full version line (contains version, platform, build date, commit hash)
+		const fullVersionMatch = line.match(/:\s*(\d+\.\d+\.\d+)\s+platform\s+(\w+)\s+(\w+)\s+linked\s+at\s+([^(]+)\s*\(([^)]+)\)/);
+		
+		if (fullVersionMatch) {
+			return {
+				version: fullVersionMatch[1],
+				platform: fullVersionMatch[2],
+				architecture: fullVersionMatch[3], 
+				buildDate: fullVersionMatch[4].trim(),
+				commitHash: fullVersionMatch[5],
+				rawOutput: output,
+				executablePath: executablePath
+			};
+		}
+		
+		// Look for partial version line (version and platform without build info)
+		const partialVersionMatch = line.match(/:\s*(\d+\.\d+\.\d+)\s+platform\s+(\w+)\s+(\w+)(?!\s+linked)/);
+		
+		if (partialVersionMatch) {
+			return {
+				version: partialVersionMatch[1],
+				platform: partialVersionMatch[2],
+				architecture: partialVersionMatch[3], 
+				buildDate: 'Unknown',
+				commitHash: 'Unknown',
+				rawOutput: output,
+				executablePath: executablePath
+			};
+		}
+	}
+
+	// If parsing fails, try to extract basic version information
+	const basicVersionMatch = output.match(/:\s*(\d+\.\d+\.\d+)/);
+	return {
+		version: basicVersionMatch ? basicVersionMatch[1] : 'Unknown',
+		platform: 'Unknown',
+		architecture: 'Unknown',
+		buildDate: 'Unknown',
+		commitHash: 'Unknown',
+		rawOutput: output,
+		executablePath: executablePath
+	};
+}
+
+/**
+ * Shows detailed version information in a formatted dialog
+ * @param versionInfo The version information to display
+ */
+export async function showVersionInfoDialog(versionInfo: DetailedVersionInfo): Promise<void> {
+	const formattedInfo = [
+		`🔧 **WinCC OA Detailed Version Information**`,
+		``,
+		`**Version:** ${versionInfo.version}`,
+		`**Platform:** ${versionInfo.platform} ${versionInfo.architecture}`,
+		`**Build Date:** ${versionInfo.buildDate}`,
+		`**Commit Hash:** ${versionInfo.commitHash}`,
+		`**Executable:** ${versionInfo.executablePath}`,
+		``,
+		`**Raw Output:**`,
+		`\`\`\``,
+		versionInfo.rawOutput.trim(),
+		`\`\`\``
+	].join('\n');
+
+	// Create a new document with the version information
+	const doc = await vscode.workspace.openTextDocument({
+		content: formattedInfo,
+		language: 'markdown'
+	});
+
+	// Show the document in a new editor
+	await vscode.window.showTextDocument(doc, {
+		preview: true,
+		viewColumn: vscode.ViewColumn.Beside
+	});
+
+	// Also show a summary in an information message
+	const summaryMsg = `WinCC OA ${versionInfo.version} (${versionInfo.platform} ${versionInfo.architecture}, built ${versionInfo.buildDate})`;
+	
+	const action = await vscode.window.showInformationMessage(
+		summaryMsg,
+		'Copy to Clipboard',
+		'Show in Output'
+	);
+
+	if (action === 'Copy to Clipboard') {
+		await vscode.env.clipboard.writeText(versionInfo.rawOutput);
+		vscode.window.showInformationMessage('Version information copied to clipboard');
+	} else if (action === 'Show in Output') {
+		outputChannel.clear();
+		outputChannel.appendLine('WinCC OA Detailed Version Information');
+		outputChannel.appendLine('=====================================');
+		outputChannel.appendLine(`Version: ${versionInfo.version}`);
+		outputChannel.appendLine(`Platform: ${versionInfo.platform} ${versionInfo.architecture}`);
+		outputChannel.appendLine(`Build Date: ${versionInfo.buildDate}`);
+		outputChannel.appendLine(`Commit Hash: ${versionInfo.commitHash}`);
+		outputChannel.appendLine(`Executable: ${versionInfo.executablePath}`);
+		outputChannel.appendLine('');
+		outputChannel.appendLine('Raw Output:');
+		outputChannel.appendLine(versionInfo.rawOutput);
+		outputChannel.show(true);
+	}
+}
+
 // Export the path utility functions and new types
-export { getPvssInstConfPath, ProjectCategory, WinCCOAProjectProvider };
+export { 
+    getPvssInstConfPath, 
+    ProjectCategory, 
+    WinCCOAProjectProvider
+};
 
 // Backward compatibility: Keep the getAPI function for existing consumers
 export function getAPI(): WinCCOAExtensionAPI {
