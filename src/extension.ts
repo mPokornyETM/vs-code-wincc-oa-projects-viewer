@@ -1580,6 +1580,31 @@ class ProjectViewPanel {
 
 		// Listen for when the panel is disposed
 		this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+
+		// Handle messages from the webview
+		this._panel.webview.onDidReceiveMessage(
+			async (message) => {
+				switch (message.command) {
+					case 'copyToClipboard':
+						if (message.text) {
+							await vscode.env.clipboard.writeText(message.text);
+							vscode.window.showInformationMessage('Version information copied to clipboard');
+						}
+						break;
+					case 'showInOutput':
+						if (message.versionInfo) {
+							this._showVersionInOutput(message.versionInfo);
+						}
+						break;
+					case 'retryVersionInfo':
+						// Refresh the panel to retry getting version info
+						this._update(this.project).catch(console.error);
+						break;
+				}
+			},
+			undefined,
+			this._disposables
+		);
 	}
 
 	public dispose() {
@@ -1605,6 +1630,7 @@ class ProjectViewPanel {
 	private async _getHtmlForWebview(project: WinCCOAProject): Promise<string> {
 		const configDetails = this._getConfigDetails(project);
 		const projectDetails = await this._getProjectDetails(project);
+		const versionInfoSection = project.isWinCCOASystem ? await this._getVersionInfoSection(project) : '';
 
 		return `<!DOCTYPE html>
 <html lang="en">
@@ -1844,6 +1870,7 @@ class ProjectViewPanel {
         </div>
     </div>
 
+    ${versionInfoSection}
     ${projectDetails}
     ${configDetails}
 </body>
@@ -1908,6 +1935,87 @@ class ProjectViewPanel {
 		}
 
 		return documentationSection + projectSection;
+	}
+
+	private async _getVersionInfoSection(project: WinCCOAProject): Promise<string> {
+		if (!project.isWinCCOASystem) {
+			return '';
+		}
+
+		try {
+			const versionInfo = await getDetailedVersionInfo(project);
+			
+			return `
+			<div class="section">
+				<div class="section-title">🔧 Detailed Version Information</div>
+				<div class="config-section">
+					<div class="info-grid">
+						<div class="info-label">Version:</div>
+						<div class="info-value">${versionInfo.version}</div>
+						<div class="info-label">Platform:</div>
+						<div class="info-value">${versionInfo.platform} ${versionInfo.architecture}</div>
+						<div class="info-label">Build Date:</div>
+						<div class="info-value">${versionInfo.buildDate}</div>
+						<div class="info-label">Commit Hash:</div>
+						<div class="info-value"><code>${versionInfo.commitHash}</code></div>
+						<div class="info-label">Executable:</div>
+						<div class="info-value">${versionInfo.executablePath}</div>
+					</div>
+					<div style="margin-top: 15px;">
+						<div class="config-title">Raw Output</div>
+						<pre style="background-color: var(--vscode-textCodeBlock-background); padding: 10px; border-radius: 4px; font-size: 0.9em; overflow-x: auto; margin: 5px 0;">${versionInfo.rawOutput.trim()}</pre>
+						<div style="margin-top: 10px;">
+							<button onclick="copyVersionInfo()" style="background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; margin-right: 8px;">📋 Copy to Clipboard</button>
+							<button onclick="showInOutput()" style="background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer;">📄 Show in Output</button>
+						</div>
+					</div>
+				</div>
+				
+				<script>
+					const vscodeApi = acquireVsCodeApi();
+					
+					function copyVersionInfo() {
+						const versionText = \`${versionInfo.rawOutput.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`;
+						vscodeApi.postMessage({
+							command: 'copyToClipboard',
+							text: versionText
+						});
+					}
+					
+					function showInOutput() {
+						vscodeApi.postMessage({
+							command: 'showInOutput',
+							versionInfo: ${JSON.stringify(versionInfo)}
+						});
+					}
+				</script>
+			</div>`;
+		} catch (error) {
+			return `
+			<div class="section">
+				<div class="section-title">🔧 Detailed Version Information</div>
+				<div class="config-section" style="background-color: var(--vscode-inputValidation-errorBackground); border-left: 3px solid var(--vscode-inputValidation-errorBorder);">
+					<div style="color: var(--vscode-inputValidation-errorForeground);">
+						<strong>⚠️ Unable to retrieve version information</strong><br>
+						Error: ${error}<br><br>
+						<em>This feature requires WCCILpmon.exe to be accessible for this WinCC OA installation.</em>
+					</div>
+					<div style="margin-top: 10px;">
+						<button onclick="retryVersionInfo()" style="background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer;">🔄 Retry</button>
+					</div>
+				</div>
+				
+				<script>
+					const vscodeApi = acquireVsCodeApi();
+					
+					function retryVersionInfo() {
+						vscodeApi.postMessage({
+							command: 'retryVersionInfo'
+						});
+					}
+				</script>
+			</div>`;
+		}
 	}
 
 	private async _getDocumentationSection(project: WinCCOAProject): Promise<string> {
@@ -2429,6 +2537,21 @@ class ProjectViewPanel {
 		}
 
 		return sections;
+	}
+
+	private _showVersionInOutput(versionInfo: DetailedVersionInfo): void {
+		outputChannel.clear();
+		outputChannel.appendLine('WinCC OA Detailed Version Information');
+		outputChannel.appendLine('=====================================');
+		outputChannel.appendLine(`Version: ${versionInfo.version}`);
+		outputChannel.appendLine(`Platform: ${versionInfo.platform} ${versionInfo.architecture}`);
+		outputChannel.appendLine(`Build Date: ${versionInfo.buildDate}`);
+		outputChannel.appendLine(`Commit Hash: ${versionInfo.commitHash}`);
+		outputChannel.appendLine(`Executable: ${versionInfo.executablePath}`);
+		outputChannel.appendLine('');
+		outputChannel.appendLine('Raw Output:');
+		outputChannel.appendLine(versionInfo.rawOutput);
+		outputChannel.show(true);
 	}
 }
 
