@@ -5,7 +5,6 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { 
     getPvssInstConfPath, 
-    getWinCCOAInstallationPaths, 
     extractVersionFromProject,
     isWinCCOADeliveredSubProject,
     WinCCOAProjectProvider,
@@ -50,11 +49,6 @@ suite('Direct Function Tests', () => {
         const result = getPvssInstConfPath();
         assert.ok(typeof result === 'string');
         assert.ok(result.length > 0);
-    });
-    
-    test('getWinCCOAInstallationPaths should return an array', () => {
-        const result = getWinCCOAInstallationPaths();
-        assert.ok(Array.isArray(result));
     });
     
     test('extractVersionFromProject should handle valid project with version', () => {
