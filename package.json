@@ -121,6 +121,11 @@
         "command": "winccOAProjects.registerRunnableProject",
         "title": "WinCC OA: Register Runnable Project",
         "icon": "$(play)"
+      },
+      {
+        "command": "winccOAProjects.getVersionInfo",
+        "title": "WinCC OA: Show Detailed Version Information",
+        "icon": "$(info)"
       }
     ],
     "menus": {
@@ -158,8 +163,18 @@
           "group": "inline@2"
         },
         {
+          "command": "winccOAProjects.getVersionInfo",
+          "when": "view == winccOAProjects && viewItem == winccOASystemProject",
+          "group": "inline@3"
+        },
+        {
           "command": "winccOAProjects.openInExplorer",
           "when": "view == winccOAProjects && viewItem == winccOAProject",
+          "group": "navigation@1"
+        },
+        {
+          "command": "winccOAProjects.getVersionInfo",
+          "when": "view == winccOAProjects && viewItem == winccOASystemProject",
           "group": "navigation@1"
         },
         {
