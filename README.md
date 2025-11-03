@@ -507,7 +507,22 @@ If you want to contribute to this project:
    - Update documentation as needed
    - Ensure all tests pass and coverage requirements are met
 
-6. **Submit Your Contribution**
+6. **Verify CI/CD Requirements**
+   
+   All PRs must pass mandatory automated checks:
+   ```bash
+   # ✅ Required local verification before PR
+   npm run lint      # Linting must pass
+   npm run compile   # TypeScript compilation must succeed
+   npm test          # All tests must pass (166/166)
+   ```
+   
+   **Mandatory CI/CD Status Checks:**
+   - `test (18.x)` - Node.js 18.x compatibility
+   - `test (20.x)` - Node.js 20.x compatibility  
+   - `package` - Extension packaging validation
+
+7. **Submit Your Contribution**
 
    ```bash
    # Commit your changes
@@ -518,7 +533,7 @@ If you want to contribute to this project:
    git push origin feature/your-feature-name
    ```
    
-7. **Create Pull Request**
+8. **Create Pull Request**
    - Go to your fork on GitHub
    - Click "New Pull Request"
    - Select `main` as the base branch

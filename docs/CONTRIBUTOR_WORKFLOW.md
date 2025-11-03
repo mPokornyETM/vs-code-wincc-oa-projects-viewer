@@ -10,6 +10,12 @@ This guide walks you through the complete process of contributing to the WinCC O
 - Node.js 18.x or later
 - VS Code 1.105.0 or later
 
+### 📋 Important: CI/CD Requirements
+Before contributing, familiarize yourself with our **mandatory CI/CD requirements**:
+- 📖 **[Read CI/CD Requirements](CI_CD_REQUIREMENTS.md)** - All PRs must pass automated checks
+- ✅ **Required Status Checks**: `test (18.x)`, `test (20.x)`, `package`
+- 🔒 **Branch Protection**: PRs required, no direct pushes to main
+
 ### 1. Fork the Repository
 
 1. Go to the [main repository](https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer)

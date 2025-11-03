@@ -107,6 +107,50 @@ npm install
 - Ensure all existing tests pass: `npm test`
 - Test with actual WinCC OA projects when possible
 
+## 🔒 **Mandatory CI/CD Checks**
+
+All pull requests **must pass** the automated CI/CD pipeline before they can be merged. The following checks are **required**:
+
+### ✅ **Required Status Checks**
+1. **`test (18.x)`** - Tests running on Node.js 18.x
+2. **`test (20.x)`** - Tests running on Node.js 20.x  
+3. **`package`** - Extension packaging validation
+
+### 🚦 **CI/CD Pipeline Steps**
+The automated pipeline runs these checks for every PR:
+
+```yaml
+- Lint check (npm run lint)
+- TypeScript compilation (npm run compile) 
+- Test suite execution (npm test)
+- Extension packaging (vsce package)
+```
+
+### ⚠️ **Branch Protection Rules**
+- **Pull requests required** - Direct pushes to main branch are blocked
+- **Status checks must pass** - All CI/CD checks must be green ✅
+- **Branch must be up-to-date** - Must include latest main branch changes
+- **Review required** - At least 1 approving review needed
+
+### 🔧 **Fixing Failed Checks**
+If your PR fails CI/CD checks:
+
+1. **Linting Errors**: Run `npm run lint` locally and fix issues
+2. **Compilation Errors**: Run `npm run compile` and resolve TypeScript errors
+3. **Test Failures**: Run `npm test` locally and fix failing tests
+4. **Packaging Issues**: Ensure all dependencies are properly declared
+
+### 📋 **Pre-PR Checklist**
+Before submitting your pull request, verify locally:
+
+```bash
+# ✅ All checks should pass
+npm run lint      # No linting errors
+npm run compile   # No TypeScript errors  
+npm test          # All tests pass
+npm run package   # Extension packages successfully (optional)
+```
+
 ## WinCC OA Specific Guidelines
 
 - Maintain compatibility with pvssInst.conf file format
