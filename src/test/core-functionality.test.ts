@@ -180,14 +180,15 @@ suite('WinCC OA Core Functionality Tests', () => {
             assert.strictEqual(result, mockProject);
         });
 
-        test('refresh should fire onDidChangeTreeData event', () => {
+        test('refresh should fire onDidChangeTreeData event', (done) => {
             let eventFired = false;
             provider.onDidChangeTreeData(() => {
                 eventFired = true;
+                assert.strictEqual(eventFired, true);
+                done();
             });
             
             provider.refresh();
-            assert.strictEqual(eventFired, true);
         });
     });
 
