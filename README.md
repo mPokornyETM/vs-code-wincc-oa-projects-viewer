@@ -37,11 +37,19 @@ Thx very much for supporting us.
 - **Expandable Tree Structure**: Nested categories with project counts and descriptions
 
 ### 🚀 **Project Types Supported**
+
 - **Runnable Projects**: Active WinCC OA projects ready for execution
 - **WinCC OA System Versions**: Installed WinCC OA system versions (3.20, 3.21, etc.)
 - **WinCC OA Version Sub-Projects**: Components delivered with WinCC OA (BACnet, OPC UA, etc.)
 - **User Sub-Projects**: Manually registered custom projects and extensions
 - **Unregistered Projects**: Projects found but not properly registered
+
+### 🔍 **Advanced Features**
+
+- **Smart Filtering**: Real-time search across all project categories with instant results
+- **Project Registration**: Register new runnable projects and sub-projects directly from VS Code
+- **Bulk Operations**: Register all unregistered projects with a single command
+- **Project Unregistration**: Remove projects from WinCC OA configuration safely
 
 ### 🌍 **Cross-Platform Support**
 - **Windows**: Full support for standard Siemens installation paths
@@ -53,6 +61,7 @@ Thx very much for supporting us.
 - **Detailed Metadata**: Name, location, version, creation date, company info
 - **Smart Tooltips**: Context-aware information and project counts
 - **Real-time Updates**: Auto-refresh when configuration files change
+- **Version Intelligence**: Automatic WinCC OA version detection (3.17-3.20 supported, 3.21 ready)
 
 ---
 
@@ -256,6 +265,86 @@ When you select a project from the tree view, a comprehensive project details pa
 
 ---
 
+## 🔍 Smart Filtering
+
+The extension provides powerful real-time filtering to quickly find projects across all categories:
+
+![Project Tree Filter](docs/images/proj-tree-filter.png)
+
+### Filter Features
+
+- **Real-time Search**: Type to instantly filter projects as you type
+- **Cross-Category Search**: Searches across all project categories simultaneously
+- **Case-Insensitive**: Search works regardless of letter case
+- **Partial Matches**: Find projects with partial name matches
+- **Category Preservation**: Maintains hierarchical structure while filtering
+- **Clear Filter**: Easy reset to show all projects
+
+### How to Use
+
+1. **Open Filter**: Click the filter icon (🔍) in the projects view toolbar
+2. **Type Search Term**: Enter project name or partial name
+3. **View Results**: See filtered projects with matching categories
+4. **Clear Filter**: Click the clear button (✖) or delete all text
+
+---
+
+## 📁 Unregistered Projects Management
+
+The extension automatically discovers projects that exist on your system but aren't properly registered with WinCC OA:
+
+![Unregistered Projects](docs/images/proj-tree-unregistered-projects-.png)
+
+### Unregistered Projects Category
+
+- **Auto-Discovery**: Automatically scans common WinCC OA project locations
+- **Smart Detection**: Identifies valid project structures
+- **Registration Status**: Shows which projects need attention
+- **Bulk Actions**: Register multiple projects at once
+
+### Bulk Registration
+
+Register all discovered unregistered projects with a single command:
+
+![Register All Projects](docs/images/proj-tree-register-all.png)
+
+- **One-Click Registration**: Register all unregistered projects simultaneously  
+- **Validation**: Automatically validates project structure before registration
+- **Progress Feedback**: Shows registration progress for multiple projects
+- **Error Handling**: Reports any issues during bulk registration
+
+---
+
+## 🔧 Project Registration
+
+### Register Runnable Project
+
+Add new runnable WinCC OA projects to your system:
+
+![Register Runnable Project](docs/images/proj-tree-register-runnable-project.png)
+
+**Features:**
+- **Structure Validation**: Ensures project has required `config/config` file
+- **Version Detection**: Automatically extracts WinCC OA version from project files
+- **Duplicate Prevention**: Prevents registering already registered projects
+- **Path Validation**: Validates project directory structure and accessibility
+
+### Project Unregistration
+
+Remove projects from WinCC OA configuration safely:
+
+![Unregister Project Context Menu](docs/images/proj-tree-item-unregister-project.png)
+
+![Unregister Project Command](docs/images/command-unregister-project.png)
+
+**Safety Features:**
+- **Confirmation Dialog**: Requires confirmation before unregistering
+- **Configuration Backup**: Safely removes entries from WinCC OA configuration
+- **Selective Removal**: Unregister individual projects without affecting others
+- **Undo Prevention**: Clear warning about permanent removal
+
+---
+
 ## 🎮 Commands
 
 ### Core Project Management
@@ -266,7 +355,7 @@ When you select a project from the tree view, a comprehensive project details pa
 - **WinCC OA: Open in Explorer**: Open project/extension location in Windows Explorer
 - **WinCC OA: Show Project Details**: Select and display detailed project/extension information
 
-### Project Registration
+### Project Registration Commands
 
 - **WinCC OA: Register Runnable Project**: Register a runnable WinCC OA project from directory
   - **Context Menu**: Available when right-clicking on directories in the file explorer
@@ -280,6 +369,26 @@ When you select a project from the tree view, a comprehensive project details pa
   - **Command Palette**: Use folder selection dialog to browse and select project directory
   - **Structure Validation**: Validates that directory does not contain runnable project structure
   - **Error Prevention**: Suggests using "Register Runnable Project" if config/config file is detected
+
+- **WinCC OA: Register All Unregistered Projects**: Register all discovered unregistered projects
+  - **Bulk Operation**: Register multiple projects with a single command
+  - **Progress Feedback**: Shows registration progress and results
+  - **Error Reporting**: Reports any issues encountered during bulk registration
+
+### Project Unregistration Commands
+
+- **WinCC OA: Unregister Project**: Remove a project from WinCC OA configuration
+  - **Context Menu**: Available when right-clicking on registered projects
+  - **Safety Confirmation**: Requires user confirmation before removal
+  - **Configuration Update**: Safely removes project entries from WinCC OA configuration files
+  - **Permanent Action**: Clear warning about permanent removal (no undo)
+
+### Filter and Search Commands
+
+- **WinCC OA: Filter Projects**: Open the project filter input
+  - **Real-time Search**: Filter projects as you type
+  - **Cross-category**: Search across all project categories
+  - **Clear Filter**: Reset to show all projects
 
 ---
 
@@ -295,9 +404,36 @@ When you select a project from the tree view, a comprehensive project details pa
 
 ## Requirements
 
-- Windows operating system
-- WinCC OA installation with properly configured projects
-- Access to `C:\ProgramData\Siemens\WinCC_OA\pvssInst.conf`
+### System Requirements
+- **Operating System**: Windows (primary), Linux/Unix (supported)
+- **WinCC OA Installation**: Properly configured WinCC OA projects
+- **File Access**: Access to `C:\ProgramData\Siemens\WinCC_OA\pvssInst.conf` (Windows) or `/etc/opt/pvss/pvssInst.conf` (Unix)
+
+### Supported WinCC OA Versions
+
+#### ✅ **Fully Supported Versions**
+- **WinCC OA 3.20** - Latest stable version with complete feature support and optimization
+- **WinCC OA 3.19** - Stable version with full compatibility and testing
+- **WinCC OA 3.18** - Legacy support with core functionality maintained
+- **WinCC OA 3.17** - Legacy support with essential features available
+
+#### 🚀 **Upcoming Versions**
+- **WinCC OA 3.21** - Coming soon! Extension prepared for future compatibility
+
+#### 🔍 **Intelligent Version Detection**
+The extension provides smart version detection through multiple methods:
+- **Configuration Files**: Automatic version extraction from `config/config` files
+- **Installation Paths**: Pattern matching in directory structures (`/3.20/`, `/3.19/`)
+- **Project Naming**: Version detection from project names (`Project_v3.20`, `Demo_3.19`)
+- **Registry Integration**: Windows registry version information parsing
+- **System Scanning**: Detection of installed WinCC OA system versions
+
+#### 📊 **Version-Aware Features**
+- **Smart Categorization**: Automatic grouping by detected WinCC OA version
+- **Multi-Version Support**: Handle multiple WinCC OA versions simultaneously
+- **Version-Specific Validation**: Compatibility checks based on detected versions
+- **Legacy Project Support**: Backwards compatibility with older project formats
+- **Future Compatibility**: Extensible architecture for upcoming WinCC OA versions
 
 ---
 
@@ -425,6 +561,21 @@ Press `F5` to launch a new VS Code window with the extension loaded for testing.
 ```
 
 ---
+
+## 📸 Visual Documentation
+
+The extension includes comprehensive visual documentation with screenshots showing all major features:
+
+### Available Screenshots
+- **Project Tree Filter** (`docs/images/proj-tree-filter.png`) - Smart filtering interface
+- **Unregistered Projects** (`docs/images/proj-tree-unregistered-projects-.png`) - Auto-discovery of unregistered projects  
+- **Register Runnable Project** (`docs/images/proj-tree-register-runnable-project.png`) - Project registration interface
+- **Register All Projects** (`docs/images/proj-tree-register-all.png`) - Bulk registration functionality
+- **Unregister Project Menu** (`docs/images/proj-tree-item-unregister-project.png`) - Context menu unregistration
+- **Unregister Command** (`docs/images/command-unregister-project.png`) - Command palette unregistration
+- **Project Documentation View** (`docs/images/project-view-documentation.png`) - Comprehensive project details
+
+See the [User Guide](docs/USER_GUIDE.md) for detailed explanations of each feature.
 
 ## Version History
 
