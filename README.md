@@ -447,18 +447,23 @@ If you want to contribute to this project:
    - Click the "Fork" button on GitHub to create your own copy
    - Clone your fork: `git clone https://github.com/YOUR_USERNAME/vs-code-wincc-oa-projects-viewer.git`
 
-2. **Create a Feature Branch from Main**
+2. **Follow Git Flow Workflow** 
+
+   **🌳 This project uses [Git Flow](docs/GITFLOW_WORKFLOW.md) branching model:**
 
    ```bash
-   # Switch to main branch
-   git checkout main
-   
-   # Pull latest changes
-   git pull upstream main
-   
-   # Create and switch to feature branch
+   # For features: branch from develop
+   git checkout develop
+   git pull upstream develop
    git checkout -b feature/your-feature-name
+   
+   # For hotfixes: branch from main
+   git checkout main
+   git pull upstream main  
+   git checkout -b hotfix/critical-fix
    ```
+
+   **📖 Complete workflow guide: [docs/GITFLOW_WORKFLOW.md](docs/GITFLOW_WORKFLOW.md)**
 
 3. **Set Up Development Environment**
 

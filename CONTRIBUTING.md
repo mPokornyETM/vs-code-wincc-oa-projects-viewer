@@ -20,23 +20,42 @@ This project and everyone participating in it is governed by our Code of Conduct
    git remote add upstream https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer.git
    ```
 
-### 2. Create Feature Branch from Main
+### 2. Follow Git Flow Workflow
+
+**🌳 This repository uses [Git Flow](docs/GITFLOW_WORKFLOW.md) branching model.**
+
+#### For New Features:
 ```bash
-# Ensure you're on main branch
-git checkout main
+# Ensure you're on develop branch  
+git checkout develop
+git pull upstream develop
 
-# Pull latest changes from upstream
-git pull upstream main
-
-# Create and switch to your feature branch
+# Create feature branch from develop
 git checkout -b feature/your-feature-name
-
-# Or for bug fixes
-git checkout -b fix/issue-description
-
-# Or for documentation updates  
-git checkout -b docs/update-description
 ```
+
+#### For Bug Fixes:
+```bash
+# For development bugs - branch from develop
+git checkout develop
+git pull upstream develop
+git checkout -b bugfix/issue-description
+
+# For production hotfixes - branch from main
+git checkout main  
+git pull upstream main
+git checkout -b hotfix/critical-fix
+```
+
+#### For Documentation:
+```bash
+# Branch from develop for documentation
+git checkout develop
+git pull upstream develop
+git checkout -b feature/docs-update-description
+```
+
+**📖 See [Git Flow Workflow Documentation](docs/GITFLOW_WORKFLOW.md) for complete guide.**
 
 ### 3. Development Workflow
 ```bash
@@ -68,7 +87,9 @@ git push origin feature/your-feature-name
 ### 5. Create Pull Request
 1. Go to your fork on GitHub
 2. Click "Compare & pull request"
-3. **Base branch**: `main` (important!)
+3. **Base branch**: 
+   - `develop` for features/bugfixes
+   - `main` for hotfixes/releases
 4. **Head branch**: `feature/your-feature-name`
 5. Fill in the PR template with detailed description
 

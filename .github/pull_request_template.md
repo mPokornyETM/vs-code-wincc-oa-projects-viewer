@@ -1,4 +1,14 @@
-# Pull Request
+# 🔄 Git Flow Pull Request
+
+## 🌳 **Git Flow Branch Type**
+
+<!-- Mark the relevant Git Flow branch type with an "x" -->
+
+- [ ] **Feature** (`feature/*` → `develop`) - New functionality
+- [ ] **Release** (`release/*` → `main` + back-merge to `develop`) - Release preparation  
+- [ ] **Hotfix** (`hotfix/*` → `main` + back-merge to `develop`) - Critical production fixes
+- [ ] **Bugfix** (`bugfix/*` → `develop`) - Bug fixes for development
+- [ ] **Other** (please specify): _______________
 
 ## 📋 **Description**
 
@@ -25,11 +35,28 @@
 - [ ] 🏗️ Build/CI changes
 - [ ] 🔒 Security fix
 
+## 🔍 **Git Flow Validation**
+
+<!-- Ensure your PR follows Git Flow workflow correctly -->
+
+- [ ] Branch follows Git Flow naming convention (`feature/`, `release/`, `hotfix/`, `bugfix/`)
+- [ ] Branch is created from correct source:
+  - [ ] Feature/Bugfix: branched from `develop`
+  - [ ] Release: branched from `develop`
+  - [ ] Hotfix: branched from `main`
+- [ ] Target branch is correct:
+  - [ ] Feature/Bugfix: merging to `develop`
+  - [ ] Release: merging to `main` (will be back-merged to `develop`)
+  - [ ] Hotfix: merging to `main` (will be back-merged to `develop`)
+- [ ] Commits follow [Conventional Commits](https://www.conventionalcommits.org/) format
+- [ ] Branch will be deleted after merge (for feature/hotfix/release branches)
+
 ## 🧪 **Testing**
 
 <!-- Describe the tests you ran to verify your changes -->
 
 ### Test Environment:
+
 - VS Code Version: 
 - Extension Version: 
 - WinCC OA Version: 
@@ -89,6 +116,29 @@
 <!-- Tag specific reviewers or provide context for reviewers -->
 
 /cc @mPokornyETM
+
+---
+
+## 🎯 **Git Flow Merge Strategy**
+
+### For Feature/Bugfix PRs:
+- Merge to `develop` using "Squash and merge" or "Create a merge commit"
+- Delete feature branch after merge
+- Ensure CI/CD checks pass before merging
+
+### For Release PRs:
+1. Merge to `main` using "Create a merge commit"
+2. Create release tag: `git tag -a v[version] -m "Release [version]"`
+3. **Important**: Create back-merge PR from `main` to `develop` to sync changes
+4. Delete release branch after both merges complete
+
+### For Hotfix PRs:
+1. Merge to `main` using "Create a merge commit"  
+2. Create hotfix tag: `git tag -a v[version] -m "Hotfix [version]"`
+3. **Important**: Create back-merge PR from `main` to `develop` to sync changes
+4. Delete hotfix branch after both merges complete
+
+**📖 For complete Git Flow documentation, see: [docs/GITFLOW_WORKFLOW.md](docs/GITFLOW_WORKFLOW.md)**
 
 ---
 
