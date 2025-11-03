@@ -3105,7 +3105,7 @@ export function getCurrentProjectsInfo(): CurrentProjectInfo[] {
 /**
  * Interface for detailed WinCC OA version information
  */
-interface DetailedVersionInfo {
+export interface DetailedVersionInfo {
 	version: string;
 	platform: string;
 	architecture: string;
@@ -3120,7 +3120,7 @@ interface DetailedVersionInfo {
  * @param project The WinCC OA system project to get version info for
  * @returns Promise with detailed version information
  */
-async function getDetailedVersionInfo(project: WinCCOAProject): Promise<DetailedVersionInfo> {
+export async function getDetailedVersionInfo(project: WinCCOAProject): Promise<DetailedVersionInfo> {
 	if (!project.isWinCCOASystem || !project.version) {
 		throw new Error('Can only get version information for WinCC OA system installations');
 	}
@@ -3184,7 +3184,7 @@ async function getDetailedVersionInfo(project: WinCCOAProject): Promise<Detailed
  * @param executablePath The path to the WCCILpmon executable
  * @returns Parsed version information
  */
-function parseVersionOutput(output: string, executablePath: string): DetailedVersionInfo {
+export function parseVersionOutput(output: string, executablePath: string): DetailedVersionInfo {
 	// Example output:
 	// WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.20.5 platform Windows AMD64 linked at Mar  2 2025 09:51:08 (faf9f4332a)
 	// WCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!
@@ -3192,24 +3192,39 @@ function parseVersionOutput(output: string, executablePath: string): DetailedVer
 	const lines = output.split('\n').filter(line => line.trim());
 	
 	for (const line of lines) {
-		// Look for the version line (contains version, platform, build date, commit hash)
-		const versionMatch = line.match(/(\d+\.\d+\.\d+)\s+platform\s+(\w+)\s+(\w+)\s+linked\s+at\s+([^(]+)\s*\(([^)]+)\)/);
+		// Look for the full version line (contains version, platform, build date, commit hash)
+		const fullVersionMatch = line.match(/:\s*(\d+\.\d+\.\d+)\s+platform\s+(\w+)\s+(\w+)\s+linked\s+at\s+([^(]+)\s*\(([^)]+)\)/);
 		
-		if (versionMatch) {
+		if (fullVersionMatch) {
 			return {
-				version: versionMatch[1],
-				platform: versionMatch[2],
-				architecture: versionMatch[3], 
-				buildDate: versionMatch[4].trim(),
-				commitHash: versionMatch[5],
+				version: fullVersionMatch[1],
+				platform: fullVersionMatch[2],
+				architecture: fullVersionMatch[3], 
+				buildDate: fullVersionMatch[4].trim(),
+				commitHash: fullVersionMatch[5],
+				rawOutput: output,
+				executablePath: executablePath
+			};
+		}
+		
+		// Look for partial version line (version and platform without build info)
+		const partialVersionMatch = line.match(/:\s*(\d+\.\d+\.\d+)\s+platform\s+(\w+)\s+(\w+)(?!\s+linked)/);
+		
+		if (partialVersionMatch) {
+			return {
+				version: partialVersionMatch[1],
+				platform: partialVersionMatch[2],
+				architecture: partialVersionMatch[3], 
+				buildDate: 'Unknown',
+				commitHash: 'Unknown',
 				rawOutput: output,
 				executablePath: executablePath
 			};
 		}
 	}
 
-	// If parsing fails, return basic information
-	const basicVersionMatch = output.match(/(\d+\.\d+\.\d+)/);
+	// If parsing fails, try to extract basic version information
+	const basicVersionMatch = output.match(/:\s*(\d+\.\d+\.\d+)/);
 	return {
 		version: basicVersionMatch ? basicVersionMatch[1] : 'Unknown',
 		platform: 'Unknown',
@@ -3225,7 +3240,7 @@ function parseVersionOutput(output: string, executablePath: string): DetailedVer
  * Shows detailed version information in a formatted dialog
  * @param versionInfo The version information to display
  */
-async function showVersionInfoDialog(versionInfo: DetailedVersionInfo): Promise<void> {
+export async function showVersionInfoDialog(versionInfo: DetailedVersionInfo): Promise<void> {
 	const formattedInfo = [
 		`🔧 **WinCC OA Detailed Version Information**`,
 		``,
@@ -3282,7 +3297,11 @@ async function showVersionInfoDialog(versionInfo: DetailedVersionInfo): Promise<
 }
 
 // Export the path utility functions and new types
-export { getPvssInstConfPath, ProjectCategory, WinCCOAProjectProvider };
+export { 
+    getPvssInstConfPath, 
+    ProjectCategory, 
+    WinCCOAProjectProvider
+};
 
 // Backward compatibility: Keep the getAPI function for existing consumers
 export function getAPI(): WinCCOAExtensionAPI {
