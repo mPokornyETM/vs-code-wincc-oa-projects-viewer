@@ -2,8 +2,12 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { JSDOM } from 'jsdom';
-import * as DOMPurify from 'dompurify';
+import * as childProcess from 'child_process';
+// import { JSDOM } from 'jsdom';
+// import * as DOMPurify from 'dompurify';
+
+// Global output channel for WCCILpmon command outputs
+let outputChannel: vscode.OutputChannel;
 
 /**
  * Gets the platform-specific path to the pvssInst.conf file
@@ -19,34 +23,14 @@ function getPvssInstConfPath(): string {
 	}
 }
 
-/**
- * Gets the common WinCC OA installation paths for detecting delivered sub-projects
- * @returns Array of common installation paths in lowercase
- */
-function getWinCCOAInstallationPaths(): string[] {
-	// Return all possible installation paths (both Windows and Unix) for testing compatibility
-	const windowsPaths = [
-		'c:\\siemens\\automation\\wincc_oa\\',
-		'c:\\program files\\siemens\\wincc_oa\\',
-		'c:\\program files (x86)\\siemens\\wincc_oa\\',
-		'c:\\programdata\\siemens\\wincc_oa\\'
-	];
-	
-	const unixPaths = [
-		'/opt/wincc_oa/'
-	];
-	
-	if (os.platform() === 'win32') {
-		// On Windows, include both Windows paths and Unix paths for cross-platform compatibility
-		return [...windowsPaths, ...unixPaths];
-	} else {
-		// On Unix systems, return Unix paths
-		return unixPaths;
-	}
-}
+
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('WinCC OA Projects extension is now active!');
+
+	// Create output channel for WCCILpmon command outputs
+	outputChannel = vscode.window.createOutputChannel('WinCC OA Projects');
+	context.subscriptions.push(outputChannel);
 
 	const provider = new WinCCOAProjectProvider();
         projectProvider = provider;
@@ -78,6 +62,266 @@ export function activate(context: vscode.ExtensionContext) {
 	// Register commands
 	const refreshCommand = vscode.commands.registerCommand('winccOAProjects.refresh', () => {
 		provider.refresh();
+	});
+
+	const filterProjectsCommand = vscode.commands.registerCommand('winccOAProjects.filterProjects', async () => {
+		const searchTerm = await vscode.window.showInputBox({
+			placeHolder: 'Type to filter projects... (leave empty to clear filter)',
+			prompt: 'Filter WinCC OA projects by name, path, version, or company',
+			value: provider.currentFilter || ''
+		});
+		
+		if (searchTerm !== undefined) { // User didn't cancel
+			provider.setFilter(searchTerm.trim());
+		}
+	});
+
+	const clearFilterCommand = vscode.commands.registerCommand('winccOAProjects.clearFilter', () => {
+		provider.setFilter('');
+	});
+
+	const registerProjectCommand = vscode.commands.registerCommand('winccOAProjects.registerProject', async (project?: WinCCOAProject) => {
+		if (project) {
+			// Called from context menu or with specific project
+			try {
+				await registerProject(project);
+				vscode.window.showInformationMessage(`✅ Project '${project.config.name}' has been registered successfully.`);
+				provider.refresh(); // Refresh to show the project in registered category
+			} catch (error) {
+				vscode.window.showErrorMessage(`❌ Failed to register project '${project.config.name}': ${error}`);
+			}
+		} else {
+			// Called from command palette - show directory selection dialog
+			const selectedFolder = await vscode.window.showOpenDialog({
+				canSelectFolders: true,
+				canSelectFiles: false,
+				canSelectMany: false,
+				openLabel: 'Select WinCC OA Project Directory',
+				title: 'Select WinCC OA Project Directory to Register'
+			});
+
+			if (!selectedFolder || selectedFolder.length === 0) {
+				return; // User cancelled
+			}
+
+			const directoryPath = selectedFolder[0].fsPath;
+			await registerRunnableProjectFromDirectory(directoryPath, provider);
+		}
+	});
+
+	const registerSubProjectCommand = vscode.commands.registerCommand('winccOAProjects.registerSubProject', async (uri?: vscode.Uri) => {
+		let directoryPath: string;
+		let projectName: string;
+
+		if (uri && fs.existsSync(uri.fsPath)) {
+			// Called from context menu with specific directory
+			directoryPath = uri.fsPath;
+			projectName = path.basename(directoryPath);
+			
+			// Check if it's a directory
+			const stats = fs.statSync(directoryPath);
+			if (!stats.isDirectory()) {
+				vscode.window.showErrorMessage('WinCC OA sub-projects can only be registered from directories.');
+				return;
+			}
+		} else {
+			// Called from command palette - show directory selection dialog
+			const selectedFolder = await vscode.window.showOpenDialog({
+				canSelectFolders: true,
+				canSelectFiles: false,
+				canSelectMany: false,
+				openLabel: 'Select WinCC OA Sub-Project Directory',
+				title: 'Select WinCC OA Sub-Project Directory to Register'
+			});
+
+			if (!selectedFolder || selectedFolder.length === 0) {
+				return; // User cancelled
+			}
+
+			directoryPath = selectedFolder[0].fsPath;
+			projectName = path.basename(directoryPath);
+		}
+
+		// Check if this project is already registered
+		const existingProject = provider.getProjects().find(p => 
+			path.normalize(p.config.installationDir).toLowerCase() === path.normalize(directoryPath).toLowerCase()
+		);
+		
+		if (existingProject && !provider.isUnregistered(existingProject)) {
+			vscode.window.showWarningMessage(`Project '${projectName}' is already registered in WinCC OA.`);
+			return;
+		}
+
+		// Check if directory contains WinCC OA project structure
+		const configPath = path.join(directoryPath, 'config', 'config');
+		const hasConfig = fs.existsSync(configPath);
+		
+		if (hasConfig) {
+			vscode.window.showErrorMessage(`❌ Failed to register sub-project '${projectName}': \n\nThe directory appears to be a runnable WinCC OA project (config/config found). Please use 'Register Project' command instead.`);
+			return;
+		}
+
+		try {
+			// Use the dedicated sub-project registration function
+			await registerSubProjectFromDirectory(directoryPath, provider);
+		} catch (error) {
+			vscode.window.showErrorMessage(`❌ Failed to register sub-project '${projectName}': ${error}`);
+		}
+	});
+
+	const registerRunnableProjectCommand = vscode.commands.registerCommand('winccOAProjects.registerRunnableProject', async (uri?: vscode.Uri) => {
+		let directoryPath: string;
+		let projectName: string;
+
+		if (uri && fs.existsSync(uri.fsPath)) {
+			// Called from context menu with specific directory
+			directoryPath = uri.fsPath;
+			projectName = path.basename(directoryPath);
+			
+			// Check if it's a directory
+			const stats = fs.statSync(directoryPath);
+			if (!stats.isDirectory()) {
+				vscode.window.showErrorMessage('WinCC OA runnable projects can only be registered from directories.');
+				return;
+			}
+		} else {
+			// Called from command palette - show directory selection dialog
+			const selectedFolder = await vscode.window.showOpenDialog({
+				canSelectFolders: true,
+				canSelectFiles: false,
+				canSelectMany: false,
+				openLabel: 'Select WinCC OA Runnable Project Directory',
+				title: 'Select WinCC OA Runnable Project Directory to Register'
+			});
+
+			if (!selectedFolder || selectedFolder.length === 0) {
+				return; // User cancelled
+			}
+
+			directoryPath = selectedFolder[0].fsPath;
+			projectName = path.basename(directoryPath);
+		}
+
+		// Check if this project is already registered
+		const existingProject = provider.getProjects().find(p => 
+			path.normalize(p.config.installationDir).toLowerCase() === path.normalize(directoryPath).toLowerCase()
+		);
+		
+		if (existingProject && !provider.isUnregistered(existingProject)) {
+			vscode.window.showWarningMessage(`Project '${projectName}' is already registered in WinCC OA.`);
+			return;
+		}
+
+		// Check if directory contains WinCC OA project structure
+		const configPath = path.join(directoryPath, 'config', 'config');
+		const hasConfig = fs.existsSync(configPath);
+		
+		if (!hasConfig) {
+			vscode.window.showErrorMessage(`❌ Failed to register runnable project '${projectName}': \n\nThe directory does not appear to be a runnable WinCC OA project (no config/config found). Please use 'Register Sub Project' command instead.`);
+			return;
+		}
+
+		try {
+			// Use the dedicated runnable project registration function
+			await registerRunnableProjectFromDirectory(directoryPath, provider);
+		} catch (error) {
+			vscode.window.showErrorMessage(`❌ Failed to register runnable project '${projectName}': ${error}`);
+		}
+	});
+
+	const unregisterProjectCommand = vscode.commands.registerCommand('winccOAProjects.unregisterProject', async (project?: WinCCOAProject) => {
+		let targetProject: WinCCOAProject;
+
+		if (project) {
+			// Called from context menu or with specific project
+			targetProject = project;
+		} else {
+			// Called from command palette or without specific project - show selection dialog
+			const allRegisteredProjects = provider.getProjects().filter(p => !provider.isUnregistered(p));
+			
+			if (allRegisteredProjects.length === 0) {
+				vscode.window.showInformationMessage('No registered projects found to unregister.');
+				return;
+			}
+
+			// Filter out projects that cannot be unregistered and prepare items
+			const projectItems: Array<{
+				label: string;
+				description: string;
+				detail: string;
+				project: WinCCOAProject;
+				disabled?: boolean;
+			}> = [];
+
+			let protectedCount = 0;
+
+			for (const proj of allRegisteredProjects) {
+				const canUnregister = canUnregisterProject(proj);
+				const item = {
+					label: proj.config.name,
+					description: proj.config.installationDir,
+					detail: `${proj.isWinCCOASystem ? '⚙️ System' : proj.isRunnable ? '🚀 Project' : '🧩 Sub-Project'}${proj.version ? ` • v${proj.version}` : ''}${!canUnregister.canUnregister ? ' • 🚫 Protected' : ''}`,
+					project: proj,
+					disabled: !canUnregister.canUnregister
+				};
+				projectItems.push(item);
+
+				if (!canUnregister.canUnregister) {
+					protectedCount++;
+				}
+			}
+
+			// Show info about protected projects if any
+			if (protectedCount > 0) {
+				const unregisterableCount = allRegisteredProjects.length - protectedCount;
+				if (unregisterableCount === 0) {
+					vscode.window.showInformationMessage(
+						`All ${protectedCount} registered projects are protected from unregistration (WinCC OA system versions and delivered sub-projects cannot be unregistered).`
+					);
+					return;
+				}
+			}
+
+			const selected = await vscode.window.showQuickPick(projectItems, {
+				placeHolder: `Select a WinCC OA project to unregister... ${protectedCount > 0 ? `(${protectedCount} protected projects shown with 🚫)` : ''}`,
+				matchOnDescription: true,
+				matchOnDetail: true,
+				title: 'Unregister WinCC OA Project'
+			});
+
+			if (!selected) {
+				return; // User cancelled
+			}
+
+			targetProject = selected.project;
+		}
+
+		// Check if project can be unregistered
+		const canUnregisterCheck = canUnregisterProject(targetProject);
+		if (!canUnregisterCheck.canUnregister) {
+			vscode.window.showErrorMessage(
+				`❌ Cannot unregister '${targetProject.config.name}': ${canUnregisterCheck.reason}`
+			);
+			return;
+		}
+
+		const confirmResult = await vscode.window.showWarningMessage(
+			`Are you sure you want to unregister project '${targetProject.config.name}'?`,
+			{ modal: true },
+			'Yes, Unregister', 'Cancel'
+		);
+
+		if (confirmResult !== 'Yes, Unregister') {
+			return;
+		}
+
+		try {
+			await unregisterProject(targetProject.config.name);
+			vscode.window.showInformationMessage(`✅ Project '${targetProject.config.name}' has been unregistered successfully.`);
+			provider.refresh();
+		} catch (error) {
+			vscode.window.showErrorMessage(`❌ Failed to unregister project '${targetProject.config.name}': ${error}`);
+		}
 	});
 
 	const openProjectCommand = vscode.commands.registerCommand('winccOAProjects.openProject', async (project?: WinCCOAProject) => {
@@ -196,6 +440,50 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
+	const scanForProjectsCommand = vscode.commands.registerCommand('winccOAProjects.scanForProjects', async () => {
+		vscode.window.showInformationMessage('Scanning for unregistered WinCC OA projects...');
+		provider.refresh(); // This will trigger the scan for unregistered projects
+		vscode.window.showInformationMessage('Project scan completed. Check the "Unregistered Projects" section.');
+	});
+
+	const registerAllUnregisteredCommand = vscode.commands.registerCommand('winccOAProjects.registerAllUnregistered', async () => {
+		const unregisteredProjects = provider.getProjects().filter(p => provider.isUnregistered(p));
+		
+		if (unregisteredProjects.length === 0) {
+			vscode.window.showInformationMessage('No unregistered projects found.');
+			return;
+		}
+
+		const confirmResult = await vscode.window.showQuickPick(['Yes', 'No'], {
+			placeHolder: `Register all ${unregisteredProjects.length} unregistered projects?`
+		});
+
+		if (confirmResult !== 'Yes') {
+			return;
+		}
+
+		let successCount = 0;
+		let errorCount = 0;
+
+		for (const project of unregisteredProjects) {
+			try {
+				await registerProject(project);
+				successCount++;
+			} catch (error) {
+				console.error(`Failed to register project ${project.config.name}:`, error);
+				errorCount++;
+			}
+		}
+
+		if (errorCount === 0) {
+			vscode.window.showInformationMessage(`Successfully registered ${successCount} projects.`);
+		} else {
+			vscode.window.showWarningMessage(`Registered ${successCount} projects. ${errorCount} failed.`);
+		}
+
+		provider.refresh();
+	});
+
 	context.subscriptions.push(
 		treeView, 
 		watcher,
@@ -203,7 +491,15 @@ export function activate(context: vscode.ExtensionContext) {
 		openProjectCommand, 
 		openProjectNewWindowCommand,
 		openInExplorerCommand,
-		showProjectViewCommand
+		showProjectViewCommand,
+		registerProjectCommand,
+		scanForProjectsCommand,
+		registerAllUnregisteredCommand,
+		unregisterProjectCommand,
+		filterProjectsCommand,
+		clearFilterCommand,
+		registerSubProjectCommand,
+		registerRunnableProjectCommand
 	);
 
 	// Auto-refresh when extension starts
@@ -243,8 +539,15 @@ export function extractVersionFromProject(project: WinCCOAProject): string | nul
 	if (project.version) {
 		return project.version;
 	}
-	
-	// Try to extract version from project name (look for patterns like 3.20, 3_20, 3.21.1, etc.)
+
+	// Try to find version from system projects (performance-oriented approach)
+	const systemProjects = projectProvider?.getProjects().filter(p => p.isWinCCOASystem) || [];
+	const systemProject = systemProjects.find(p => project.config.installationDir.startsWith(p.config.installationDir));
+	if (systemProject) {
+		return systemProject.version || null;
+	}
+
+	// Fallback: Try to extract version from project name (look for patterns like 3.20, 3_20, 3.21.1, etc.)
 	if (project.config.name) {
 		const versionMatch = project.config.name.match(/(\d{1,2}[._]\d{1,2}(?:[._]\d{1,2})?)/);
 		if (versionMatch) {
@@ -253,14 +556,14 @@ export function extractVersionFromProject(project: WinCCOAProject): string | nul
 		}
 	}
 	
-	// Try to extract from installation directory path
+	// Fallback: Try to extract from installation directory path
 	if (project.config.installationDir) {
 		const pathVersionMatch = project.config.installationDir.match(/(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/);
 		if (pathVersionMatch) {
 			return pathVersionMatch[1];
 		}
 	}
-	
+
 	return null;
 }
 
@@ -269,15 +572,51 @@ export function isWinCCOADeliveredSubProject(project: WinCCOAProject): boolean {
 	if (!project || !project.config || !project.config.installationDir) {
 		return false;
 	}
-	
-	// Check if the project is installed in the WinCC OA installation directory
+
+	// Try to find if project is under a system project (performance-oriented approach)
+	const systemProjects = projectProvider?.getProjects().filter(p => p.isWinCCOASystem) || [];
+	const systemProject = systemProjects.find(p => project.config.installationDir.startsWith(p.config.installationDir));
+	if (systemProject) {
+		return true;
+	}
+
+	// Fallback: Check if the project is installed in common WinCC OA installation directories
 	const installDir = project.config.installationDir.toLowerCase().replace(/\\/g, '/');
-	const winccOAInstallPaths = getWinCCOAInstallationPaths();
+	const commonWinCCOAPaths = [
+		'c:/siemens/automation/wincc_oa/',
+		'c:/program files/siemens/wincc_oa/',
+		'c:/program files (x86)/siemens/wincc_oa/',
+		'c:/programdata/siemens/wincc_oa/',
+		'/opt/wincc_oa/'
+	];
 	
-	return winccOAInstallPaths.some(path => {
-		const normalizedPath = path.toLowerCase().replace(/\\/g, '/');
-		return installDir.startsWith(normalizedPath);
-	});
+	return commonWinCCOAPaths.some(path => installDir.startsWith(path));
+}
+
+/**
+ * Checks if a project can be safely unregistered
+ * @param project The project to check
+ * @returns Object with canUnregister flag and reason if not allowed
+ */
+export function canUnregisterProject(project: WinCCOAProject): { canUnregister: boolean; reason?: string } {
+	// WinCC OA System versions cannot be unregistered
+	if (project.isWinCCOASystem) {
+		return {
+			canUnregister: false,
+			reason: 'WinCC OA system versions cannot be unregistered as they are part of the core installation.'
+		};
+	}
+	
+	// WinCC OA delivered sub-projects cannot be unregistered
+	if (isWinCCOADeliveredSubProject(project)) {
+		return {
+			canUnregister: false,
+			reason: 'WinCC OA delivered sub-projects cannot be unregistered as they are part of the standard installation.'
+		};
+	}
+	
+	// Project can be unregistered
+	return { canUnregister: true };
 }
 
 class ProjectCategory extends vscode.TreeItem {
@@ -348,7 +687,7 @@ class WinCCOAProject extends vscode.TreeItem {
 		
 		this.tooltip = this.createTooltip();
 		this.description = this.createDescription();
-		this.contextValue = 'winccOAProject';
+		this.contextValue = this.getContextValue();
 		this.iconPath = this.getIcon();
 	}
 
@@ -357,9 +696,24 @@ class WinCCOAProject extends vscode.TreeItem {
 		return this.version !== undefined && this.config.name === this.version;
 	}
 
+	private getContextValue(): string {
+		// Check if project can be unregistered to determine context value
+		const canUnregisterResult = canUnregisterProject(this);
+		
+		if (!canUnregisterResult.canUnregister) {
+			// Protected projects (WinCC OA systems and delivered sub-projects) get a special context
+			return 'winccOAProjectProtected';
+		}
+		
+		// Regular projects that can be unregistered
+		return 'winccOAProject';
+	}
+
 	private createTooltip(): string {
 		let projectType: string;
-		if (this.isWinCCOASystem) {
+		if (this.contextValue === 'winccOAProjectUnregistered') {
+			projectType = 'Unregistered WinCC OA Project';
+		} else if (this.isWinCCOASystem) {
 			projectType = 'WinCC OA System Installation';
 		} else if (this.isRunnable) {
 			projectType = 'WinCC OA Project';
@@ -382,7 +736,17 @@ class WinCCOAProject extends vscode.TreeItem {
 			lines.push(`Company: ${this.config.company}`);
 		}
 		
-		if (this.isCurrent) {
+		if (this.contextValue === 'winccOAProjectUnregistered') {
+			lines.unshift('⚠️ NOT REGISTERED IN PVSS CONFIGURATION');
+			lines.push('Right-click to register this project.');
+		} else if (this.contextValue === 'winccOAProjectProtected') {
+			lines.unshift('🚫 PROTECTED FROM UNREGISTRATION');
+			if (this.isWinCCOASystem) {
+				lines.push('This is a WinCC OA system installation and cannot be unregistered.');
+			} else {
+				lines.push('This is a WinCC OA delivered sub-project and cannot be unregistered.');
+			}
+		} else if (this.isCurrent) {
 			lines.unshift('*** CURRENT PROJECT ***');
 		}
 		
@@ -393,7 +757,11 @@ class WinCCOAProject extends vscode.TreeItem {
 		const labels: string[] = [];
 		
 		// Add status indicators
-		if (this.isCurrent) {
+		if (this.contextValue === 'winccOAProjectUnregistered') {
+			labels.push('❗ Unregistered');
+		} else if (this.contextValue === 'winccOAProjectProtected') {
+			labels.push('🚫 Protected');
+		} else if (this.isCurrent) {
 			labels.push('⭐ Current');
 		}
 		
@@ -414,7 +782,10 @@ class WinCCOAProject extends vscode.TreeItem {
 	}
 
 	private getIcon(): vscode.ThemeIcon {
-		if (this.isCurrent) {
+		if (this.contextValue === 'winccOAProjectUnregistered') {
+			// Unregistered projects get a warning icon
+			return new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'));
+		} else if (this.isCurrent) {
 			return new vscode.ThemeIcon('star-full');
 		} else if (this.isWinCCOASystem) {
 			// WinCC OA system installations (name equals version)
@@ -437,10 +808,16 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
 
 	private projects: WinCCOAProject[] = [];
 	public categories: ProjectCategory[] = [];
+	public currentFilter: string = '';
+	private filteredCategories: ProjectCategory[] = [];
 
 	refresh(): void {
-		this.loadProjects();
-		this._onDidChangeTreeData.fire();
+		this.loadProjects().then(() => {
+			this._onDidChangeTreeData.fire();
+		}).catch(error => {
+			console.error('Error refreshing projects:', error);
+			this._onDidChangeTreeData.fire();
+		});
 	}
 
 	getProjects(): WinCCOAProject[] {
@@ -453,8 +830,9 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
 
 	getChildren(element?: TreeItem): Promise<TreeItem[]> {
 		if (!element) {
-			// Return top-level categories
-			return Promise.resolve(this.categories);
+			// Return top-level categories (filtered or all)
+			const categoriesToShow = this.currentFilter ? this.filteredCategories : this.categories;
+			return Promise.resolve(categoriesToShow);
 		} else if (element instanceof ProjectCategory) {
 			// If category has sub-categories, return those first, then projects
 			if (element.subCategories.length > 0) {
@@ -466,12 +844,142 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
 		return Promise.resolve([]);
 	}
 
-	private loadProjects(): void {
+	/**
+	 * Sets the filter for projects and updates the tree view
+	 * @param filter The search term to filter by
+	 */
+	setFilter(filter: string): void {
+		this.currentFilter = filter;
+		
+		if (!filter) {
+			// No filter - show all categories
+			this.filteredCategories = [];
+		} else {
+			// Apply filter
+			this.filteredCategories = this.createFilteredCategories(filter.toLowerCase());
+		}
+		
+		// Update tree view
+		this._onDidChangeTreeData.fire();
+		
+		// Show status message with filter statistics
+		if (filter) {
+			const totalProjects = this.projects.length;
+			const filteredProjects = this.getFilteredProjectsCount();
+			vscode.window.showInformationMessage(
+				`🔍 Filter: "${filter}" - Showing ${filteredProjects} of ${totalProjects} projects`
+			);
+		} else {
+			vscode.window.showInformationMessage('✨ Filter cleared - Showing all projects');
+		}
+	}
+
+	/**
+	 * Creates filtered categories based on search term
+	 * @param searchTerm The search term in lowercase
+	 * @returns Array of categories containing matching projects
+	 */
+	private createFilteredCategories(searchTerm: string): ProjectCategory[] {
+		const filteredCategories: ProjectCategory[] = [];
+		
+		for (const category of this.categories) {
+			const filteredCategory = this.filterCategory(category, searchTerm);
+			if (filteredCategory && (filteredCategory.projects.length > 0 || filteredCategory.subCategories.length > 0)) {
+				filteredCategories.push(filteredCategory);
+			}
+		}
+		
+		return filteredCategories;
+	}
+
+	/**
+	 * Filters a category and its projects/sub-categories based on search term
+	 * @param category The category to filter
+	 * @param searchTerm The search term in lowercase
+	 * @returns Filtered category or null if no matches
+	 */
+	private filterCategory(category: ProjectCategory, searchTerm: string): ProjectCategory | null {
+		// Filter projects in this category
+		const filteredProjects = category.projects.filter(project => 
+			this.projectMatchesFilter(project, searchTerm)
+		);
+
+		// Filter sub-categories recursively
+		const filteredSubCategories: ProjectCategory[] = [];
+		for (const subCategory of category.subCategories) {
+			const filteredSubCategory = this.filterCategory(subCategory, searchTerm);
+			if (filteredSubCategory && (filteredSubCategory.projects.length > 0 || filteredSubCategory.subCategories.length > 0)) {
+				filteredSubCategories.push(filteredSubCategory);
+			}
+		}
+
+		// Return filtered category if it has any matching content
+		if (filteredProjects.length > 0 || filteredSubCategories.length > 0) {
+			const newCategory = new ProjectCategory(
+				category.label,
+				filteredProjects,
+				category.categoryType,
+				category.version,
+				category.categoryDescription
+			);
+			newCategory.subCategories = filteredSubCategories;
+			return newCategory;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Checks if a project matches the search filter
+	 * @param project The project to check
+	 * @param searchTerm The search term in lowercase
+	 * @returns True if project matches the filter
+	 */
+	private projectMatchesFilter(project: WinCCOAProject, searchTerm: string): boolean {
+		const projectName = project.config.name.toLowerCase();
+		const projectPath = project.config.installationDir.toLowerCase();
+		const projectVersion = (project.version || '').toLowerCase();
+		const projectCompany = (project.config.company || '').toLowerCase();
+		
+		return projectName.includes(searchTerm) || 
+			   projectPath.includes(searchTerm) || 
+			   projectVersion.includes(searchTerm) ||
+			   projectCompany.includes(searchTerm);
+	}
+
+	/**
+	 * Counts the total number of filtered projects
+	 * @returns Number of projects visible after filtering
+	 */
+	private getFilteredProjectsCount(): number {
+		let count = 0;
+		
+		const countProjectsInCategories = (categories: ProjectCategory[]): void => {
+			for (const category of categories) {
+				count += category.projects.length;
+				countProjectsInCategories(category.subCategories);
+			}
+		};
+		
+		countProjectsInCategories(this.filteredCategories);
+		return count;
+	}
+
+	private async loadProjects(): Promise<void> {
 		const configPath = getPvssInstConfPath();
 		
 		if (!fs.existsSync(configPath)) {
 			vscode.window.showWarningMessage(`WinCC OA configuration file not found: ${configPath}`);
 			this.projects = [];
+			// Still try to find unregistered projects even if config file is missing
+			try {
+				const unregisteredProjects = await this.findUnregisteredProjects();
+				this.projects = unregisteredProjects;
+				this.createCategories();
+			} catch (error) {
+				console.error('Error loading unregistered projects:', error);
+				this.categories = [];
+			}
 			return;
 		}
 
@@ -522,6 +1030,10 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
 				}
 			}
 
+			// Add unregistered projects to the list
+			const unregisteredProjects = await this.findUnregisteredProjects();
+			projects.push(...unregisteredProjects);
+
 			// Sort projects: current first, then runnable projects, then WinCC OA systems, then extensions/plugins
 			projects.sort((a, b) => {
 				if (a.isCurrent && !b.isCurrent) { return -1; }
@@ -542,18 +1054,21 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
 		}
 	}
 
+
+
 	private createCategories(): void {
 		// Filter projects into categories
-		const currentProjects = this.projects.filter(p => p.isCurrent);
-		const runnableProjects = this.projects.filter(p => p.isRunnable && !p.isWinCCOASystem && !p.isCurrent);
-		const winccOASystemVersions = this.projects.filter(p => p.isWinCCOASystem);
+		const currentProjects = this.projects.filter(p => p.isCurrent && !this.isUnregistered(p));
+		const runnableProjects = this.projects.filter(p => p.isRunnable && !p.isWinCCOASystem && !p.isCurrent && !this.isUnregistered(p));
+		const winccOASystemVersions = this.projects.filter(p => p.isWinCCOASystem && !this.isUnregistered(p));
 		
 		// Separate WinCC OA delivered sub-projects from user sub-projects
 		const allSubProjects = this.projects.filter(p => !p.isRunnable && !p.isWinCCOASystem && !this.isUnregistered(p));
 		const winccOADeliveredSubProjects = allSubProjects.filter(p => this.isWinCCOADeliveredSubProject(p));
 		const userSubProjects = allSubProjects.filter(p => !this.isWinCCOADeliveredSubProject(p));
 		
-		const notRegisteredProjects = this.projects.filter(p => this.isUnregistered(p));
+		// Get unregistered projects
+		const unregisteredProjects = this.projects.filter(p => this.isUnregistered(p));
 
 		// Create categories
 		this.categories = [];
@@ -580,8 +1095,8 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
 			this.categories.push(userSubProjectsCategory);
 		}
 		
-		if (notRegisteredProjects.length > 0) {
-			this.categories.push(new ProjectCategory('Not Registered', notRegisteredProjects, 'notregistered'));
+		if (unregisteredProjects.length > 0) {
+			this.categories.push(new ProjectCategory('Unregistered Projects', unregisteredProjects, 'notregistered', undefined, 'Found projects that are not registered in pvssInst.conf'));
 		}
 
 		// Log category summary
@@ -598,7 +1113,7 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
 		
 		subProjects.forEach(project => {
 			// Try to extract version from project name or use 'Unknown' if not found
-			const version = this.extractVersionFromProject(project) || 'Unknown';
+			const version = extractVersionFromProject(project) || 'Unknown';
 			
 			if (!versionGroups.has(version)) {
 				versionGroups.set(version, []);
@@ -626,41 +1141,9 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
 		return subProjectsCategory;
 	}
 
-	private extractVersionFromProject(project: WinCCOAProject): string | null {
-		// Check for null or undefined project
-		if (!project || !project.config) {
-			return null;
-		}
-		
-		// Try to extract version from project version field first
-		if (project.version) {
-			return project.version;
-		}
-		
-		// Try to extract version from project name (look for patterns like 3.20, 3_20, 3.21.1, etc.)
-		if (project.config.name) {
-			const versionMatch = project.config.name.match(/(\d{1,2}[._]\d{1,2}(?:[._]\d{1,2})?)/);
-			if (versionMatch) {
-				// Convert underscores to dots for consistency
-				return versionMatch[1].replace(/_/g, '.');
-			}
-		}
-		
-		// Try to extract from installation directory path
-		if (project.config.installationDir) {
-			const pathVersionMatch = project.config.installationDir.match(/(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/);
-			if (pathVersionMatch) {
-				return pathVersionMatch[1];
-			}
-		}
-		
-		return null;
-	}
-
-	private isUnregistered(project: WinCCOAProject): boolean {
-		// For now, we'll consider projects as "not registered" if they don't have proper config
-		// This can be expanded based on specific criteria
-		return !project.config.installationDir || project.config.installationDir === 'Unknown';
+	public isUnregistered(project: WinCCOAProject): boolean {
+		// Check if the project has the unregistered context value
+		return project.contextValue === 'winccOAProjectUnregistered';
 	}
 
 	private isWinCCOADeliveredSubProject(project: WinCCOAProject): boolean {
@@ -669,15 +1152,151 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
 	}
 
 	private async findUnregisteredProjects(): Promise<WinCCOAProject[]> {
-		// This method can be extended to scan file system for WinCC OA projects
-		// that are not registered in pvssInst.conf
+		const unregisteredProjects: WinCCOAProject[] = [];
+		const registeredPaths = new Set(this.projects.map(p => path.normalize(p.config.installationDir).toLowerCase()));
+		
+		// Get common search locations for WinCC OA projects
+		const searchPaths = this.getProjectSearchPaths();
+		
+		console.log(`Scanning ${searchPaths.length} locations for unregistered WinCC OA projects...`);
+		
+		for (const searchPath of searchPaths) {
+			try {
+				if (fs.existsSync(searchPath)) {
+					const foundProjects = await this.scanDirectoryForProjects(searchPath, registeredPaths);
+					unregisteredProjects.push(...foundProjects);
+				}
+			} catch (error) {
+				console.error(`Error scanning ${searchPath}:`, error);
+			}
+		}
+		
+		console.log(`Found ${unregisteredProjects.length} unregistered WinCC OA projects`);
+		return unregisteredProjects;
+	}
+
+	private getProjectSearchPaths(): string[] {
+		const searchPaths: string[] = [];
+		
+		// Only search in currently opened workspace folders
+		const workspaceFolders = vscode.workspace.workspaceFolders;
+		if (workspaceFolders) {
+			workspaceFolders.forEach(folder => {
+				searchPaths.push(folder.uri.fsPath);
+			});
+		}
+		
+		// If no workspace is open, return empty array
+		if (searchPaths.length === 0) {
+			console.log('No workspace folders open - cannot scan for unregistered projects');
+			return [];
+		}
+		
+		console.log(`Will scan workspace folders: ${searchPaths.join(', ')}`);
+		return searchPaths;
+	}
+
+	private async scanDirectoryForProjects(searchPath: string, registeredPaths: Set<string>, depth: number = 0): Promise<WinCCOAProject[]> {
+		const maxDepth = 3; // Limit recursion depth to avoid performance issues
 		const unregisteredProjects: WinCCOAProject[] = [];
 		
-		// Example: Scan common WinCC OA project locations
-		// This would need to be implemented based on specific requirements
-		// For now, return empty array
+		if (depth > maxDepth) {
+			return unregisteredProjects;
+		}
+		
+		try {
+			// Check if current directory is a WinCC OA project
+			const isProject = this.isWinCCOAProject(searchPath);
+			if (isProject) {
+				const normalizedPath = path.normalize(searchPath).toLowerCase();
+				if (!registeredPaths.has(normalizedPath)) {
+					// This is an unregistered WinCC OA project
+					const projectConfig = this.createConfigFromDirectory(searchPath);
+					const version = this.getProjectVersion(searchPath);
+					const unregisteredProject = new WinCCOAProject(
+						projectConfig,
+						searchPath,
+						true, // Assume runnable since it has config/config
+						false, // Not current
+						version
+					);
+					
+					// Mark as unregistered with special context
+					unregisteredProject.contextValue = 'winccOAProjectUnregistered';
+					unregisteredProjects.push(unregisteredProject);
+					
+					console.log(`Found unregistered project: ${projectConfig.name} at ${searchPath}`);
+				}
+				
+				// Don't scan subdirectories of WinCC OA projects
+				return unregisteredProjects;
+			}
+			
+			// Scan subdirectories
+			const entries = fs.readdirSync(searchPath, { withFileTypes: true });
+			const directories = entries.filter(entry => entry.isDirectory() && !this.shouldSkipDirectory(entry.name));
+			
+			for (const dir of directories) {
+				const dirPath = path.join(searchPath, dir.name);
+				try {
+					const subProjects = await this.scanDirectoryForProjects(dirPath, registeredPaths, depth + 1);
+					unregisteredProjects.push(...subProjects);
+				} catch (error) {
+					// Continue scanning other directories even if one fails
+					console.debug(`Skipping directory ${dirPath}: ${error}`);
+				}
+			}
+		} catch (error) {
+			console.debug(`Error scanning directory ${searchPath}: ${error}`);
+		}
 		
 		return unregisteredProjects;
+	}
+
+	private isWinCCOAProject(directoryPath: string): boolean {
+		// Check if directory contains the essential WinCC OA project structure
+		const configPath = path.join(directoryPath, 'config', 'config');
+		return fs.existsSync(configPath);
+	}
+
+	private shouldSkipDirectory(dirName: string): boolean {
+		// Skip common directories that are unlikely to contain WinCC OA projects
+		const skipDirs = new Set([
+			'.git', '.svn', '.hg', // Version control
+			'node_modules', '.npm', // Node.js
+			'bin', 'obj', 'build', 'dist', 'out', // Build outputs
+			'temp', 'tmp', '.tmp', // Temporary directories
+			'cache', '.cache', // Cache directories
+			'logs', 'log', // Log directories
+			'__pycache__', '.pytest_cache', // Python
+			'.vs', '.vscode', '.idea', // IDE directories
+			'$Recycle.Bin', 'System Volume Information', // Windows system
+			'.Trash', '.Trashes' // macOS system
+		]);
+		
+		return skipDirs.has(dirName) || dirName.startsWith('.');
+	}
+
+	private createConfigFromDirectory(directoryPath: string): ProjectConfig {
+		const projectName = path.basename(directoryPath);
+		let installationDate = 'Unknown';
+		
+		try {
+			// Try to get creation date from directory stats
+			const stats = fs.statSync(directoryPath);
+			installationDate = stats.birthtime.toISOString().split('T')[0];
+		} catch (error) {
+			// Use current date if we can't get directory stats
+			installationDate = new Date().toISOString().split('T')[0];
+		}
+		
+		return {
+			name: projectName,
+			installationDir: directoryPath,
+			installationDate: installationDate,
+			notRunnable: false,
+			currentProject: false
+		};
 	}
 
 	public parseConfigFile(configPath: string): ProjectConfig[] {
@@ -1424,39 +2043,48 @@ class ProjectViewPanel {
 
 	private async _convertMarkdownToHtml(markdown: string): Promise<string> {
 		try {
-			// Dynamically import marked since it's an ES module
-			const { marked } = await import('marked');
+			// Simple markdown-to-HTML conversion without external dependencies
+			let html = markdown;
 			
-			// Configure marked options
-			marked.setOptions({
-				gfm: true, // GitHub Flavored Markdown
-				breaks: true, // Convert line breaks to <br>
+			// Escape HTML characters first
+			html = html.replace(/&/g, '&amp;')
+						.replace(/</g, '&lt;')
+						.replace(/>/g, '&gt;')
+						.replace(/"/g, '&quot;')
+						.replace(/'/g, '&#39;');
+			
+			// Convert markdown syntax to HTML
+			// Headers
+			html = html.replace(/^### (.*$)/gm, '<h3>$1</h3>');
+			html = html.replace(/^## (.*$)/gm, '<h2>$1</h2>');
+			html = html.replace(/^# (.*$)/gm, '<h1>$1</h1>');
+			
+			// Bold and italic
+			html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+			html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+			
+			// Code blocks
+			html = html.replace(/```[\s\S]*?```/g, (match) => {
+				const code = match.slice(3, -3).trim();
+				return `<pre><code>${code}</code></pre>`;
 			});
-
-			// Convert markdown to HTML
-			const rawHtml = await marked.parse(markdown);
 			
-			// Sanitize HTML to prevent XSS attacks
-			const window = new JSDOM('').window;
-			const purify = DOMPurify.default(window as any);
+			// Inline code
+			html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
 			
-			// Configure DOMPurify to allow safe HTML elements
-			const cleanHtml = purify.sanitize(rawHtml, {
-				ALLOWED_TAGS: [
-					'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-					'p', 'br', 'strong', 'em', 'u', 's', 'code', 'pre',
-					'ul', 'ol', 'li', 'blockquote',
-					'a', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
-					'hr', 'div', 'span'
-				],
-				ALLOWED_ATTR: [
-					'href', 'title', 'alt', 'src', 'width', 'height',
-					'class', 'id', 'style'
-				],
-				ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|ftp):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i
-			});
-
-			return cleanHtml;
+			// Links
+			html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+			
+			// Line breaks
+			html = html.replace(/\n\n/g, '</p><p>');
+			html = html.replace(/\n/g, '<br>');
+			
+			// Wrap in paragraphs
+			if (!html.startsWith('<')) {
+				html = '<p>' + html + '</p>';
+			}
+			
+			return html;
 		} catch (error) {
 			console.error('Error converting markdown to HTML:', error);
 			// Fall back to simple text conversion
@@ -1756,7 +2384,452 @@ class ProjectViewPanel {
 	}
 }
 
-export function deactivate() {}
+/**
+ * Registers an unregistered WinCC OA project using WCCILpmon executable
+ * @param project The unregistered project to register
+ */
+async function registerProject(project: WinCCOAProject): Promise<void> {
+	try {
+		if (project.isRunnable) {
+			// Register runnable project
+			await registerRunnableProject(project);
+		} else {
+			// Register sub-project
+			await registerSubProject(project);
+		}
+		
+		console.log(`Successfully registered project: ${project.config.name}`);
+	} catch (error) {
+		throw new Error(`Failed to register project: ${error}`);
+	}
+}
+
+/**
+ * Registers a runnable WinCC OA project using WCCILpmon
+ * @param project The runnable project to register
+ */
+async function registerRunnableProject(project: WinCCOAProject): Promise<void> {
+	const projectVersion = project.version;
+	if (!projectVersion) {
+		throw new Error('Cannot determine WinCC OA version for runnable project');
+	}
+
+	const pmonPath = getWCCILpmonPath(projectVersion);
+	if (!pmonPath) {
+		throw new Error(`WCCILpmon not found for version ${projectVersion}`);
+	}
+
+	const configFilePath = path.join(project.config.installationDir, 'config', 'config');
+	if (!fs.existsSync(configFilePath)) {
+		throw new Error('Project config file not found');
+	}
+
+	return new Promise<void>((resolve, reject) => {
+		const args = ['-config', `"${configFilePath}"`, '-status', '-log', '+stderr', '-autofreg'];
+		
+		outputChannel.appendLine(`[Runnable Project Registration] Executing: "${pmonPath}" ${args.join(' ')}`);
+		outputChannel.show(true); // Show the output channel
+		
+		const child = childProcess.spawn(`"${pmonPath}"`, args, {
+			stdio: ['pipe', 'pipe', 'pipe'],
+			shell: true
+		});
+
+		let stdout = '';
+		let stderr = '';
+
+		child.stdout.on('data', (data: Buffer) => {
+			const text = data.toString();
+			stdout += text;
+			outputChannel.append(text);
+		});
+
+		child.stderr.on('data', (data: Buffer) => {
+			const text = data.toString();
+			stderr += text;
+			outputChannel.append(text);
+		});
+
+		child.on('close', (code: number) => {
+			outputChannel.appendLine(`[Runnable Project Registration] WCCILpmon exited with code: ${code}`);
+			if (stdout.trim()) {
+				outputChannel.appendLine(`[Runnable Project Registration] stdout: ${stdout.trim()}`);
+			}
+			if (stderr.trim()) {
+				outputChannel.appendLine(`[Runnable Project Registration] stderr: ${stderr.trim()}`);
+			}
+			
+			if (code === 3) {
+				// Success case for runnable project registration
+				outputChannel.appendLine(`[Runnable Project Registration] ✅ Successfully registered runnable project: ${project.config.name}`);
+				resolve();
+			} else {
+				outputChannel.appendLine(`[Runnable Project Registration] ❌ Registration failed with exit code ${code}`);
+				reject(new Error(`Registration failed with exit code ${code}. Error: ${stderr}`));
+			}
+		});
+
+		child.on('error', (error: Error) => {
+			outputChannel.appendLine(`[Runnable Project Registration] ❌ Failed to execute WCCILpmon: ${error.message}`);
+			reject(new Error(`Failed to execute WCCILpmon: ${error.message}`));
+		});
+	});
+}
+
+/**
+ * Registers a sub-project using WCCILpmon
+ * @param project The sub-project to register
+ */
+async function registerSubProject(project: WinCCOAProject): Promise<void> {
+	const pmonPath = getWCCILpmonPath(); // Use highest available version for sub-projects
+	if (!pmonPath) {
+		throw new Error('WCCILpmon not found for sub-project registration');
+	}
+
+	return new Promise<void>((resolve, reject) => {
+		const args = ['-regsubf', '-proj', `"${project.config.installationDir}"`, '-log', '+stderr'];
+		
+		outputChannel.appendLine(`[Sub-Project Registration] Executing: "${pmonPath}" ${args.join(' ')}`);
+		outputChannel.show(true); // Show the output channel
+		
+		const child = childProcess.spawn(`"${pmonPath}"`, args, {
+			stdio: ['pipe', 'pipe', 'pipe'],
+			shell: true,
+			cwd: project.config.installationDir // Execute in project directory
+		});
+
+		let stdout = '';
+		let stderr = '';
+
+		child.stdout.on('data', (data: Buffer) => {
+			const text = data.toString();
+			stdout += text;
+			outputChannel.append(text);
+		});
+
+		child.stderr.on('data', (data: Buffer) => {
+			const text = data.toString();
+			stderr += text;
+			outputChannel.append(text);
+		});
+
+		child.on('close', (code: number) => {
+			outputChannel.appendLine(`[Sub-Project Registration] WCCILpmon exited with code: ${code}`);
+			if (stdout.trim()) {
+				outputChannel.appendLine(`[Sub-Project Registration] stdout: ${stdout.trim()}`);
+			}
+			if (stderr.trim()) {
+				outputChannel.appendLine(`[Sub-Project Registration] stderr: ${stderr.trim()}`);
+			}
+			
+			if (code === 0) {
+				// Success case for sub-project registration
+				outputChannel.appendLine(`[Sub-Project Registration] ✅ Successfully registered sub-project: ${project.config.name}`);
+				resolve();
+			} else {
+				outputChannel.appendLine(`[Sub-Project Registration] ❌ Registration failed with exit code ${code}`);
+				reject(new Error(`Sub-project registration failed with exit code ${code}. Error: ${stderr}`));
+			}
+		});
+
+		child.on('error', (error: Error) => {
+			outputChannel.appendLine(`[Sub-Project Registration] ❌ Failed to execute WCCILpmon: ${error.message}`);
+			reject(new Error(`Failed to execute WCCILpmon: ${error.message}`));
+		});
+	});
+}
+
+/**
+ * Gets the path to WCCILpmon executable for a specific version or the highest available version
+ * @param version Optional specific version to find. If not provided, returns highest available version
+ * @returns Path to WCCILpmon executable or null if not found
+ */
+function getWCCILpmonPath(version?: string): string | null {
+	// Get all WinCC OA system installations from registered projects
+	const systemProjects = projectProvider?.getProjects().filter(p => p.isWinCCOASystem) || [];
+	
+	if (version) {
+		// Look for specific version
+		const systemProject = systemProjects.find(p => p.version === version);
+		if (systemProject) {
+			const pmonPath = buildWCCILpmonPathFromInstallation(systemProject.config.installationDir);
+			return fs.existsSync(pmonPath) ? pmonPath : null;
+		}
+	} else {
+		// Find highest available version by sorting system projects by version
+		const sortedSystems = systemProjects
+			.filter(p => p.version) // Only systems with valid version
+			.sort((a, b) => {
+				// Sort by version number (descending - highest first)
+				const versionA = parseVersionString(a.version!);
+				const versionB = parseVersionString(b.version!);
+				return versionB - versionA;
+			});
+		
+		// Try each system installation from highest to lowest version
+		for (const systemProject of sortedSystems) {
+			const pmonPath = buildWCCILpmonPathFromInstallation(systemProject.config.installationDir);
+			if (fs.existsSync(pmonPath)) {
+				console.log(`Using WCCILpmon from version ${systemProject.version}: ${pmonPath}`);
+				return pmonPath;
+			}
+		}
+	}
+	
+	return null;
+}
+
+/**
+ * Builds the path to WCCILpmon executable from a WinCC OA installation directory
+ * @param installationDir The WinCC OA installation directory from pvssInst.conf
+ * @returns Full path to WCCILpmon executable
+ */
+function buildWCCILpmonPathFromInstallation(installationDir: string): string {
+	if (os.platform() === 'win32') {
+		// Windows: InstallationDir + bin\WCCILpmon.exe
+		return path.join(installationDir, 'bin', 'WCCILpmon.exe');
+	} else {
+		// Linux/Unix: InstallationDir + bin/WCCILpmon
+		return path.join(installationDir, 'bin', 'WCCILpmon');
+	}
+}
+
+/**
+ * Parses a version string into a numeric value for comparison
+ * @param version Version string like "3.20", "3.19.1", etc.
+ * @returns Numeric representation for comparison
+ */
+function parseVersionString(version: string): number {
+	const parts = version.split('.').map(part => parseInt(part, 10));
+	// Convert to format: major * 10000 + minor * 100 + patch
+	return (parts[0] || 0) * 10000 + (parts[1] || 0) * 100 + (parts[2] || 0);
+}
+
+/**
+ * Gets all available WinCC OA versions installed on the system
+ * @returns Array of version strings
+ */
+function getAvailableWinCCOAVersions(): string[] {
+	// Get all WinCC OA system installations from registered projects
+	const systemProjects = projectProvider?.getProjects().filter(p => p.isWinCCOASystem) || [];
+	const availableVersions: string[] = [];
+	
+	for (const systemProject of systemProjects) {
+		if (systemProject.version) {
+			const pmonPath = buildWCCILpmonPathFromInstallation(systemProject.config.installationDir);
+			if (fs.existsSync(pmonPath)) {
+				availableVersions.push(systemProject.version);
+			}
+		}
+	}
+	
+	// Sort versions in descending order (highest first)
+	return availableVersions.sort((a, b) => {
+		const versionA = parseVersionString(a);
+		const versionB = parseVersionString(b);
+		return versionB - versionA;
+	});
+}
+
+/**
+ * Registers a runnable WinCC OA project from a directory path
+ * @param directoryPath The path to the project directory
+ * @param provider The tree data provider to refresh after registration
+ * @returns Promise that resolves when project is registered
+ */
+async function registerRunnableProjectFromDirectory(directoryPath: string, provider?: WinCCOAProjectProvider): Promise<void> {
+	const projectName = path.basename(directoryPath);
+	
+	// Validate if directory contains a WinCC OA project structure
+	const configFilePath = path.join(directoryPath, 'config', 'config');
+	if (!fs.existsSync(configFilePath)) {
+		vscode.window.showErrorMessage(`❌ Directory '${directoryPath}' does not appear to be a valid WinCC OA runnable project (no config/config found).`);
+		return;
+	}
+
+	try {
+		// Create a temporary project config for registration
+		const tempConfig: ProjectConfig = {
+			name: projectName,
+			installationDir: directoryPath,
+			installationDate: new Date().toISOString().split('T')[0],
+			notRunnable: false, // Runnable project
+			currentProject: false
+		};
+
+		// Detect version from config file
+		const version = provider?.getProjectVersion(directoryPath);
+		if (!version) {
+			vscode.window.showErrorMessage(`❌ Cannot determine WinCC OA version for project '${projectName}'. Ensure the config file contains valid version information.`);
+			return;
+		}
+
+		// Create a WinCCOAProject instance for registration
+		const runnableProject = new WinCCOAProject(tempConfig, directoryPath, true, false, version);
+		
+		// Register the runnable project using the dedicated function
+		await registerRunnableProject(runnableProject);
+		
+		vscode.window.showInformationMessage(`✅ Runnable project '${projectName}' has been registered successfully.`);
+		if (provider) {
+			provider.refresh();
+		}
+	} catch (error) {
+		vscode.window.showErrorMessage(`❌ Failed to register runnable project '${projectName}': ${error}`);
+	}
+}
+
+/**
+ * Registers a sub-project WinCC OA project from a directory path
+ * @param directoryPath The path to the project directory
+ * @param provider The tree data provider to refresh after registration
+ * @returns Promise that resolves when project is registered
+ */
+async function registerSubProjectFromDirectory(directoryPath: string, provider?: WinCCOAProjectProvider): Promise<void> {
+	const projectName = path.basename(directoryPath);
+	
+	try {
+		// Create a temporary project config for registration
+		const tempConfig: ProjectConfig = {
+			name: projectName,
+			installationDir: directoryPath,
+			installationDate: new Date().toISOString().split('T')[0],
+			notRunnable: true, // Sub-projects are typically not runnable
+			currentProject: false
+		};
+
+		// Detect version if config file exists
+		const configPath = path.join(directoryPath, 'config', 'config');
+		const hasConfig = fs.existsSync(configPath);
+		let version: string | undefined;
+		if (hasConfig) {
+			version = provider?.getProjectVersion(directoryPath);
+		}
+
+		// Create a WinCCOAProject instance for registration
+		const subProject = new WinCCOAProject(tempConfig, directoryPath, false, false, version);
+		
+		// Register the sub-project using the dedicated function
+		await registerSubProject(subProject);
+		
+		vscode.window.showInformationMessage(`✅ Sub-project '${projectName}' has been registered successfully.`);
+		if (provider) {
+			provider.refresh();
+		}
+	} catch (error) {
+		vscode.window.showErrorMessage(`❌ Failed to register sub-project '${projectName}': ${error}`);
+	}
+}
+
+/**
+ * Unregisters a WinCC OA project using WCCILpmon
+ * @param projectName The name of the project to unregister
+ * @returns Promise that resolves when project is unregistered
+ */
+async function unregisterProject(projectName: string): Promise<void> {
+	const pmonPath = getWCCILpmonPath(); // Use highest available version
+	if (!pmonPath) {
+		throw new Error('WCCILpmon not found for project unregistration');
+	}
+
+	return new Promise<void>((resolve, reject) => {
+		const args = ['-unreg', `"${projectName}"`, '-log', '+stderr'];
+		
+		outputChannel.appendLine(`[Project Unregistration] Executing: "${pmonPath}" ${args.join(' ')}`);
+		outputChannel.show(true); // Show the output channel
+		
+		const child = childProcess.spawn(`"${pmonPath}"`, args, {
+			stdio: ['pipe', 'pipe', 'pipe'],
+			shell: true
+		});
+
+		let stdout = '';
+		let stderr = '';
+
+		child.stdout.on('data', (data: Buffer) => {
+			const text = data.toString();
+			stdout += text;
+			outputChannel.append(text);
+		});
+
+		child.stderr.on('data', (data: Buffer) => {
+			const text = data.toString();
+			stderr += text;
+			outputChannel.append(text);
+		});
+
+		child.on('close', (code: number) => {
+			outputChannel.appendLine(`[Project Unregistration] WCCILpmon exited with code: ${code}`);
+			if (stdout.trim()) {
+				outputChannel.appendLine(`[Project Unregistration] stdout: ${stdout.trim()}`);
+			}
+			if (stderr.trim()) {
+				outputChannel.appendLine(`[Project Unregistration] stderr: ${stderr.trim()}`);
+			}
+			
+			if (code === 0) {
+				// Success case for unregistration
+				outputChannel.appendLine(`[Project Unregistration] ✅ Successfully unregistered project: ${projectName}`);
+				resolve();
+			} else {
+				outputChannel.appendLine(`[Project Unregistration] ❌ Unregistration failed with exit code ${code}`);
+				reject(new Error(`Project unregistration failed with exit code ${code}. Error: ${stderr}`));
+			}
+		});
+
+		child.on('error', (error: Error) => {
+			outputChannel.appendLine(`[Project Unregistration] ❌ Failed to execute WCCILpmon: ${error.message}`);
+			reject(new Error(`Failed to execute WCCILpmon: ${error.message}`));
+		});
+	});
+}
+
+/**
+ * Generates a unique section name for a project in the configuration file
+ * @param content Current content of the configuration file
+ * @param projectName The name of the project
+ * @returns A unique section name
+ */
+function generateUniqueSectionName(content: string, projectName: string): string {
+	let baseName = projectName.replace(/[^a-zA-Z0-9_-]/g, '_');
+	let sectionName = baseName;
+	let counter = 1;
+	
+	// Check if section name already exists
+	while (content.includes(`[${sectionName}]`)) {
+		sectionName = `${baseName}_${counter}`;
+		counter++;
+	}
+	
+	return sectionName;
+}
+
+/**
+ * Creates a configuration section for a project
+ * @param sectionName The section name to use
+ * @param project The project to create configuration for
+ * @returns The formatted configuration section
+ */
+function createProjectConfigSection(sectionName: string, project: WinCCOAProject): string {
+	const installationDate = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+	
+	const section = [
+		`[${sectionName}]`,
+		`InstallationDir="${project.config.installationDir}"`,
+		`InstallationDate="${installationDate}"`,
+		`NotRunnable=${project.isRunnable ? 'FALSE' : 'TRUE'}`,
+		`Company="${project.config.company || 'Unknown'}"`
+	];
+	
+	return section.join('\n');
+}
+
+export function deactivate() {
+	// Clean up resources
+	if (outputChannel) {
+		outputChannel.dispose();
+	}
+}
 
 // Export types and interfaces for other extensions to use
 export interface WinCCOAExtensionAPI {
@@ -1859,7 +2932,7 @@ export function getCurrentProjectsInfo(): CurrentProjectInfo[] {
 }
 
 // Export the path utility functions and new types
-export { getPvssInstConfPath, getWinCCOAInstallationPaths, ProjectCategory, WinCCOAProjectProvider };
+export { getPvssInstConfPath, ProjectCategory, WinCCOAProjectProvider };
 
 // Backward compatibility: Keep the getAPI function for existing consumers
 export function getAPI(): WinCCOAExtensionAPI {

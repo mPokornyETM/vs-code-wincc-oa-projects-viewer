@@ -44,19 +44,19 @@ suite('Extension Activation Tests', () => {
         // Should return projects for a category
     });
 
-    test('TreeDataProvider refresh should fire change event', () => {
+    test('TreeDataProvider refresh should fire change event', (done) => {
         const provider = new WinCCOAProjectProvider();
         let eventFired = false;
         
         // Listen for the change event
         provider.onDidChangeTreeData(() => {
             eventFired = true;
+            assert.strictEqual(eventFired, true);
+            done();
         });
         
         // Trigger refresh
         provider.refresh();
-        
-        assert.strictEqual(eventFired, true);
     });
 });
 

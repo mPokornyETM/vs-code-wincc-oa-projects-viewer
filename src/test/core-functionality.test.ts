@@ -6,7 +6,6 @@ import * as path from 'path';
 // Import functions and classes from extension
 import { 
     getPvssInstConfPath, 
-    getWinCCOAInstallationPaths,
     extractVersionFromProject, 
     isWinCCOADeliveredSubProject,
     WinCCOAProjectProvider,
@@ -61,31 +60,7 @@ suite('WinCC OA Core Functionality Tests', () => {
             assert.strictEqual(path1, path2, 'Function should return consistent results');
         });
 
-        test('getWinCCOAInstallationPaths should return array of paths', () => {
-            const paths = getWinCCOAInstallationPaths();
-            assert.ok(Array.isArray(paths));
-            assert.ok(paths.length > 0);
-            
-            // All paths should be strings
-            paths.forEach(path => {
-                assert.ok(typeof path === 'string');
-                assert.ok(path.length > 0);
-            });
-        });
 
-        test('getWinCCOAInstallationPaths should contain WinCC OA related paths', () => {
-            const paths = getWinCCOAInstallationPaths();
-            assert.ok(Array.isArray(paths));
-            
-            // Should contain some WinCC OA related paths (case-insensitive)
-            const hasWinCCOAPaths = paths.some(p => 
-                p.toLowerCase().includes('wincc') || 
-                p.toLowerCase().includes('siemens') ||
-                p.toLowerCase().includes('pvss') ||
-                p.includes('opt')
-            );
-            assert.ok(hasWinCCOAPaths, 'Should contain WinCC OA related paths');
-        });
     });
 
     suite('Version Extraction', () => {
@@ -205,14 +180,15 @@ suite('WinCC OA Core Functionality Tests', () => {
             assert.strictEqual(result, mockProject);
         });
 
-        test('refresh should fire onDidChangeTreeData event', () => {
+        test('refresh should fire onDidChangeTreeData event', (done) => {
             let eventFired = false;
             provider.onDidChangeTreeData(() => {
                 eventFired = true;
+                assert.strictEqual(eventFired, true);
+                done();
             });
             
             provider.refresh();
-            assert.strictEqual(eventFired, true);
         });
     });
 
