@@ -96,4 +96,4 @@ Use this checklist to ensure your contribution meets the project standards.
 
 ---
 
-*This checklist helps ensure high-quality contributions that benefit the entire WinCC OA community!* ✨
+_This checklist helps ensure high-quality contributions that benefit the entire WinCC OA community!_ ✨

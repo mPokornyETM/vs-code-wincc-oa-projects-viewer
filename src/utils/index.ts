@@ -1,20 +1,20 @@
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
-import { WinCCOAProject } from '../types';
+import { WinCCOAProject, WinCCOAManager, WinCCOAProjectState } from '../types';
 
 /**
  * Gets the platform-specific path to the pvssInst.conf file
  * @returns The full path to the pvssInst.conf file
  */
 export function getPvssInstConfPath(): string {
-	if (os.platform() === 'win32') {
-		// Windows path
-		return 'C:\\ProgramData\\Siemens\\WinCC_OA\\pvssInst.conf';
-	} else {
-		// Unix/Linux path
-		return '/etc/opt/pvss/pvssInst.conf';
-	}
+    if (os.platform() === 'win32') {
+        // Windows path
+        return 'C:\\ProgramData\\Siemens\\WinCC_OA\\pvssInst.conf';
+    } else {
+        // Unix/Linux path
+        return '/etc/opt/pvss/pvssInst.conf';
+    }
 }
 
 /**
@@ -23,19 +23,19 @@ export function getPvssInstConfPath(): string {
  * @returns Object with success status and error reason if failed
  */
 export function analyzePmonResponse(response: string): { success: boolean; errorReason?: string } {
-	const trimmedResponse = response.trim();
-	
-	if (trimmedResponse === 'OK') {
-		return { success: true };
-	}
-	
-	if (trimmedResponse.startsWith('ERROR')) {
-		const errorReason = trimmedResponse.substring(5).trim(); // Remove 'ERROR' prefix
-		return { success: false, errorReason };
-	}
-	
-	// Consider empty or other responses as successful if they don't start with ERROR
-	return { success: true };
+    const trimmedResponse = response.trim();
+
+    if (trimmedResponse === 'OK') {
+        return { success: true };
+    }
+
+    if (trimmedResponse.startsWith('ERROR')) {
+        const errorReason = trimmedResponse.substring(5).trim(); // Remove 'ERROR' prefix
+        return { success: false, errorReason };
+    }
+
+    // Consider empty or other responses as successful if they don't start with ERROR
+    return { success: true };
 }
 
 /**
@@ -44,24 +44,24 @@ export function analyzePmonResponse(response: string): { success: boolean; error
  * @returns The version string or null if not found
  */
 export function extractVersionFromProject(project: WinCCOAProject): string | null {
-	// First try to get version from project version field
-	if (project.version) {
-		return project.version;
-	}
+    // First try to get version from project version field
+    if (project.version) {
+        return project.version;
+    }
 
-	// Try to extract version from project name
-	const nameMatch = project.name.match(/(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)/);
-	if (nameMatch) {
-		return nameMatch[1];
-	}
+    // Try to extract version from project name
+    const nameMatch = project.config.name.match(/(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)/);
+    if (nameMatch) {
+        return nameMatch[1];
+    }
 
-	// Try to extract version from installation directory
-	const pathMatch = project.installationDir.match(/WinCC_OA[\\\/](\d+\.\d+(?:\.\d+)?(?:\.\d+)?)/);
-	if (pathMatch) {
-		return pathMatch[1];
-	}
+    // Try to extract version from installation directory
+    const pathMatch = project.installationDir.match(/WinCC_OA[\\\/](\d+\.\d+(?:\.\d+)?(?:\.\d+)?)/);
+    if (pathMatch) {
+        return pathMatch[1];
+    }
 
-	return null;
+    return null;
 }
 
 /**
@@ -70,18 +70,18 @@ export function extractVersionFromProject(project: WinCCOAProject): string | nul
  * @returns True if it's a delivered sub-project
  */
 export function isWinCCOADeliveredSubProject(project: WinCCOAProject): boolean {
-	if (!project) {
-		return false;
-	}
+    if (!project) {
+        return false;
+    }
 
-	// Check if it's not runnable and not a system project
-	if (project.runnable || project.system === 1) {
-		return false;
-	}
+    // Check if it's not runnable and not a system project
+    if (project.isRunnable || project.isWinCCOASystem) {
+        return false;
+    }
 
-	// Check if installation directory contains WinCC_OA (indicating delivered sub-project)
-	const normalizedPath = project.installationDir.replace(/\\/g, '/');
-	return normalizedPath.includes('/WinCC_OA/') || normalizedPath.includes('\\WinCC_OA\\');
+    // Check if installation directory contains WinCC_OA (indicating delivered sub-project)
+    const normalizedPath = project.installationDir.replace(/\\/g, '/');
+    return normalizedPath.includes('/WinCC_OA/') || normalizedPath.includes('\\WinCC_OA\\');
 }
 
 /**
@@ -90,24 +90,24 @@ export function isWinCCOADeliveredSubProject(project: WinCCOAProject): boolean {
  * @returns Object with canUnregister flag and reason if not allowed
  */
 export function canUnregisterProject(project: WinCCOAProject): { canUnregister: boolean; reason?: string } {
-	// Cannot unregister WinCC OA system projects
-	if (project.system === 1) {
-		return { 
-			canUnregister: false, 
-			reason: 'Cannot unregister WinCC OA system installations' 
-		};
-	}
+    // Cannot unregister WinCC OA system projects
+    if (project.isWinCCOASystem) {
+        return {
+            canUnregister: false,
+            reason: 'Cannot unregister WinCC OA system installations'
+        };
+    }
 
-	// Cannot unregister WinCC OA delivered sub-projects
-	if (isWinCCOADeliveredSubProject(project)) {
-		return { 
-			canUnregister: false, 
-			reason: 'Cannot unregister WinCC OA delivered sub-projects' 
-		};
-	}
+    // Cannot unregister WinCC OA delivered sub-projects
+    if (isWinCCOADeliveredSubProject(project)) {
+        return {
+            canUnregister: false,
+            reason: 'Cannot unregister WinCC OA delivered sub-projects'
+        };
+    }
 
-	// User projects can be unregistered
-	return { canUnregister: true };
+    // User projects can be unregistered
+    return { canUnregister: true };
 }
 
 /**
@@ -116,32 +116,32 @@ export function canUnregisterProject(project: WinCCOAProject): { canUnregister: 
  * @returns Path to WCCILpmon executable or null if not found
  */
 export function getWCCILpmonPath(version?: string): string | null {
-	if (os.platform() !== 'win32') {
-		// On non-Windows platforms, assume pmon is in PATH
-		return 'pmon';
-	}
+    if (os.platform() !== 'win32') {
+        // On non-Windows platforms, assume pmon is in PATH
+        return 'pmon';
+    }
 
-	// Windows-specific logic
-	const basePath = 'C:\\Program Files\\Siemens\\WinCC_OA';
+    // Windows-specific logic
+    const basePath = 'C:\\Program Files\\Siemens\\WinCC_OA';
 
-	if (version) {
-		// Try specific version first
-		const versionPath = path.join(basePath, version, 'bin', 'WCCILpmon.exe');
-		if (fs.existsSync(versionPath)) {
-			return versionPath;
-		}
-	}
+    if (version) {
+        // Try specific version first
+        const versionPath = path.join(basePath, version, 'bin', 'WCCILpmon.exe');
+        if (fs.existsSync(versionPath)) {
+            return versionPath;
+        }
+    }
 
-	// Find the highest available version
-	const availableVersions = getAvailableWinCCOAVersions();
-	for (const availableVersion of availableVersions) {
-		const pmonPath = buildWCCILpmonPathFromInstallation(path.join(basePath, availableVersion));
-		if (fs.existsSync(pmonPath)) {
-			return pmonPath;
-		}
-	}
+    // Find the highest available version
+    const availableVersions = getAvailableWinCCOAVersions();
+    for (const availableVersion of availableVersions) {
+        const pmonPath = buildWCCILpmonPathFromInstallation(path.join(basePath, availableVersion));
+        if (fs.existsSync(pmonPath)) {
+            return pmonPath;
+        }
+    }
 
-	return null;
+    return null;
 }
 
 /**
@@ -150,11 +150,11 @@ export function getWCCILpmonPath(version?: string): string | null {
  * @returns Full path to WCCILpmon executable
  */
 export function buildWCCILpmonPathFromInstallation(installationDir: string): string {
-	if (os.platform() === 'win32') {
-		return path.join(installationDir, 'bin', 'WCCILpmon.exe');
-	} else {
-		return path.join(installationDir, 'bin', 'pmon');
-	}
+    if (os.platform() === 'win32') {
+        return path.join(installationDir, 'bin', 'WCCILpmon.exe');
+    } else {
+        return path.join(installationDir, 'bin', 'pmon');
+    }
 }
 
 /**
@@ -163,8 +163,8 @@ export function buildWCCILpmonPathFromInstallation(installationDir: string): str
  * @returns Numeric representation for comparison
  */
 export function parseVersionString(version: string): number {
-	const parts = version.split('.').map(part => parseInt(part, 10));
-	return parts[0] * 10000 + (parts[1] || 0) * 100 + (parts[2] || 0);
+    const parts = version.split('.').map(part => parseInt(part, 10));
+    return parts[0] * 10000 + (parts[1] || 0) * 100 + (parts[2] || 0);
 }
 
 /**
@@ -172,28 +172,29 @@ export function parseVersionString(version: string): number {
  * @returns Array of version strings sorted from highest to lowest
  */
 export function getAvailableWinCCOAVersions(): string[] {
-	if (os.platform() !== 'win32') {
-		return [];
-	}
+    if (os.platform() !== 'win32') {
+        return [];
+    }
 
-	const basePath = 'C:\\Program Files\\Siemens\\WinCC_OA';
-	
-	try {
-		if (!fs.existsSync(basePath)) {
-			return [];
-		}
+    const basePath = 'C:\\Program Files\\Siemens\\WinCC_OA';
 
-		const versions = fs.readdirSync(basePath)
-			.filter(item => {
-				const fullPath = path.join(basePath, item);
-				return fs.statSync(fullPath).isDirectory() && /^\d+\.\d+/.test(item);
-			})
-			.sort((a, b) => parseVersionString(b) - parseVersionString(a)); // Sort descending
+    try {
+        if (!fs.existsSync(basePath)) {
+            return [];
+        }
 
-		return versions;
-	} catch (error) {
-		return [];
-	}
+        const versions = fs
+            .readdirSync(basePath)
+            .filter(item => {
+                const fullPath = path.join(basePath, item);
+                return fs.statSync(fullPath).isDirectory() && /^\d+\.\d+/.test(item);
+            })
+            .sort((a, b) => parseVersionString(b) - parseVersionString(a)); // Sort descending
+
+        return versions;
+    } catch (error) {
+        return [];
+    }
 }
 
 /**
@@ -201,30 +202,38 @@ export function getAvailableWinCCOAVersions(): string[] {
  * @param output - Raw output from MGRLIST:LIST command
  * @returns Array of manager names
  */
-export function parseManagerList(output: string): string[] {
-	if (!output || output.trim() === '') {
-		return [];
-	}
+export function parseManagerList(output: string): WinCCOAManager[] {
+    if (!output || output.trim() === '') {
+        return [];
+    }
 
-	const lines = output.split('\n');
-	const managers: string[] = [];
+    const lines = output.split('\n');
+    const managers: WinCCOAManager[] = [];
 
-	for (const line of lines) {
-		const trimmedLine = line.trim();
-		
-		// Skip empty lines and headers
-		if (trimmedLine === '' || trimmedLine.includes('Manager') || trimmedLine.includes('---')) {
-			continue;
-		}
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmedLine = line.trim();
 
-		// Extract manager name (usually the first column)
-		const parts = trimmedLine.split(/\s+/);
-		if (parts.length > 0 && parts[0] !== '') {
-			managers.push(parts[0]);
-		}
-	}
+        // Skip empty lines and headers
+        if (trimmedLine === '' || trimmedLine.includes('Manager') || trimmedLine.includes('---')) {
+            continue;
+        }
 
-	return managers;
+        // Extract manager name (usually the first column)
+        const parts = trimmedLine.split(/\s+/);
+        if (parts.length > 0 && parts[0] !== '') {
+            const manager: WinCCOAManager = {
+                index: i,
+                name: parts[0],
+                type: parts[1] || 'unknown',
+                state: parts[2] || 'unknown',
+                restarts: 0
+            };
+            managers.push(manager);
+        }
+    }
+
+    return managers;
 }
 
 /**
@@ -232,32 +241,35 @@ export function parseManagerList(output: string): string[] {
  * @param output - Raw output from MGRLIST:STATI command
  * @returns Array of manager status objects
  */
-export function parseManagerStatus(output: string): any[] {
-	if (!output || output.trim() === '') {
-		return [];
-	}
+export function parseManagerStatus(output: string): { managers: WinCCOAManager[]; projectState?: WinCCOAProjectState } {
+    if (!output || output.trim() === '') {
+        return { managers: [] };
+    }
 
-	const lines = output.split('\n');
-	const managers: any[] = [];
+    const lines = output.split('\n');
+    const managers: WinCCOAManager[] = [];
 
-	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i].trim();
-		
-		// Skip empty lines and headers
-		if (line === '' || line.includes('Manager') || line.includes('---')) {
-			continue;
-		}
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
 
-		// Basic parsing - this might need to be enhanced based on actual output format
-		const parts = line.split(/\s+/);
-		if (parts.length >= 3) {
-			managers.push({
-				name: parts[0],
-				status: parts[1],
-				info: parts.slice(2).join(' ')
-			});
-		}
-	}
+        // Skip empty lines and headers
+        if (line === '' || line.includes('Manager') || line.includes('---')) {
+            continue;
+        }
 
-	return managers;
+        // Basic parsing - this might need to be enhanced based on actual output format
+        const parts = line.split(/\s+/);
+        if (parts.length >= 3) {
+            const manager: WinCCOAManager = {
+                index: i,
+                name: parts[0],
+                type: parts[1] || 'unknown',
+                state: parts[2] || 'unknown',
+                restarts: 0
+            };
+            managers.push(manager);
+        }
+    }
+
+    return { managers };
 }

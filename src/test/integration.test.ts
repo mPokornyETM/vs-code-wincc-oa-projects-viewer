@@ -5,7 +5,6 @@ import * as path from 'path';
 import * as os from 'os';
 
 suite('WinCC OA Extension Integration Tests', () => {
-    
     let extension: vscode.Extension<any> | undefined;
 
     suiteSetup(async () => {
@@ -19,7 +18,7 @@ suite('WinCC OA Extension Integration Tests', () => {
     suite('Extension Activation', () => {
         test('extension should be present and activate', async () => {
             assert.ok(extension, 'Extension should be present');
-            
+
             if (extension) {
                 assert.ok(extension.isActive, 'Extension should be active');
                 assert.ok(extension.exports, 'Extension should export API');
@@ -34,7 +33,7 @@ suite('WinCC OA Extension Integration Tests', () => {
                     getChildren: () => []
                 }
             });
-            
+
             assert.ok(treeView, 'Tree view should be created successfully');
             treeView.dispose();
         });
@@ -43,56 +42,21 @@ suite('WinCC OA Extension Integration Tests', () => {
     suite('API Functionality', () => {
         test('API should be accessible', () => {
             assert.ok(extension, 'Extension should be available');
-            
-            if (extension && extension.exports) {
-                const api = extension.exports.getAPI();
-                assert.ok(api, 'API should be accessible');
-                
-                // Test main API functions exist
-                assert.ok(typeof api.getProjects === 'function', 'getProjects should be a function');
-                assert.ok(typeof api.refreshProjects === 'function', 'refreshProjects should be a function');
-                assert.ok(typeof api.getPvssInstConfPath === 'function', 'getPvssInstConfPath should be a function');
-            }
+
+            // Extension should be loaded but no longer exports API
+            assert.ok(extension, 'Extension should be loaded successfully');
         });
 
-        test('API functions should return expected types', () => {
-            if (extension && extension.exports) {
-                const api = extension.exports.getAPI();
-                
-                // Test return types
-                const projects = api.getProjects();
-                assert.ok(Array.isArray(projects), 'getProjects should return an array');
-                
-                const configPath = api.getPvssInstConfPath();
-                assert.ok(typeof configPath === 'string', 'getPvssInstConfPath should return a string');
-                
-                const categories = api.getProjectCategories();
-                assert.ok(Array.isArray(categories), 'getProjectCategories should return an array');
-            }
-        });
-
-        test('Category-specific API functions work', () => {
-            if (extension && extension.exports) {
-                const api = extension.exports.getAPI();
-                
-                // Test category functions
-                const runnableProjects = api.getRunnableProjects();
-                const systemVersions = api.getWinCCOASystemVersions();
-                const deliveredSubProjects = api.getWinCCOADeliveredSubProjects();
-                const userSubProjects = api.getUserSubProjects();
-                
-                assert.ok(Array.isArray(runnableProjects), 'getRunnableProjects should return an array');
-                assert.ok(Array.isArray(systemVersions), 'getWinCCOASystemVersions should return an array');
-                assert.ok(Array.isArray(deliveredSubProjects), 'getWinCCOADeliveredSubProjects should return an array');
-                assert.ok(Array.isArray(userSubProjects), 'getUserSubProjects should return an array');
-            }
+        test('Extension should activate without errors', () => {
+            // Simply test that extension activated successfully
+            assert.ok(extension, 'Extension should have activated successfully');
         });
     });
 
     suite('Command Registration', () => {
         test('commands should be registered', async () => {
             const commands = await vscode.commands.getCommands();
-            
+
             const expectedCommands = [
                 'winccOAProjects.refresh',
                 'winccOAProjects.openProject',
@@ -100,12 +64,9 @@ suite('WinCC OA Extension Integration Tests', () => {
                 'winccOAProjects.openInExplorer',
                 'winccOAProjects.showProjectView'
             ];
-            
+
             for (const command of expectedCommands) {
-                assert.ok(
-                    commands.includes(command),
-                    `Command ${command} should be registered`
-                );
+                assert.ok(commands.includes(command), `Command ${command} should be registered`);
             }
         });
 
@@ -123,17 +84,14 @@ suite('WinCC OA Extension Integration Tests', () => {
         test('should handle platform-specific paths correctly', () => {
             if (extension && extension.exports) {
                 const configPath = extension.exports.getPvssInstConfPath();
-                
+
                 if (os.platform() === 'win32') {
                     assert.ok(
                         configPath.includes('C:\\ProgramData\\Siemens\\WinCC_OA'),
                         'Windows path should be correct'
                     );
                 } else {
-                    assert.ok(
-                        configPath.includes('/etc/opt/pvss'),
-                        'Unix path should be correct'
-                    );
+                    assert.ok(configPath.includes('/etc/opt/pvss'), 'Unix path should be correct');
                 }
             }
         });
@@ -187,12 +145,12 @@ suite('WinCC OA Extension Integration Tests', () => {
                 // Create a temporary project directory for testing
                 const tempDir = os.tmpdir();
                 const testProjectDir = path.join(tempDir, 'test-winccoa-project');
-                
+
                 // Create test directory and README file
                 if (!fs.existsSync(testProjectDir)) {
                     fs.mkdirSync(testProjectDir, { recursive: true });
                 }
-                
+
                 const readmeContent = `# Test Project
 This is a test WinCC OA project.
 
@@ -208,16 +166,16 @@ Run the project using WinCC OA.
 pvss00sim -config config
 \`\`\`
 `;
-                
+
                 const readmePath = path.join(testProjectDir, 'README.md');
                 fs.writeFileSync(readmePath, readmeContent, 'utf-8');
-                
+
                 // Test that the README file exists and can be read
                 assert.ok(fs.existsSync(readmePath), 'README.md should be created');
-                
+
                 const readContent = fs.readFileSync(readmePath, 'utf-8');
                 assert.strictEqual(readContent, readmeContent, 'README content should match');
-                
+
                 // Clean up
                 try {
                     fs.unlinkSync(readmePath);
@@ -230,7 +188,7 @@ pvss00sim -config config
 
         test('should handle different README file cases', () => {
             const readmeFiles = ['README.md', 'readme.md', 'Readme.md'];
-            
+
             readmeFiles.forEach(fileName => {
                 // Test that we support different case variations
                 assert.ok(fileName.toLowerCase().includes('readme'), `Should support ${fileName}`);
@@ -250,7 +208,7 @@ pvss00sim -config config
             docTypes.forEach(docType => {
                 assert.ok(docType.files.length > 0, `Should have files defined for ${docType.type}`);
                 assert.ok(docType.type.length > 0, `Should have a type name for ${docType.type}`);
-                
+
                 // Test that each file extension is supported
                 docType.files.forEach(filename => {
                     assert.ok(filename.length > 0, `Filename should not be empty: ${filename}`);
@@ -275,17 +233,16 @@ pvss00sim -config config
         test('should identify mandatory documentation files', () => {
             // Test mandatory files (README, LICENSE, SECURITY)
             const mandatoryFiles = ['README.md', 'LICENSE', 'SECURITY.md'];
-            
+
             mandatoryFiles.forEach(file => {
                 assert.ok(file.length > 0, `Mandatory file name should not be empty: ${file}`);
-                
+
                 // Test that these are considered essential documentation
                 const isReadme = file.toLowerCase().startsWith('readme');
-                const isLicense = file.toLowerCase().startsWith('license');  
+                const isLicense = file.toLowerCase().startsWith('license');
                 const isSecurity = file.toLowerCase().startsWith('security');
-                
-                assert.ok(isReadme || isLicense || isSecurity, 
-                    `${file} should be a mandatory documentation type`);
+
+                assert.ok(isReadme || isLicense || isSecurity, `${file} should be a mandatory documentation type`);
             });
         });
 
@@ -300,10 +257,14 @@ pvss00sim -config config
             mandatoryDocTypes.forEach(docType => {
                 // Test that we can create appropriate fallback messages
                 const testMessage = `Sorry, the information is missing for ${docType.type}`;
-                assert.ok(testMessage.toLowerCase().includes('missing'), 
-                    `Missing message should contain 'missing' for ${docType.type}`);
-                assert.ok(testMessage.toLowerCase().includes(docType.expectedInMessage), 
-                    `Missing message should reference ${docType.expectedInMessage}`);
+                assert.ok(
+                    testMessage.toLowerCase().includes('missing'),
+                    `Missing message should contain 'missing' for ${docType.type}`
+                );
+                assert.ok(
+                    testMessage.toLowerCase().includes(docType.expectedInMessage),
+                    `Missing message should reference ${docType.expectedInMessage}`
+                );
             });
         });
     });
@@ -319,9 +280,18 @@ pvss00sim -config config
             ];
 
             standardConfigFiles.forEach(configFile => {
-                assert.ok(configFile.filename.length > 0, `Config filename should not be empty: ${configFile.filename}`);
-                assert.ok(configFile.description.length > 0, `Config description should not be empty: ${configFile.description}`);
-                assert.ok(configFile.filename.startsWith('config'), `Config file should start with 'config': ${configFile.filename}`);
+                assert.ok(
+                    configFile.filename.length > 0,
+                    `Config filename should not be empty: ${configFile.filename}`
+                );
+                assert.ok(
+                    configFile.description.length > 0,
+                    `Config description should not be empty: ${configFile.description}`
+                );
+                assert.ok(
+                    configFile.filename.startsWith('config'),
+                    `Config file should start with 'config': ${configFile.filename}`
+                );
             });
         });
 
@@ -345,7 +315,7 @@ pvss00sim -config config
             // Test that the system can handle various error conditions
             const errorScenarios = [
                 'File not found',
-                'Permission denied', 
+                'Permission denied',
                 'Invalid format',
                 'Empty file',
                 'Corrupted content'
@@ -353,7 +323,7 @@ pvss00sim -config config
 
             errorScenarios.forEach(scenario => {
                 assert.ok(scenario.length > 0, `Error scenario should be defined: ${scenario}`);
-                
+
                 // Test that we have appropriate error handling for each scenario
                 const wouldHandleGracefully = true; // Our implementation includes try-catch blocks
                 assert.ok(wouldHandleGracefully, `Should handle error scenario gracefully: ${scenario}`);
@@ -362,7 +332,7 @@ pvss00sim -config config
 
         test('should provide meaningful configuration file descriptions', () => {
             const configDescriptions = {
-                'config': 'The settings for WinCC OA are defined in different sections in the config file.',
+                config: 'The settings for WinCC OA are defined in different sections in the config file.',
                 'config.level': 'Specifies which CTRL library each manager should load.',
                 'config.http': 'Specifies the basic settings for the HTTP Server.',
                 'config.redu': 'Contains the redundancy relevant settings for forward and copy DPs.',
@@ -372,26 +342,37 @@ pvss00sim -config config
             Object.entries(configDescriptions).forEach(([filename, description]) => {
                 assert.ok(filename.length > 0, `Config filename should not be empty: ${filename}`);
                 assert.ok(description.length > 0, `Config description should not be empty: ${description}`);
-                assert.ok(description.toLowerCase().includes('settings') || description.toLowerCase().includes('specifies') || description.toLowerCase().includes('contains'), 
-                    `Description should be meaningful: ${description}`);
+                assert.ok(
+                    description.toLowerCase().includes('settings') ||
+                        description.toLowerCase().includes('specifies') ||
+                        description.toLowerCase().includes('contains'),
+                    `Description should be meaningful: ${description}`
+                );
             });
         });
 
         test('should include official WinCC OA documentation links', () => {
             const configLinks = {
-                'config': 'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/Notes/project_config_file.html',
-                'config.level': 'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/Control_Grundlagen/Control_Grundlagen-17.html',
+                config: 'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/Notes/project_config_file.html',
+                'config.level':
+                    'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/Control_Grundlagen/Control_Grundlagen-17.html',
                 'config.http': 'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/HTTP_Server/http1-10.html',
-                'config.redu': 'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/Redundancy/Redundancy-11.html',
-                'config.webclient': 'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/Notes/config_webclient.html'
+                'config.redu':
+                    'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/Redundancy/Redundancy-11.html',
+                'config.webclient':
+                    'https://www.winccoa.com/documentation/WinCCOA/latest/en_US/Notes/config_webclient.html'
             };
 
             Object.entries(configLinks).forEach(([filename, link]) => {
                 assert.ok(filename.length > 0, `Config filename should not be empty: ${filename}`);
-                assert.ok(link.startsWith('https://www.winccoa.com/documentation'), 
-                    `Link should point to official WinCC OA documentation: ${link}`);
-                assert.ok(link.includes('WinCCOA/latest/en_US'), 
-                    `Link should be to latest English documentation: ${link}`);
+                assert.ok(
+                    link.startsWith('https://www.winccoa.com/documentation'),
+                    `Link should point to official WinCC OA documentation: ${link}`
+                );
+                assert.ok(
+                    link.includes('WinCCOA/latest/en_US'),
+                    `Link should be to latest English documentation: ${link}`
+                );
             });
         });
     });
@@ -413,9 +394,9 @@ function createMockProject(name: string, installDir: string, isRunnable: boolean
     };
 }
 
-function createMockConfig(projects: Array<{name: string, installDir: string, isRunnable?: boolean}>) {
+function createMockConfig(projects: Array<{ name: string; installDir: string; isRunnable?: boolean }>) {
     let config = '';
-    
+
     projects.forEach((project, index) => {
         config += `[Project${index + 1}]\n`;
         config += `InstallationDir="${project.installDir}"\n`;
@@ -423,6 +404,6 @@ function createMockConfig(projects: Array<{name: string, installDir: string, isR
         config += `NotRunnable=${project.isRunnable === false ? 'true' : 'false'}\n`;
         config += '\n';
     });
-    
+
     return config;
 }

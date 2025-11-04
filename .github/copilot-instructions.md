@@ -13,6 +13,7 @@ This is a VS Code extension for viewing and managing WinCC OA (Open Architecture
 ## Development
 
 This extension is built with TypeScript and uses VS Code's extension API for:
+
 - TreeDataProvider for project tree view
 - Activity bar contributions
 - File system operations for parsing config files

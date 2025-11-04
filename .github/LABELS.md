@@ -7,7 +7,7 @@ This document describes the label system used for organizing issues and pull req
 ### **Priority Labels** (Red Spectrum)
 
 - `priority/critical` - 🔴 Must have for milestone, blocks other work
-- `priority/high` - 🟠 Important for milestone success  
+- `priority/high` - 🟠 Important for milestone success
 - `priority/medium` - 🟡 Nice to have, can be moved to next milestone
 - `priority/low` - ⚫ Future consideration, not scheduled
 
@@ -23,7 +23,7 @@ This document describes the label system used for organizing issues and pull req
 ### **Component Labels** (Green Spectrum)
 
 - `core-feature` - 🟢 Core extension functionality
-- `ui` - 🎨 User interface and experience  
+- `ui` - 🎨 User interface and experience
 - `api` - 🔌 API and integration features
 - `testing` - 🧪 Testing framework and test cases
 - `quality` - 🔍 Code quality and static analysis
@@ -45,7 +45,7 @@ This document describes the label system used for organizing issues and pull req
 ### **Special Labels** (Various Colors)
 
 - `good-first-issue` - 🌱 Good for newcomers (Green)
-- `help-wanted` - 🙋 Extra attention is needed (Blue)  
+- `help-wanted` - 🙋 Extra attention is needed (Blue)
 - `breaking-change` - ⚠️ Introduces breaking changes (Red)
 - `security` - 🔒 Security related issue (Red)
 - `performance` - ⚡ Performance improvement (Yellow)
@@ -56,20 +56,20 @@ This document describes the label system used for organizing issues and pull req
 ### **Issue Labeling Workflow**
 
 1. **Automatic Labels** (via GitHub Actions):
-   - Issue type labels added based on title prefix
-   - `needs-triage` added to all new issues
-   - Component labels added based on issue template selection
+    - Issue type labels added based on title prefix
+    - `needs-triage` added to all new issues
+    - Component labels added based on issue template selection
 
 2. **Manual Triage Process**:
-   - Maintainers review `needs-triage` issues within 2-3 business days
-   - Add priority and component labels
-   - Add to appropriate milestone
-   - Remove `needs-triage` and add `status/ready` or `status/planning`
+    - Maintainers review `needs-triage` issues within 2-3 business days
+    - Add priority and component labels
+    - Add to appropriate milestone
+    - Remove `needs-triage` and add `status/ready` or `status/planning`
 
 3. **Development Workflow**:
-   - Add `status/in-progress` when work begins
-   - Add `status/review` when PR is created
-   - Close issue when merged and tested
+    - Add `status/in-progress` when work begins
+    - Add `status/review` when PR is created
+    - Close issue when merged and tested
 
 ### **Pull Request Labeling**
 
@@ -119,7 +119,7 @@ is:issue is:open label:"status/ready" label:"priority/high"
 # Good first issues
 is:issue is:open label:"good-first-issue" label:"priority/medium"
 
-# Current milestone critical items  
+# Current milestone critical items
 is:issue is:open milestone:"Foundation (v1.0)" label:"priority/critical"
 
 # Documentation needs
@@ -137,7 +137,7 @@ is:issue is:open label:"breaking-change" milestone:"Developer Experience (v1.5)"
 Labels can trigger automatic project board movements:
 
 - `needs-triage` → **Inbox** column
-- `status/ready` → **Backlog** column  
+- `status/ready` → **Backlog** column
 - `status/in-progress` → **In Progress** column
 - `status/review` → **Review** column
 - Closed → **Done** column
@@ -153,7 +153,7 @@ gh label create "priority/high" --color "D93F0B" --description "Important for mi
 gh label create "priority/medium" --color "FBCA04" --description "Nice to have, can be moved"
 gh label create "priority/low" --color "0E8A16" --description "Future consideration"
 
-# Component labels  
+# Component labels
 gh label create "core-feature" --color "0E8A16" --description "Core extension functionality"
 gh label create "ui" --color "1D76DB" --description "User interface and experience"
 gh label create "api" --color "5319E7" --description "API and integration features"
@@ -188,4 +188,4 @@ Track project health using label metrics:
 
 ---
 
-*This label system helps maintain organization and visibility across the entire WinCC OA VS Code Extension project lifecycle.*
+_This label system helps maintain organization and visibility across the entire WinCC OA VS Code Extension project lifecycle._

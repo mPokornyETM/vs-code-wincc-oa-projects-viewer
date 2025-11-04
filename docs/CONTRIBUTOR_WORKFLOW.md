@@ -5,13 +5,16 @@ This guide walks you through the complete process of contributing to the WinCC O
 ## 🚀 Step-by-Step Contribution Process
 
 ### Prerequisites
+
 - GitHub account
 - Git installed on your system
 - Node.js 18.x or later
 - VS Code 1.105.0 or later
 
 ### 📋 Important: CI/CD Requirements
+
 Before contributing, familiarize yourself with our **mandatory CI/CD requirements**:
+
 - 📖 **[Read CI/CD Requirements](CI_CD_REQUIREMENTS.md)** - All PRs must pass automated checks
 - ✅ **Required Status Checks**: `test (18.x)`, `test (20.x)`, `package`
 - 🔒 **Branch Protection**: PRs required, no direct pushes to main
@@ -99,12 +102,14 @@ npm run compile
 ### 6. Making Changes
 
 #### Code Guidelines
+
 - Follow existing TypeScript coding style
 - Add JSDoc comments for public functions
 - Update tests for new functionality
 - Ensure cross-platform compatibility (Windows/Unix)
 
 #### Testing Your Changes
+
 1. **Manual Testing**: Press `F5` in VS Code to launch Extension Development Host
 2. **Unit Tests**: Run `npm test` to execute automated tests
 3. **Integration Testing**: Test with real WinCC OA projects if possible
@@ -125,6 +130,7 @@ git commit -m "test: add integration tests for tree provider"
 ```
 
 #### Conventional Commit Types
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation changes
@@ -176,11 +182,13 @@ git push --force-with-lease origin feature/your-feature-name
 ## 🔄 After Creating the Pull Request
 
 ### Respond to Reviews
+
 - Address reviewer feedback promptly
 - Make additional commits to the same branch
 - Push changes to update the pull request automatically
 
 ### Update Your Pull Request
+
 ```bash
 # Make additional changes
 # ... edit files ...
@@ -217,6 +225,7 @@ git push origin main
 ## 🚨 Common Issues and Solutions
 
 ### Sync Fork with Upstream
+
 ```bash
 # Add upstream if not already added
 git remote add upstream https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer.git
@@ -235,6 +244,7 @@ git push origin main
 ```
 
 ### Resolve Merge Conflicts
+
 ```bash
 # If conflicts occur during rebase
 git rebase main
@@ -250,6 +260,7 @@ git rebase --continue
 ```
 
 ### Reset Branch to Match Upstream
+
 ```bash
 # If your main branch is messed up
 git checkout main
@@ -267,7 +278,7 @@ git push --force-with-lease origin main
 ## 💡 Tips for Success
 
 1. **Start Small**: Begin with small, focused changes
-2. **Test Thoroughly**: Always test your changes manually and with automated tests  
+2. **Test Thoroughly**: Always test your changes manually and with automated tests
 3. **Follow Conventions**: Use consistent naming and commit message formats
 4. **Ask Questions**: Don't hesitate to ask for help in discussions or issues
 5. **Stay Updated**: Keep your fork synchronized with upstream regularly

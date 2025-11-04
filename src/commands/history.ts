@@ -13,7 +13,7 @@ let outputChannel: vscode.OutputChannel;
  * @param channel - The VS Code output channel to use
  */
 export function initializeCommandHistory(channel: vscode.OutputChannel): void {
-	outputChannel = channel;
+    outputChannel = channel;
 }
 
 /**
@@ -23,59 +23,63 @@ export function initializeCommandHistory(channel: vscode.OutputChannel): void {
  * @param response - Response received from pmon
  */
 export function addToCommandHistory(project: string, command: string, response: string): void {
-	const analysis = analyzePmonResponse(response);
-	
-	const historyEntry: PmonCommandHistory = {
-		timestamp: new Date(),
-		project,
-		command,
-		response: response.trim(),
-		success: analysis.success,
-		errorReason: analysis.errorReason
-	};
-	
-	pmonCommandHistory.unshift(historyEntry); // Add to beginning
-	
-	// Keep only last 100 entries to prevent memory bloat
-	if (pmonCommandHistory.length > 100) {
-		pmonCommandHistory = pmonCommandHistory.slice(0, 100);
-	}
-	
-	// Log to output channel if available
-	if (outputChannel) {
-		const status = analysis.success ? '✅' : '❌';
-		const errorInfo = analysis.errorReason ? ` (${analysis.errorReason})` : '';
-		outputChannel.appendLine(`${status} [${historyEntry.timestamp.toLocaleString()}] ${project}: ${command}${errorInfo}`);
-	}
-	
-	// Show warning for errors
-	if (!analysis.success) {
-		vscode.window.showWarningMessage(
-			`WinCC OA Command Failed: ${command}\nReason: ${analysis.errorReason || 'Unknown error'}`,
-			'Show History'
-		).then(selection => {
-			if (selection === 'Show History') {
-				showCommandHistory();
-			}
-		});
-	}
+    const analysis = analyzePmonResponse(response);
+
+    const historyEntry: PmonCommandHistory = {
+        timestamp: new Date(),
+        project,
+        command,
+        response: response.trim(),
+        success: analysis.success,
+        errorReason: analysis.errorReason
+    };
+
+    pmonCommandHistory.unshift(historyEntry); // Add to beginning
+
+    // Keep only last 100 entries to prevent memory bloat
+    if (pmonCommandHistory.length > 100) {
+        pmonCommandHistory = pmonCommandHistory.slice(0, 100);
+    }
+
+    // Log to output channel if available
+    if (outputChannel) {
+        const status = analysis.success ? '✅' : '❌';
+        const errorInfo = analysis.errorReason ? ` (${analysis.errorReason})` : '';
+        outputChannel.appendLine(
+            `${status} [${historyEntry.timestamp.toLocaleString()}] ${project}: ${command}${errorInfo}`
+        );
+    }
+
+    // Show warning for errors
+    if (!analysis.success) {
+        vscode.window
+            .showWarningMessage(
+                `WinCC OA Command Failed: ${command}\nReason: ${analysis.errorReason || 'Unknown error'}`,
+                'Show History'
+            )
+            .then(selection => {
+                if (selection === 'Show History') {
+                    showCommandHistory();
+                }
+            });
+    }
 }
 
 /**
  * Shows the command history in a webview
  */
 export function showCommandHistory(): void {
-	const panel = vscode.window.createWebviewPanel(
-		'pmonCommandHistory',
-		'Pmon Command History',
-		vscode.ViewColumn.One,
-		{
-			enableScripts: true,
-			retainContextWhenHidden: true
-		}
-	);
+    const panel = vscode.window.createWebviewPanel(
+        'pmonCommandHistory',
+        'Pmon Command History',
+        vscode.ViewColumn.One,
+        {
+            enableScripts: true,
+            retainContextWhenHidden: true
+        }
+    );
 
-	panel.webview.html = generateCommandHistoryHTML();
+    panel.webview.html = generateCommandHistoryHTML();
 }
 
 /**
@@ -83,17 +87,17 @@ export function showCommandHistory(): void {
  * @returns Array of command history entries
  */
 export function getCommandHistory(): PmonCommandHistory[] {
-	return [...pmonCommandHistory]; // Return a copy
+    return [...pmonCommandHistory]; // Return a copy
 }
 
 /**
  * Clears the command history
  */
 export function clearCommandHistory(): void {
-	pmonCommandHistory = [];
-	if (outputChannel) {
-		outputChannel.clear();
-	}
+    pmonCommandHistory = [];
+    if (outputChannel) {
+        outputChannel.clear();
+    }
 }
 
 /**
@@ -101,11 +105,14 @@ export function clearCommandHistory(): void {
  * @returns HTML string
  */
 function generateCommandHistoryHTML(): string {
-	const historyItems = pmonCommandHistory.map(entry => {
-		const statusIcon = entry.success ? '✅' : '❌';
-		const errorInfo = entry.errorReason ? `<br><span style="color: #ff6b6b; font-size: 0.9em;">Error: ${entry.errorReason}</span>` : '';
-		
-		return `
+    const historyItems = pmonCommandHistory
+        .map(entry => {
+            const statusIcon = entry.success ? '✅' : '❌';
+            const errorInfo = entry.errorReason
+                ? `<br><span style="color: #ff6b6b; font-size: 0.9em;">Error: ${entry.errorReason}</span>`
+                : '';
+
+            return `
 			<div class="history-item ${entry.success ? 'success' : 'error'}">
 				<div class="history-header">
 					<span class="status-icon">${statusIcon}</span>
@@ -121,9 +128,10 @@ function generateCommandHistoryHTML(): string {
 				</div>
 			</div>
 		`;
-	}).join('');
+        })
+        .join('');
 
-	return `
+    return `
 		<!DOCTYPE html>
 		<html lang="en">
 		<head>
@@ -226,13 +234,17 @@ function generateCommandHistoryHTML(): string {
 			</div>
 			
 			<div class="history-container">
-				${pmonCommandHistory.length > 0 ? historyItems : `
+				${
+                    pmonCommandHistory.length > 0
+                        ? historyItems
+                        : `
 					<div class="empty-state">
 						<div class="icon">📝</div>
 						<h3>No Command History</h3>
 						<p>Pmon commands executed through VS Code will appear here.</p>
 					</div>
-				`}
+				`
+                }
 			</div>
 		</body>
 		</html>

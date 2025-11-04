@@ -11,7 +11,7 @@ This release system is designed to work with GitHub branch protection rules that
 When your repository has branch protection enabled (requires PRs for changes to `main`):
 
 1. **Release Triggered**: Push to `main` or manual workflow dispatch
-2. **Version Calculation**: Analyzes PR labels or conventional commits  
+2. **Version Calculation**: Analyzes PR labels or conventional commits
 3. **Local Changes**: Updates `package.json` and `CHANGELOG.md` locally
 4. **Tag Creation**: Creates release tag locally
 5. **Release PR**: Creates PR with version/changelog changes
@@ -34,10 +34,12 @@ If no branch protection is enabled:
 ### Primary Release Workflow (`.github/workflows/release.yml`)
 
 **Triggers:**
+
 - Push to `main` branch
 - Manual workflow dispatch
 
 **Key Features:**
+
 - ✅ Respects branch protection rules
 - ✅ Creates immediate releases (no waiting for PR merge)
 - ✅ Automatic PR creation for version updates
@@ -46,6 +48,7 @@ If no branch protection is enabled:
 - ✅ VS Code Marketplace publishing (if configured)
 
 **Steps:**
+
 1. Run tests to ensure code quality
 2. Detect release type from PR labels
 3. Update version and changelog (locally)
@@ -59,11 +62,13 @@ If no branch protection is enabled:
 ### Auto-Merge Workflow (`.github/workflows/auto-merge-release.yml`)
 
 **Triggers:**
+
 - PR opened by `github-actions[bot]`
 - PR title starts with `chore(release):`
 - PR has `release` label
 
 **Key Features:**
+
 - ✅ Automatic approval of release PRs
 - ✅ 30-second delay for CI completion
 - ✅ Squash merge for clean history
@@ -81,6 +86,7 @@ remote: - Changes must be made through a pull request
 ```
 
 **Solution:**
+
 1. Workflow continues normally
 2. Creates PR with version changes
 3. Auto-merge workflow handles the PR
@@ -91,11 +97,13 @@ remote: - Changes must be made through a pull request
 If token doesn't have sufficient permissions:
 
 **Symptoms:**
+
 - Tag push fails
 - PR creation fails
 - Release creation fails
 
 **Solutions:**
+
 1. **Use PAT Token**: Add `PAT_TOKEN` secret with repo admin permissions
 2. **Update Workflow**: The workflow will fall back to `GITHUB_TOKEN`
 3. **Manual Intervention**: Create release manually if needed
@@ -104,26 +112,26 @@ If token doesn't have sufficient permissions:
 
 ### Repository Settings
 
-1. **Branch Protection Rules**: 
-   - ✅ Require pull request reviews before merging
-   - ✅ Restrict pushes that create files
-   - ✅ Allow specified actors (optional: add `github-actions[bot]`)
+1. **Branch Protection Rules**:
+    - ✅ Require pull request reviews before merging
+    - ✅ Restrict pushes that create files
+    - ✅ Allow specified actors (optional: add `github-actions[bot]`)
 
 2. **Required Status Checks**:
-   - Add any CI/CD checks that must pass
-   - Auto-merge will wait 30 seconds for checks
+    - Add any CI/CD checks that must pass
+    - Auto-merge will wait 30 seconds for checks
 
 3. **Auto-merge Settings**:
-   - ✅ Allow auto-merge
-   - ✅ Automatically delete head branches
+    - ✅ Allow auto-merge
+    - ✅ Automatically delete head branches
 
 ### Secrets Configuration
 
-| Secret | Purpose | Required |
-|--------|---------|----------|
-| `GITHUB_TOKEN` | Basic GitHub API access | ✅ Auto-provided |
-| `PAT_TOKEN` | Admin access (optional) | ❌ Fallback for complex rules |
-| `VSCE_PAT` | VS Code Marketplace | ❌ For marketplace publishing |
+| Secret         | Purpose                 | Required                      |
+| -------------- | ----------------------- | ----------------------------- |
+| `GITHUB_TOKEN` | Basic GitHub API access | ✅ Auto-provided              |
+| `PAT_TOKEN`    | Admin access (optional) | ❌ Fallback for complex rules |
+| `VSCE_PAT`     | VS Code Marketplace     | ❌ For marketplace publishing |
 
 ## Benefits
 
@@ -151,6 +159,7 @@ If token doesn't have sufficient permissions:
 **Cause**: Auto-merge workflow didn't run or failed
 
 **Solution**:
+
 ```bash
 # Check for open release PR
 gh pr list --label release
@@ -166,6 +175,7 @@ gh pr merge <PR-NUMBER> --squash
 **Cause**: Release creation step failed
 
 **Solution**:
+
 ```bash
 # Create release manually
 gh release create v1.0.0 --title "Release v1.0.0" --notes "Release notes"
@@ -176,6 +186,7 @@ gh release create v1.0.0 --title "Release v1.0.0" --notes "Release notes"
 **Symptom**: Release PR created but not auto-merged
 
 **Causes & Solutions**:
+
 1. **Missing Labels**: Ensure PR has `release` label
 2. **Wrong Author**: Only works for PRs from `github-actions[bot]`
 3. **Workflow Disabled**: Check if auto-merge workflow is enabled
@@ -186,22 +197,24 @@ gh release create v1.0.0 --title "Release v1.0.0" --notes "Release notes"
 If automation fails, you can always:
 
 1. **Manual Release**:
-   ```bash
-   npm run release:patch  # or minor/major
-   git push --follow-tags
-   gh release create v1.0.0 --generate-notes
-   ```
+
+    ```bash
+    npm run release:patch  # or minor/major
+    git push --follow-tags
+    gh release create v1.0.0 --generate-notes
+    ```
 
 2. **Manual PR Merge**:
-   ```bash
-   gh pr merge <PR-NUMBER> --squash
-   ```
+
+    ```bash
+    gh pr merge <PR-NUMBER> --squash
+    ```
 
 3. **Manual Marketplace Publish**:
-   ```bash
-   vsce publish
-   ```
+    ```bash
+    vsce publish
+    ```
 
 ---
 
-*This system provides the best of both worlds: immediate releases for users while maintaining proper change control through branch protection rules.*
+_This system provides the best of both worlds: immediate releases for users while maintaining proper change control through branch protection rules._

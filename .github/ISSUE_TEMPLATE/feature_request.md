@@ -5,7 +5,6 @@ title: '[FEATURE] '
 labels: 'enhancement'
 assignees: ''
 projects: ['mPokornyETM/3']
-
 ---
 
 **Is your feature request related to a problem? Please describe.**
@@ -18,6 +17,7 @@ A clear and concise description of what you want to happen.
 A clear and concise description of any alternative solutions or features you've considered.
 
 **WinCC OA Context**
+
 - How would this feature help with WinCC OA project management?
 - Which WinCC OA workflow would this improve?
 

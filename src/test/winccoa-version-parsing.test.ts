@@ -1,20 +1,17 @@
 import * as assert from 'assert';
 
 // Import functions from extension
-import { 
-    parseVersionOutput,
-    DetailedVersionInfo
-} from '../extension';
+import { parseVersionOutput, DetailedVersionInfo } from '../extension';
 
 suite('WinCC OA Version Information - Unit Tests', () => {
-    
     suite('parseVersionOutput Function', () => {
         test('should parse valid WCCILpmon output with all information', () => {
-            const output = 'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.20.5 platform Windows AMD64 linked at Mar  2 2025 09:51:08 (faf9f4332a)\nWCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!';
+            const output =
+                'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.20.5 platform Windows AMD64 linked at Mar  2 2025 09:51:08 (faf9f4332a)\nWCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!';
             const executablePath = 'C:\\Siemens\\Automation\\WinCC_OA\\3.20\\bin\\WCCILpmon.exe';
-            
+
             const result = parseVersionOutput(output, executablePath);
-            
+
             assert.strictEqual(result.version, '3.20.5');
             assert.strictEqual(result.platform, 'Windows');
             assert.strictEqual(result.architecture, 'AMD64');
@@ -25,11 +22,12 @@ suite('WinCC OA Version Information - Unit Tests', () => {
         });
 
         test('should parse Linux output format correctly', () => {
-            const output = 'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.21.0 platform Linux x86_64 linked at Jan 15 2025 14:30:22 (abc123def4)\nWCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!';
+            const output =
+                'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.21.0 platform Linux x86_64 linked at Jan 15 2025 14:30:22 (abc123def4)\nWCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!';
             const executablePath = '/opt/wincc_oa/3.21/bin/WCCILpmon';
-            
+
             const result = parseVersionOutput(output, executablePath);
-            
+
             assert.strictEqual(result.version, '3.21.0');
             assert.strictEqual(result.platform, 'Linux');
             assert.strictEqual(result.architecture, 'x86_64');
@@ -39,11 +37,12 @@ suite('WinCC OA Version Information - Unit Tests', () => {
         });
 
         test('should handle partial parsing when build info is missing', () => {
-            const output = 'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.19.8 platform Windows AMD64\nWCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!';
+            const output =
+                'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.19.8 platform Windows AMD64\nWCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!';
             const executablePath = 'C:\\WinCC_OA\\3.19\\bin\\WCCILpmon.exe';
-            
+
             const result = parseVersionOutput(output, executablePath);
-            
+
             assert.strictEqual(result.version, '3.19.8');
             assert.strictEqual(result.platform, 'Windows');
             assert.strictEqual(result.architecture, 'AMD64');
@@ -54,9 +53,9 @@ suite('WinCC OA Version Information - Unit Tests', () => {
         test('should handle completely unparseable output gracefully', () => {
             const output = 'Invalid output format that does not match expected pattern';
             const executablePath = 'C:\\WinCC_OA\\bin\\WCCILpmon.exe';
-            
+
             const result = parseVersionOutput(output, executablePath);
-            
+
             assert.strictEqual(result.version, 'Unknown');
             assert.strictEqual(result.platform, 'Unknown');
             assert.strictEqual(result.architecture, 'Unknown');
@@ -69,9 +68,9 @@ suite('WinCC OA Version Information - Unit Tests', () => {
         test('should handle empty output', () => {
             const output = '';
             const executablePath = 'C:\\WinCC_OA\\bin\\WCCILpmon.exe';
-            
+
             const result = parseVersionOutput(output, executablePath);
-            
+
             assert.strictEqual(result.version, 'Unknown');
             assert.strictEqual(result.platform, 'Unknown');
             assert.strictEqual(result.architecture, 'Unknown');
@@ -84,9 +83,9 @@ suite('WinCC OA Version Information - Unit Tests', () => {
         test('should extract basic version when full parsing fails', () => {
             const output = 'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.18.7 some other format without platform info';
             const executablePath = 'C:\\WinCC_OA\\bin\\WCCILpmon.exe';
-            
+
             const result = parseVersionOutput(output, executablePath);
-            
+
             assert.strictEqual(result.version, '3.18.7');
             assert.strictEqual(result.platform, 'Unknown');
             assert.strictEqual(result.architecture, 'Unknown');
@@ -112,8 +111,11 @@ suite('WinCC OA Version Information - Unit Tests', () => {
 
             testCases.forEach((testCase, index) => {
                 const result = parseVersionOutput(testCase.output, 'test.exe');
-                assert.strictEqual(result.version, testCase.expectedVersion, 
-                    `Test case ${index + 1} failed for version parsing`);
+                assert.strictEqual(
+                    result.version,
+                    testCase.expectedVersion,
+                    `Test case ${index + 1} failed for version parsing`
+                );
             });
         });
 
@@ -138,10 +140,16 @@ suite('WinCC OA Version Information - Unit Tests', () => {
 
             testCases.forEach((testCase, index) => {
                 const result = parseVersionOutput(testCase.output, 'test.exe');
-                assert.strictEqual(result.platform, testCase.expectedPlatform, 
-                    `Test case ${index + 1} failed for platform parsing`);
-                assert.strictEqual(result.architecture, testCase.expectedArchitecture, 
-                    `Test case ${index + 1} failed for architecture parsing`);
+                assert.strictEqual(
+                    result.platform,
+                    testCase.expectedPlatform,
+                    `Test case ${index + 1} failed for platform parsing`
+                );
+                assert.strictEqual(
+                    result.architecture,
+                    testCase.expectedArchitecture,
+                    `Test case ${index + 1} failed for architecture parsing`
+                );
             });
         });
 
@@ -163,8 +171,11 @@ suite('WinCC OA Version Information - Unit Tests', () => {
 
             testCases.forEach((testCase, index) => {
                 const result = parseVersionOutput(testCase.output, 'test.exe');
-                assert.strictEqual(result.buildDate, testCase.expectedBuildDate, 
-                    `Test case ${index + 1} failed for build date parsing`);
+                assert.strictEqual(
+                    result.buildDate,
+                    testCase.expectedBuildDate,
+                    `Test case ${index + 1} failed for build date parsing`
+                );
             });
         });
 
@@ -186,17 +197,21 @@ suite('WinCC OA Version Information - Unit Tests', () => {
 
             testCases.forEach((testCase, index) => {
                 const result = parseVersionOutput(testCase.output, 'test.exe');
-                assert.strictEqual(result.commitHash, testCase.expectedCommitHash, 
-                    `Test case ${index + 1} failed for commit hash parsing`);
+                assert.strictEqual(
+                    result.commitHash,
+                    testCase.expectedCommitHash,
+                    `Test case ${index + 1} failed for commit hash parsing`
+                );
             });
         });
 
         test('should preserve raw output exactly', () => {
-            const output = 'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.20.5 platform Windows AMD64 linked at Mar  2 2025 09:51:08 (faf9f4332a)\nWCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!\n\nExtra content that should be preserved';
+            const output =
+                'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.20.5 platform Windows AMD64 linked at Mar  2 2025 09:51:08 (faf9f4332a)\nWCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!\n\nExtra content that should be preserved';
             const executablePath = 'C:\\test\\WCCILpmon.exe';
-            
+
             const result = parseVersionOutput(output, executablePath);
-            
+
             assert.strictEqual(result.rawOutput, output, 'Raw output should be preserved exactly');
             assert.strictEqual(result.executablePath, executablePath, 'Executable path should be preserved');
         });
@@ -208,19 +223,20 @@ suite('WinCC OA Version Information - Unit Tests', () => {
                 'Additional debug info',
                 'WCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!'
             ].join('\n');
-            
+
             const result = parseVersionOutput(output, 'test.exe');
-            
+
             assert.strictEqual(result.version, '3.20.5');
             assert.strictEqual(result.platform, 'Windows');
             assert.strictEqual(result.architecture, 'AMD64');
         });
 
         test('should handle output with no line breaks', () => {
-            const output = 'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.20.5 platform Windows AMD64 linked at Mar  2 2025 09:51:08 (faf9f4332a) WCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!';
-            
+            const output =
+                'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.20.5 platform Windows AMD64 linked at Mar  2 2025 09:51:08 (faf9f4332a) WCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!';
+
             const result = parseVersionOutput(output, 'test.exe');
-            
+
             assert.strictEqual(result.version, '3.20.5');
             assert.strictEqual(result.platform, 'Windows');
             assert.strictEqual(result.architecture, 'AMD64');
@@ -272,11 +288,12 @@ suite('WinCC OA Version Information - Unit Tests', () => {
 
     suite('Error Resilience and Edge Cases', () => {
         test('should handle null or undefined executable path gracefully', () => {
-            const output = 'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.20.5 platform Windows AMD64 linked at Mar  2 2025 09:51:08 (faf9f4332a)';
-            
+            const output =
+                'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.20.5 platform Windows AMD64 linked at Mar  2 2025 09:51:08 (faf9f4332a)';
+
             const result1 = parseVersionOutput(output, null as any);
             const result2 = parseVersionOutput(output, undefined as any);
-            
+
             assert.strictEqual(result1.executablePath, null);
             assert.strictEqual(result2.executablePath, undefined);
             // Version parsing should still work
@@ -285,12 +302,14 @@ suite('WinCC OA Version Information - Unit Tests', () => {
         });
 
         test('should handle very large output strings', () => {
-            const largeOutput = 'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.20.5 platform Windows AMD64 linked at Mar  2 2025 09:51:08 (faf9f4332a)\n' + 
-                              'A'.repeat(10000) + '\n' +
-                              'WCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!';
-            
+            const largeOutput =
+                'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.20.5 platform Windows AMD64 linked at Mar  2 2025 09:51:08 (faf9f4332a)\n' +
+                'A'.repeat(10000) +
+                '\n' +
+                'WCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!';
+
             const result = parseVersionOutput(largeOutput, 'test.exe');
-            
+
             // Should still parse correctly despite large output
             assert.strictEqual(result.version, '3.20.5');
             assert.strictEqual(result.platform, 'Windows');
@@ -298,20 +317,22 @@ suite('WinCC OA Version Information - Unit Tests', () => {
         });
 
         test('should handle special characters in output', () => {
-            const output = 'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.20.5 platform Windows AMD64 linked at Mar  2 2025 09:51:08 (faf9f4332a)';
-            
+            const output =
+                'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.20.5 platform Windows AMD64 linked at Mar  2 2025 09:51:08 (faf9f4332a)';
+
             const result = parseVersionOutput(output, 'test.exe');
-            
+
             assert.strictEqual(result.version, '3.20.5');
             assert.strictEqual(result.platform, 'Windows');
             assert.strictEqual(result.architecture, 'AMD64');
         });
 
         test('should handle whitespace variations in output', () => {
-            const output = '  WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.20.5    platform   Windows   AMD64   linked   at   Mar    2   2025   09:51:08   (faf9f4332a)  ';
-            
+            const output =
+                '  WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.20.5    platform   Windows   AMD64   linked   at   Mar    2   2025   09:51:08   (faf9f4332a)  ';
+
             const result = parseVersionOutput(output, 'test.exe');
-            
+
             assert.strictEqual(result.version, '3.20.5');
             assert.strictEqual(result.platform, 'Windows');
             assert.strictEqual(result.architecture, 'AMD64');

@@ -8,23 +8,25 @@ All pull requests **MUST** pass the following automated checks before they can b
 
 ### ✅ Required Checks
 
-| Check Name | Node Version | Description |
-|------------|--------------|-------------|
-| `test (18.x)` | Node.js 18.x | Full test suite on LTS version |
+| Check Name    | Node Version | Description                        |
+| ------------- | ------------ | ---------------------------------- |
+| `test (18.x)` | Node.js 18.x | Full test suite on LTS version     |
 | `test (20.x)` | Node.js 20.x | Full test suite on current version |
-| `package` | Node.js 20.x | Extension packaging validation |
+| `package`     | Node.js 20.x | Extension packaging validation     |
 
 ### 📋 What Each Check Does
 
 #### Test Jobs (`test (18.x)`, `test (20.x)`)
+
 ```yaml
 - Install dependencies (npm ci)
 - Run linting (npm run lint)
-- Compile TypeScript (npm run compile)  
+- Compile TypeScript (npm run compile)
 - Execute test suite (npm test)
 ```
 
 #### Package Job (`package`)
+
 ```yaml
 - Install dependencies (npm ci)
 - Build VSIX package (vsce package)
@@ -37,7 +39,7 @@ The following branch protection rules are enforced:
 
 - ✅ **Pull requests required** - No direct pushes to main
 - ✅ **Status checks required** - All CI/CD checks must pass
-- ✅ **Branch must be up-to-date** - Must include latest main changes  
+- ✅ **Branch must be up-to-date** - Must include latest main changes
 - ✅ **Review required** - At least 1 approving review
 - ✅ **No force pushes** - Prevents history rewriting
 - ✅ **No branch deletion** - Protects main branch
@@ -57,6 +59,7 @@ npm test          # ✅ All 166 tests pass
 ```
 
 ### Optional: Package Test
+
 ```bash
 # Install vsce globally (one time)
 npm install -g @vscode/vsce
@@ -68,6 +71,7 @@ vsce package
 ## ❌ Common Failure Scenarios
 
 ### Lint Failures
+
 ```bash
 # Fix automatically where possible
 npm run lint -- --fix
@@ -77,6 +81,7 @@ npm run lint
 ```
 
 ### Compilation Errors
+
 ```bash
 # Check TypeScript errors
 npm run compile
@@ -85,7 +90,8 @@ npm run compile
 # Re-run until clean compilation
 ```
 
-### Test Failures  
+### Test Failures
+
 ```bash
 # Run tests with detailed output
 npm test
@@ -98,6 +104,7 @@ npm test -- --reporter spec
 ```
 
 ### Package Failures
+
 ```bash
 # Check for missing files or dependencies
 vsce package --out test.vsix
@@ -109,8 +116,9 @@ code --install-extension test.vsix
 ## 🚀 Auto-Merge Support
 
 Dependabot PRs are configured for auto-merge when:
+
 - All status checks pass ✅
-- Labeled with `dependencies` 
+- Labeled with `dependencies`
 - Security updates get priority treatment
 
 ## 📞 Getting Help
@@ -118,7 +126,7 @@ Dependabot PRs are configured for auto-merge when:
 If CI/CD checks are failing and you need assistance:
 
 1. **Check the logs** in the GitHub Actions tab
-2. **Run locally** to reproduce the issue  
+2. **Run locally** to reproduce the issue
 3. **Review recent changes** that might have broken tests
 4. **Ask for help** in the PR comments or issues
 

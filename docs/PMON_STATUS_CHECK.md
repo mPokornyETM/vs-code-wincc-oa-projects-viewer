@@ -7,18 +7,22 @@ This feature provides the ability to check if WinCC OA projects are currently ru
 ## Key Changes Made
 
 ### 1. **Corrected WCCILpmon Arguments**
+
 - **Fixed**: Changed from `-project` to `-proj` argument as per WCCILpmon specification
 - **Command**: `WCCILpmon.exe -proj "<project_name>" -status`
 
 ### 2. **Renamed Components for Clarity**
+
 - **Enum**: `ProjectRunningStatus` → `PmonProjectRunningStatus`
 - **Command**: `winccOAProjects.checkProjectStatus` → `winccOAProjects.checkPmonProjectStatus`
 - **Rationale**: Clarifies that we're checking the pmon process status, not the project itself
 
 ### 3. **Status Interpretation**
+
 The feature correctly interprets WCCILpmon exit codes:
+
 - **Exit Code 0**: Pmon is RUNNING
-- **Exit Code 3**: Pmon is STOPPED  
+- **Exit Code 3**: Pmon is STOPPED
 - **Exit Code 4**: Pmon status is UNKNOWN
 
 ## Implementation Details
@@ -27,28 +31,31 @@ The feature correctly interprets WCCILpmon exit codes:
 
 ```typescript
 export enum PmonProjectRunningStatus {
-    RUNNING = 'running',    // Exit code 0: pmon is running
-    STOPPED = 'stopped',    // Exit code 3: pmon is stopped  
-    UNKNOWN = 'unknown'     // Exit code 4: unknown status
+    RUNNING = 'running', // Exit code 0: pmon is running
+    STOPPED = 'stopped', // Exit code 3: pmon is stopped
+    UNKNOWN = 'unknown' // Exit code 4: unknown status
 }
 
-export async function checkProjectRunningStatus(project: WinCCOAProject): Promise<PmonProjectRunningStatus>
-export async function isProjectRunning(project: WinCCOAProject): Promise<boolean>
+export async function checkProjectRunningStatus(project: WinCCOAProject): Promise<PmonProjectRunningStatus>;
+export async function isProjectRunning(project: WinCCOAProject): Promise<boolean>;
 ```
 
 ### VS Code Integration
 
 #### Command
+
 - **ID**: `winccOAProjects.checkPmonProjectStatus`
 - **Title**: "WinCC OA: Check Pmon Project Status"
 - **Icon**: `$(pulse)`
 
 #### Tree View Integration
+
 - **Context Value**: `winccOAProjectRunnable` for runnable projects
-- **Inline Button**: Status check button (pulse icon) for runnable projects  
+- **Inline Button**: Status check button (pulse icon) for runnable projects
 - **Context Menu**: Right-click option for runnable projects
 
 #### Command Palette
+
 - Available via Command Palette: "WinCC OA: Check Pmon Project Status"
 - Shows quick pick for runnable projects if none selected
 
@@ -62,12 +69,15 @@ export async function isProjectRunning(project: WinCCOAProject): Promise<boolean
 ### User Experience
 
 #### Status Display
+
 - **Running**: ✅ "Project 'ProjectName' is currently RUNNING."
 - **Stopped**: ⏹️ "Project 'ProjectName' is currently STOPPED."
 - **Unknown**: ❓ "Project 'ProjectName' status is UNKNOWN."
 
 #### Output Logging
+
 All operations are logged to the "WinCC OA Projects" output channel with detailed information:
+
 - Command execution details
 - Exit codes and interpretation
 - Error messages and troubleshooting information
@@ -75,6 +85,7 @@ All operations are logged to the "WinCC OA Projects" output channel with detaile
 ## Usage Examples
 
 ### Programmatic Usage
+
 ```typescript
 // Check status and get enum value
 const status = await checkProjectRunningStatus(project);
@@ -86,6 +97,7 @@ console.log(isRunning); // true or false (throws error for unknown)
 ```
 
 ### User Interface
+
 1. **Tree View Button**: Click pulse icon ($(pulse)) on runnable projects
 2. **Context Menu**: Right-click runnable project → "WinCC OA: Check Pmon Project Status"
 3. **Command Palette**: `Ctrl+Shift+P` → "WinCC OA: Check Pmon Project Status"
@@ -93,6 +105,7 @@ console.log(isRunning); // true or false (throws error for unknown)
 ## Testing
 
 The feature includes comprehensive unit tests covering:
+
 - Enum values validation
 - Project type validation (runnable vs system)
 - Error handling scenarios
@@ -103,6 +116,7 @@ The feature includes comprehensive unit tests covering:
 ## Future Enhancements
 
 This foundation enables future WCCILpmon process management features:
+
 - Start/stop/restart projects
 - Manager-level control (start/stop individual components)
 - Real-time status monitoring
