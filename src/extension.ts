@@ -9,6 +9,19 @@ import * as childProcess from 'child_process';
 // Global output channel for WCCILpmon command outputs
 let outputChannel: vscode.OutputChannel;
 
+// Pmon command history tracking
+interface PmonCommandHistory {
+	timestamp: Date;
+	project: string;
+	command: string;
+	response: string;
+	success: boolean;
+	errorReason?: string;
+}
+
+// Global command history storage
+let pmonCommandHistory: PmonCommandHistory[] = [];
+
 /**
  * Gets the platform-specific path to the pvssInst.conf file
  * @returns The full path to the pvssInst.conf file
@@ -21,6 +34,278 @@ function getPvssInstConfPath(): string {
 		// Unix/Linux path
 		return '/etc/opt/pvss/pvssInst.conf';
 	}
+}
+
+/**
+ * Analyzes pmon command response to determine success/failure
+ * @param response - The raw response from pmon command
+ * @returns Object with success status and error reason if failed
+ */
+function analyzePmonResponse(response: string): { success: boolean; errorReason?: string } {
+	const trimmedResponse = response.trim();
+	
+	if (trimmedResponse === 'OK') {
+		return { success: true };
+	}
+	
+	if (trimmedResponse.startsWith('ERROR')) {
+		const errorReason = trimmedResponse.substring(5).trim(); // Remove 'ERROR' prefix
+		return { success: false, errorReason };
+	}
+	
+	// Consider empty or other responses as successful if they don't start with ERROR
+	return { success: true };
+}
+
+/**
+ * Adds a command to the pmon command history
+ * @param project - Project name
+ * @param command - Command that was executed
+ * @param response - Response received from pmon
+ */
+function addToCommandHistory(project: string, command: string, response: string): void {
+	const analysis = analyzePmonResponse(response);
+	
+	const historyEntry: PmonCommandHistory = {
+		timestamp: new Date(),
+		project,
+		command,
+		response: response.trim(),
+		success: analysis.success,
+		errorReason: analysis.errorReason
+	};
+	
+	pmonCommandHistory.unshift(historyEntry); // Add to beginning
+	
+	// Keep only last 100 entries to prevent memory bloat
+	if (pmonCommandHistory.length > 100) {
+		pmonCommandHistory = pmonCommandHistory.slice(0, 100);
+	}
+	
+	// Log to output channel
+	const status = analysis.success ? '✅' : '❌';
+	const errorInfo = analysis.errorReason ? ` (${analysis.errorReason})` : '';
+	outputChannel.appendLine(`${status} [${historyEntry.timestamp.toLocaleString()}] ${project}: ${command}${errorInfo}`);
+	
+	// Show warning for errors
+	if (!analysis.success) {
+		vscode.window.showWarningMessage(
+			`WinCC OA Command Failed: ${command}\nReason: ${analysis.errorReason || 'Unknown error'}`,
+			'Show History'
+		).then(selection => {
+			if (selection === 'Show History') {
+				showCommandHistory();
+			}
+		});
+	}
+}
+
+/**
+ * Shows the command history in a webview panel
+ */
+function showCommandHistory(): void {
+	const panel = vscode.window.createWebviewPanel(
+		'winccOACommandHistory',
+		'WinCC OA Pmon Command History',
+		vscode.ViewColumn.One,
+		{ enableScripts: true }
+	);
+
+	panel.webview.html = generateCommandHistoryHTML();
+
+	// Handle webview messages
+	panel.webview.onDidReceiveMessage(
+		(message) => {
+			switch (message.command) {
+				case 'refreshHistory':
+					// Refresh the command history display
+					panel.webview.html = generateCommandHistoryHTML();
+					break;
+			}
+		}
+	);
+}
+
+/**
+ * Generates HTML for command history display
+ */
+function generateCommandHistoryHTML(): string {
+	const historyRows = pmonCommandHistory.map(entry => `
+		<tr class="${entry.success ? '' : 'error-row'}">
+			<td>${entry.timestamp.toLocaleString()}</td>
+			<td>${entry.project}</td>
+			<td><code>${entry.command}</code></td>
+			<td class="${entry.success ? 'success' : 'error'}">${entry.success ? '✅ OK' : '❌ ERROR'}</td>
+			<td title="${entry.response}">${entry.success ? 'OK' : (entry.errorReason || 'Unknown error')}</td>
+		</tr>
+	`).join('');
+
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WinCC OA Pmon Command History</title>
+    <style>
+        body {
+            font-family: var(--vscode-font-family);
+            padding: 20px;
+            color: var(--vscode-foreground);
+            background-color: var(--vscode-editor-background);
+        }
+        .header {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--vscode-panel-border);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border: 1px solid var(--vscode-panel-border);
+        }
+        th {
+            background-color: var(--vscode-panel-background);
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+        }
+        tr:nth-child(even) {
+            background-color: var(--vscode-input-background);
+        }
+        .error-row {
+            background-color: rgba(220, 53, 69, 0.05) !important;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .no-history {
+            text-align: center;
+            padding: 40px;
+            color: var(--vscode-descriptionForeground);
+        }
+        code {
+            background-color: var(--vscode-textCodeBlock-background);
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: var(--vscode-editor-font-family);
+        }
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        .header-info {
+            flex: 1;
+        }
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .refresh-btn {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background-color 0.2s;
+        }
+        .refresh-btn:hover {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+        .refresh-icon {
+            transition: transform 0.5s;
+        }
+        .refresh-btn.refreshing .refresh-icon {
+            transform: rotate(360deg);
+        }
+        .history-count {
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="header-info">
+                <h1>📋 WinCC OA Pmon Command History</h1>
+                <p>Recent pmon command executions with responses and status</p>
+                <div class="history-count">Total commands: ${pmonCommandHistory.length}</div>
+            </div>
+            <div class="header-actions">
+                <button id="refreshBtn" class="refresh-btn" onclick="refreshHistory()" title="Refresh Command History">
+                    <span class="refresh-icon">🔄</span> Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+
+    ${pmonCommandHistory.length > 0 ? `
+    <table>
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Project</th>
+                <th>Command</th>
+                <th>Status</th>
+                <th>Response/Error</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${historyRows}
+        </tbody>
+    </table>
+    ` : `
+    <div class="no-history">
+        <h3>No command history available</h3>
+        <p>Execute some pmon commands to see the history here.</p>
+    </div>
+    `}
+
+    <script>
+        const vscode = acquireVsCodeApi();
+        
+        function refreshHistory() {
+            const refreshBtn = document.getElementById('refreshBtn');
+            const refreshIcon = refreshBtn.querySelector('.refresh-icon');
+            
+            // Show loading state
+            refreshBtn.disabled = true;
+            refreshBtn.classList.add('refreshing');
+            
+            // Send refresh command to extension
+            vscode.postMessage({
+                command: 'refreshHistory'
+            });
+            
+            // Reset button after animation
+            setTimeout(() => {
+                refreshBtn.disabled = false;
+                refreshBtn.classList.remove('refreshing');
+            }, 500);
+        }
+    </script>
+</body>
+</html>`;
 }
 
 
@@ -526,6 +811,567 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
+	const checkPmonProjectStatusCommand = vscode.commands.registerCommand('winccOAProjects.checkPmonProjectStatus', async (project?: WinCCOAProject) => {
+		if (!project) {
+			// Show quick pick for runnable projects only
+			const runnableProjects = provider.getProjects().filter(p => p.isRunnable && !p.isWinCCOASystem);
+			
+			if (runnableProjects.length === 0) {
+				vscode.window.showWarningMessage('No runnable WinCC OA projects found.');
+				return;
+			}
+
+			const projectItems = runnableProjects.map(p => ({
+				label: p.config.name,
+				description: p.config.installationDir,
+				detail: `Version: ${p.version || 'Unknown'}`,
+				project: p
+			}));
+
+			const selected = await vscode.window.showQuickPick(projectItems, {
+				placeHolder: 'Select a runnable WinCC OA project to check status...',
+				matchOnDescription: true,
+				matchOnDetail: true
+			});
+
+			if (!selected) {
+				return;
+			}
+			project = selected.project;
+		}
+
+		// Validate that the project is runnable
+		if (!project.isRunnable) {
+			vscode.window.showErrorMessage(`Project '${project.config.name}' is not runnable. Only runnable projects can have their status checked.`);
+			return;
+		}
+
+		// Validate that it's not a system installation
+		if (project.isWinCCOASystem) {
+			vscode.window.showErrorMessage(`Cannot check status for WinCC OA system installation '${project.config.name}'. Use this command only for user projects.`);
+			return;
+		}
+
+		try {
+			outputChannel.show(true);
+			const status = await checkProjectRunningStatus(project);
+			
+			// Update the project's pmon status and refresh tree view
+			await provider.updateProjectPmonStatus(project);
+			
+			let message: string;
+			let icon: string;
+			
+			switch (status) {
+				case PmonProjectRunningStatus.RUNNING:
+					icon = '✅';
+					message = `Project '${project.config.name}' is currently RUNNING.`;
+					break;
+				case PmonProjectRunningStatus.STOPPED:
+					icon = '⏹️';
+					message = `Project '${project.config.name}' is currently STOPPED.`;
+					break;
+				case PmonProjectRunningStatus.UNKNOWN:
+					icon = '❓';
+					message = `Project '${project.config.name}' status is UNKNOWN.`;
+					break;
+				default:
+					icon = '❌';
+					message = `Project '${project.config.name}' has unexpected status: ${status}`;
+					break;
+			}
+
+			outputChannel.appendLine(`${icon} ${message}`);
+			vscode.window.showInformationMessage(
+				`${icon} ${message}`,
+				'Show Output'
+			).then(selection => {
+				if (selection === 'Show Output') {
+					outputChannel.show();
+				}
+			});
+
+		} catch (error) {
+			const errorMsg = `Failed to check project status: ${error}`;
+			outputChannel.appendLine(`❌ ${errorMsg}`);
+			vscode.window.showErrorMessage(errorMsg);
+		}
+	});
+
+	// Pmon management commands
+	const refreshAllStatusCommand = vscode.commands.registerCommand('winccOAProjects.refreshAllStatus', async () => {
+		try {
+			const allProjects = provider.getProjects();
+			if (!allProjects || allProjects.length === 0) {
+				vscode.window.showInformationMessage('No projects to refresh status for.');
+				return;
+			}
+
+			outputChannel.appendLine('🔄 Refreshing status for all projects...');
+			outputChannel.show(true);
+
+			const runnableProjects = allProjects.filter((p: WinCCOAProject) => p.isRunnable && !p.isWinCCOASystem);
+			if (runnableProjects.length === 0) {
+				vscode.window.showInformationMessage('No runnable projects found.');
+				return;
+			}
+
+			const statusResults = await Promise.allSettled(
+				runnableProjects.map(async (project: WinCCOAProject) => {
+					try {
+						const status = await checkProjectRunningStatus(project);
+						return { project: project.config.name, status };
+					} catch (error) {
+						return { project: project.config.name, status: PmonProjectRunningStatus.UNKNOWN, error };
+					}
+				})
+			);
+
+			const results = statusResults.map((result: any, index: number) => {
+				if (result.status === 'fulfilled') {
+					return result.value;
+				} else {
+					return { 
+						project: runnableProjects[index].config.name, 
+						status: PmonProjectRunningStatus.UNKNOWN, 
+						error: result.reason 
+					};
+				}
+			});
+
+			// Display results
+			const runningProjects = results.filter((r: any) => r.status === PmonProjectRunningStatus.RUNNING);
+			const stoppedProjects = results.filter((r: any) => r.status === PmonProjectRunningStatus.STOPPED);
+			const unknownProjects = results.filter((r: any) => r.status === PmonProjectRunningStatus.UNKNOWN);
+
+			let message = `Status refresh complete:\n`;
+			message += `✅ Running: ${runningProjects.length}\n`;
+			message += `⏹️ Stopped: ${stoppedProjects.length}\n`;
+			message += `❓ Unknown: ${unknownProjects.length}`;
+
+			outputChannel.appendLine(message);
+			vscode.window.showInformationMessage(`Project status refreshed: ${runningProjects.length} running, ${stoppedProjects.length} stopped, ${unknownProjects.length} unknown`);
+
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			outputChannel.appendLine(`❌ Error refreshing all status: ${errorMessage}`);
+			vscode.window.showErrorMessage(`Error refreshing project status: ${errorMessage}`);
+		}
+	});
+
+	const showAllRunnableStatusCommand = vscode.commands.registerCommand('winccOAProjects.showAllRunnableStatus', async () => {
+		try {
+			const allProjects = provider.getProjects();
+			if (!allProjects || allProjects.length === 0) {
+				vscode.window.showInformationMessage('No projects found.');
+				return;
+			}
+
+			const runnableProjects = allProjects.filter((p: WinCCOAProject) => p.isRunnable && !p.isWinCCOASystem);
+			if (runnableProjects.length === 0) {
+				vscode.window.showInformationMessage('No runnable projects found.');
+				return;
+			}
+
+			outputChannel.appendLine('📊 Retrieving status for all runnable projects...');
+			outputChannel.show(true);
+
+			const statusPromises = runnableProjects.map(async (project: WinCCOAProject) => {
+				try {
+					const status = await getComprehensiveProjectStatus(project);
+					return status;
+				} catch (error) {
+					return {
+						projectName: project.config.name,
+						isRunning: false,
+						managers: [],
+						pmonStatus: PmonProjectRunningStatus.UNKNOWN,
+						lastUpdate: new Date(),
+						error: error instanceof Error ? error.message : String(error)
+					} as WinCCOAProjectStatus & { error: string };
+				}
+			});
+
+			const statusResults = await Promise.allSettled(statusPromises);
+			const allStatus = statusResults.map((result: any, index: number) => {
+				if (result.status === 'fulfilled') {
+					return result.value;
+				} else {
+					return {
+						projectName: runnableProjects[index].config.name,
+						isRunning: false,
+						managers: [],
+						pmonStatus: PmonProjectRunningStatus.UNKNOWN,
+						lastUpdate: new Date(),
+						error: result.reason instanceof Error ? result.reason.message : String(result.reason)
+					} as WinCCOAProjectStatus & { error: string };
+				}
+			});
+
+			// Create and show webview panel with status overview
+			const panel = vscode.window.createWebviewPanel(
+				'winccOAProjectStatus',
+				'WinCC OA Project Status Overview',
+				vscode.ViewColumn.One,
+				{ enableScripts: true }
+			);
+
+			panel.webview.html = generateStatusOverviewHTML(allStatus);
+
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			outputChannel.appendLine(`❌ Error showing project status: ${errorMessage}`);
+			vscode.window.showErrorMessage(`Error showing project status: ${errorMessage}`);
+		}
+	});
+
+	const startPmonOnlyCommand = vscode.commands.registerCommand('winccOAProjects.startPmonOnly', async (project?: WinCCOAProject) => {
+		try {
+			if (!project) {
+				vscode.window.showErrorMessage('No project selected');
+				return;
+			}
+			await startPmonOnly(project);
+			// Update pmon status after operation
+			await provider.updateProjectPmonStatus(project);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			outputChannel.appendLine(`❌ Error starting pmon: ${errorMessage}`);
+			vscode.window.showErrorMessage(`Error starting pmon: ${errorMessage}`);
+		}
+	});
+
+	const startProjectCommand = vscode.commands.registerCommand('winccOAProjects.startProject', async (project?: WinCCOAProject) => {
+		try {
+			if (!project) {
+				vscode.window.showErrorMessage('No project selected');
+				return;
+			}
+			await startProject(project);
+			// Update pmon status after operation
+			await provider.updateProjectPmonStatus(project);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			outputChannel.appendLine(`❌ Error starting project: ${errorMessage}`);
+			vscode.window.showErrorMessage(`Error starting project: ${errorMessage}`);
+		}
+	});
+
+	const stopProjectCommand = vscode.commands.registerCommand('winccOAProjects.stopProject', async (project?: WinCCOAProject) => {
+		try {
+			if (!project) {
+				vscode.window.showErrorMessage('No project selected');
+				return;
+			}
+			await stopProject(project);
+			// Update pmon status after operation
+			await provider.updateProjectPmonStatus(project);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			outputChannel.appendLine(`❌ Error stopping project: ${errorMessage}`);
+			vscode.window.showErrorMessage(`Error stopping project: ${errorMessage}`);
+		}
+	});
+
+	const stopProjectAndPmonCommand = vscode.commands.registerCommand('winccOAProjects.stopProjectAndPmon', async (project?: WinCCOAProject) => {
+		try {
+			if (!project) {
+				vscode.window.showErrorMessage('No project selected');
+				return;
+			}
+			await stopProjectAndPmon(project);
+			// Update pmon status after operation
+			await provider.updateProjectPmonStatus(project);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			outputChannel.appendLine(`❌ Error stopping project and pmon: ${errorMessage}`);
+			vscode.window.showErrorMessage(`Error stopping project and pmon: ${errorMessage}`);
+		}
+	});
+
+	const restartProjectCommand = vscode.commands.registerCommand('winccOAProjects.restartProject', async (project?: WinCCOAProject) => {
+		try {
+			if (!project) {
+				vscode.window.showErrorMessage('No project selected');
+				return;
+			}
+			await restartProject(project);
+			await provider.updateProjectPmonStatus(project);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			outputChannel.appendLine(`❌ Error restarting project: ${errorMessage}`);
+			vscode.window.showErrorMessage(`Error restarting project: ${errorMessage}`);
+		}
+	});
+
+	const setPmonWaitModeCommand = vscode.commands.registerCommand('winccOAProjects.setPmonWaitMode', async (project?: WinCCOAProject) => {
+		try {
+			if (!project) {
+				vscode.window.showErrorMessage('No project selected');
+				return;
+			}
+			await setPmonWaitMode(project);
+			await provider.updateProjectPmonStatus(project);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			outputChannel.appendLine(`❌ Error setting pmon wait mode: ${errorMessage}`);
+			vscode.window.showErrorMessage(`Error setting pmon wait mode: ${errorMessage}`);
+		}
+	});
+
+	const showManagerOverviewCommand = vscode.commands.registerCommand('winccOAProjects.showManagerOverview', async (project?: WinCCOAProject) => {
+		try {
+			if (!project) {
+				vscode.window.showErrorMessage('No project selected');
+				return;
+			}
+
+			outputChannel.appendLine(`📋 Getting manager overview for project: ${project.config.name}`);
+			outputChannel.show(true);
+
+			// Get both configuration (LIST) and runtime status (STATI)
+			const [configManagers, statusResult] = await Promise.all([
+				getManagerList(project),
+				getDetailedManagerStatus(project)
+			]);
+			
+			const panel = vscode.window.createWebviewPanel(
+				'winccOAManagerOverview',
+				`Manager Overview - ${project.config.name}`,
+				vscode.ViewColumn.One,
+				{ enableScripts: true }
+			);
+
+			panel.webview.html = generateManagerOverviewHTML(project, configManagers, statusResult.managers, statusResult.projectState);
+
+			// Handle webview messages
+			panel.webview.onDidReceiveMessage(
+				async (message) => {
+					try {
+						switch (message.command) {
+							case 'refreshManagerOverview':
+								// Refresh the manager overview data
+								const [newConfigManagers, newStatusResult] = await Promise.all([
+									getManagerList(project),
+									getDetailedManagerStatus(project)
+								]);
+								panel.webview.html = generateManagerOverviewHTML(project, newConfigManagers, newStatusResult.managers, newStatusResult.projectState);
+								break;
+							case 'startManager':
+								await startManager(project, message.index);
+								// Refresh data after action
+								const [refreshedConfigManagers1, refreshedStatusResult1] = await Promise.all([
+									getManagerList(project),
+									getDetailedManagerStatus(project)
+								]);
+								panel.webview.html = generateManagerOverviewHTML(project, refreshedConfigManagers1, refreshedStatusResult1.managers, refreshedStatusResult1.projectState);
+								break;
+							case 'stopManager':
+								await stopManager(project, message.index);
+								// Refresh data after action
+								const [refreshedConfigManagers2, refreshedStatusResult2] = await Promise.all([
+									getManagerList(project),
+									getDetailedManagerStatus(project)
+								]);
+								panel.webview.html = generateManagerOverviewHTML(project, refreshedConfigManagers2, refreshedStatusResult2.managers, refreshedStatusResult2.projectState);
+								break;
+							case 'killManager':
+								await killManager(project, message.index);
+								// Refresh data after action
+								const [refreshedConfigManagers3, refreshedStatusResult3] = await Promise.all([
+									getManagerList(project),
+									getDetailedManagerStatus(project)
+								]);
+								panel.webview.html = generateManagerOverviewHTML(project, refreshedConfigManagers3, refreshedStatusResult3.managers, refreshedStatusResult3.projectState);
+								break;
+							case 'getAutoRefreshSettings':
+								// Send current auto-refresh settings to webview
+								const config = vscode.workspace.getConfiguration('winccOAProjects.managerOverview');
+								const interval = config.get<number>('autoRefreshInterval', 5);
+								const enabled = config.get<boolean>('enableAutoRefresh', true);
+								
+								panel.webview.postMessage({
+									command: 'setRefreshInterval',
+									interval: interval
+								});
+								panel.webview.postMessage({
+									command: 'setAutoRefreshEnabled',
+									enabled: enabled
+								});
+								break;
+							case 'setAutoRefresh':
+								// Update auto-refresh setting
+								const autoRefreshConfig = vscode.workspace.getConfiguration('winccOAProjects.managerOverview');
+								await autoRefreshConfig.update('enableAutoRefresh', message.enabled, vscode.ConfigurationTarget.Global);
+								break;
+						}
+					} catch (error) {
+						const errorMessage = error instanceof Error ? error.message : String(error);
+						outputChannel.appendLine(`❌ Error handling webview message: ${errorMessage}`);
+						vscode.window.showErrorMessage(`Error: ${errorMessage}`);
+					}
+				},
+				undefined,
+				context.subscriptions
+			);
+
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			outputChannel.appendLine(`❌ Error getting manager overview: ${errorMessage}`);
+			vscode.window.showErrorMessage(`Error getting manager overview: ${errorMessage}`);
+		}
+	});
+
+	const startManagerCommand = vscode.commands.registerCommand('winccOAProjects.startManager', async (project?: WinCCOAProject) => {
+		try {
+			if (!project) {
+				vscode.window.showErrorMessage('No project selected');
+				return;
+			}
+
+			const indexInput = await vscode.window.showInputBox({
+				prompt: 'Enter manager index to start',
+				placeHolder: '0, 1, 2, ...',
+				validateInput: (value) => {
+					const index = parseInt(value, 10);
+					if (isNaN(index) || index < 0) {
+						return 'Please enter a valid positive number';
+					}
+					return null;
+				}
+			});
+
+			if (indexInput === undefined) {
+				return; // User cancelled
+			}
+
+			const index = parseInt(indexInput, 10);
+			await startManager(project, index);
+			await provider.updateProjectPmonStatus(project);
+
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			outputChannel.appendLine(`❌ Error starting manager: ${errorMessage}`);
+			vscode.window.showErrorMessage(`Error starting manager: ${errorMessage}`);
+		}
+	});
+
+	const stopManagerCommand = vscode.commands.registerCommand('winccOAProjects.stopManager', async (project?: WinCCOAProject) => {
+		try {
+			if (!project) {
+				vscode.window.showErrorMessage('No project selected');
+				return;
+			}
+
+			const indexInput = await vscode.window.showInputBox({
+				prompt: 'Enter manager index to stop',
+				placeHolder: '0, 1, 2, ...',
+				validateInput: (value) => {
+					const index = parseInt(value, 10);
+					if (isNaN(index) || index < 0) {
+						return 'Please enter a valid positive number';
+					}
+					return null;
+				}
+			});
+
+			if (indexInput === undefined) {
+				return; // User cancelled
+			}
+
+			const index = parseInt(indexInput, 10);
+			await stopManager(project, index);
+			await provider.updateProjectPmonStatus(project);
+
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			outputChannel.appendLine(`❌ Error stopping manager: ${errorMessage}`);
+			vscode.window.showErrorMessage(`Error stopping manager: ${errorMessage}`);
+		}
+	});
+
+	const killManagerCommand = vscode.commands.registerCommand('winccOAProjects.killManager', async (project?: WinCCOAProject) => {
+		try {
+			if (!project) {
+				vscode.window.showErrorMessage('No project selected');
+				return;
+			}
+
+			const indexInput = await vscode.window.showInputBox({
+				prompt: 'Enter manager index to kill',
+				placeHolder: '0, 1, 2, ...',
+				validateInput: (value) => {
+					const index = parseInt(value, 10);
+					if (isNaN(index) || index < 0) {
+						return 'Please enter a valid positive number';
+					}
+					return null;
+				}
+			});
+
+			if (indexInput === undefined) {
+				return; // User cancelled
+			}
+
+			const index = parseInt(indexInput, 10);
+			await killManager(project, index);
+			await provider.updateProjectPmonStatus(project);
+
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			outputChannel.appendLine(`❌ Error killing manager: ${errorMessage}`);
+			vscode.window.showErrorMessage(`Error killing manager: ${errorMessage}`);
+		}
+	});
+
+	const removeManagerCommand = vscode.commands.registerCommand('winccOAProjects.removeManager', async (project?: WinCCOAProject) => {
+		try {
+			if (!project) {
+				vscode.window.showErrorMessage('No project selected');
+				return;
+			}
+
+			const indexInput = await vscode.window.showInputBox({
+				prompt: 'Enter manager index to remove',
+				placeHolder: '0, 1, 2, ...',
+				validateInput: (value) => {
+					const index = parseInt(value, 10);
+					if (isNaN(index) || index < 0) {
+						return 'Please enter a valid positive number';
+					}
+					return null;
+				}
+			});
+
+			if (indexInput === undefined) {
+				return; // User cancelled
+			}
+
+			const index = parseInt(indexInput, 10);
+			
+			// Confirm removal
+			const confirmation = await vscode.window.showWarningMessage(
+				`Are you sure you want to remove manager ${index} from project '${project.config.name}'?`,
+				{ modal: true },
+				'Yes, Remove'
+			);
+
+			if (confirmation === 'Yes, Remove') {
+				await removeManager(project, index);
+				await provider.updateProjectPmonStatus(project);
+			}
+
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			outputChannel.appendLine(`❌ Error removing manager: ${errorMessage}`);
+			vscode.window.showErrorMessage(`Error removing manager: ${errorMessage}`);
+		}
+	});
+
+	const showCommandHistoryCommand = vscode.commands.registerCommand('winccOAProjects.showCommandHistory', () => {
+		showCommandHistory();
+	});
+
 	context.subscriptions.push(
 		treeView, 
 		watcher,
@@ -542,7 +1388,22 @@ export function activate(context: vscode.ExtensionContext) {
 		clearFilterCommand,
 		registerSubProjectCommand,
 		registerRunnableProjectCommand,
-		getVersionInfoCommand
+		getVersionInfoCommand,
+		checkPmonProjectStatusCommand,
+		refreshAllStatusCommand,
+		showAllRunnableStatusCommand,
+		startPmonOnlyCommand,
+		startProjectCommand,
+		stopProjectCommand,
+		stopProjectAndPmonCommand,
+		restartProjectCommand,
+		setPmonWaitModeCommand,
+		showManagerOverviewCommand,
+		showCommandHistoryCommand,
+		startManagerCommand,
+		stopManagerCommand,
+		killManagerCommand,
+		removeManagerCommand
 	);
 
 	// Auto-refresh when extension starts
@@ -662,6 +1523,1083 @@ export function canUnregisterProject(project: WinCCOAProject): { canUnregister: 
 	return { canUnregister: true };
 }
 
+/**
+ * Generate HTML for project status overview
+ */
+function generateStatusOverviewHTML(statusList: (WinCCOAProjectStatus & { error?: string })[]): string {
+	const runningProjects = statusList.filter(s => s.pmonStatus === PmonProjectRunningStatus.RUNNING);
+	const stoppedProjects = statusList.filter(s => s.pmonStatus === PmonProjectRunningStatus.STOPPED);
+	const unknownProjects = statusList.filter(s => s.pmonStatus === PmonProjectRunningStatus.UNKNOWN);
+	
+	const projectRows = statusList.map(status => {
+		const statusIcon = status.pmonStatus === PmonProjectRunningStatus.RUNNING ? '✅' : 
+						  status.pmonStatus === PmonProjectRunningStatus.STOPPED ? '⏹️' : '❓';
+		const statusText = status.pmonStatus === PmonProjectRunningStatus.RUNNING ? 'Running' : 
+						  status.pmonStatus === PmonProjectRunningStatus.STOPPED ? 'Stopped' : 'Unknown';
+		const statusColor = status.pmonStatus === PmonProjectRunningStatus.RUNNING ? '#28a745' : 
+						   status.pmonStatus === PmonProjectRunningStatus.STOPPED ? '#ffc107' : '#dc3545';
+		
+		const managerCount = status.managers?.length || 0;
+		const runningManagers = status.managers?.filter(m => m.status?.toLowerCase().includes('running') || m.status?.toLowerCase().includes('started'))?.length || 0;
+		
+		return `
+			<tr>
+				<td><strong>${status.projectName}</strong></td>
+				<td style="color: ${statusColor};">${statusIcon} ${statusText}</td>
+				<td>${managerCount}</td>
+				<td>${runningManagers}</td>
+				<td>${status.lastUpdate.toLocaleString()}</td>
+				${status.error ? `<td style="color: #dc3545;">${status.error}</td>` : '<td>-</td>'}
+			</tr>
+		`;
+	}).join('');
+
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WinCC OA Project Status Overview</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: var(--vscode-editor-background);
+            color: var(--vscode-editor-foreground);
+        }
+        .header {
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--vscode-panel-border);
+        }
+        .summary {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .summary-card {
+            flex: 1;
+            padding: 15px;
+            background-color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 5px;
+            text-align: center;
+        }
+        .summary-number {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .running { color: #28a745; }
+        .stopped { color: #ffc107; }
+        .unknown { color: #dc3545; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border: 1px solid var(--vscode-panel-border);
+        }
+        th {
+            background-color: var(--vscode-panel-background);
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: var(--vscode-input-background);
+        }
+        .refresh-button {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .refresh-button:hover {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🖥️ WinCC OA Project Status Overview</h1>
+        <p>Comprehensive status of all runnable projects</p>
+        <button class="refresh-button" onclick="refreshStatus()">🔄 Refresh All Status</button>
+    </div>
+
+    <div class="summary">
+        <div class="summary-card">
+            <div class="summary-number running">${runningProjects.length}</div>
+            <div>Running</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number stopped">${stoppedProjects.length}</div>
+            <div>Stopped</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number unknown">${unknownProjects.length}</div>
+            <div>Unknown</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number">${statusList.length}</div>
+            <div>Total Projects</div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Project Name</th>
+                <th>Status</th>
+                <th>Total Managers</th>
+                <th>Running Managers</th>
+                <th>Last Updated</th>
+                <th>Error</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${projectRows}
+        </tbody>
+    </table>
+
+    <script>
+        function refreshStatus() {
+            // This would trigger VS Code command
+            console.log('Refresh status requested');
+        }
+    </script>
+</body>
+</html>`;
+}
+
+/**
+ * Generate HTML for manager list
+ */
+/**
+ * Generate comprehensive manager overview HTML combining LIST and STATI data
+ */
+function generateManagerOverviewHTML(
+	project: WinCCOAProject, 
+	configManagers: WinCCOAManager[], 
+	statusManagers: WinCCOAManager[], 
+	projectState?: WinCCOAProjectState
+): string {
+	// Merge configuration and status data
+	const mergedManagers: WinCCOAManager[] = configManagers.map((configMgr, index) => {
+		// Find corresponding status manager by index
+		const statusMgr = statusManagers.find(sm => sm.index === configMgr.index);
+		
+		return {
+			...configMgr,
+			// Override with runtime status if available
+			runningState: (statusMgr?.runningState as 'stopped' | 'init' | 'running' | 'blocked') || undefined,
+			pid: statusMgr?.pid,
+			startTimeStamp: statusMgr?.startTimeStamp,
+			managerNumber: statusMgr?.managerNumber
+		};
+	});
+
+	// Calculate health score
+	const healthScore = calculateProjectHealth(mergedManagers, projectState);
+
+	const managerRows = mergedManagers.map((manager) => {
+		// Determine status icon and color based on running state
+		let statusIcon = '❓';
+		let statusColor = '#6c757d';
+		
+		switch (manager.runningState) {
+			case 'running':
+				statusIcon = '✅';
+				statusColor = '#28a745';
+				break;
+			case 'stopped':
+				statusIcon = '⏹️';
+				statusColor = '#ffc107';
+				break;
+			case 'init':
+				statusIcon = '🔄';
+				statusColor = '#17a2b8';
+				break;
+			case 'blocked':
+				statusIcon = '🚫';
+				statusColor = '#dc3545';
+				break;
+		}
+
+		const startModeIcon = manager.startMode === 'always' ? '🔄' : 
+							 manager.startMode === 'once' ? '1️⃣' : '🖐️';
+
+		return `
+		<tr class="${manager.pid === -2 ? 'fatal-error-row' : ''}">
+			<td>${manager.index}</td>
+			<td class="${manager.pid === -2 ? 'fatal-error' : ''}">${manager.pid === -2 ? '⚠️ ' : ''}<strong>${manager.name}</strong></td>
+			<td style="color: ${statusColor};">${statusIcon} ${manager.runningState || 'unknown'}</td>
+			<td title="${manager.pid === -2 ? 'FATAL ERROR: Manager cannot start - check WinCC OA logs for DB connection, configuration errors, etc.' : 'Process ID'}" class="${manager.pid === -2 ? 'fatal-error' : ''}">${manager.pid === -2 ? '⚠️ FATAL' : (manager.pid || '')}</td>
+			<td>${startModeIcon} ${manager.startMode || ''}</td>
+			<td title="${manager.secKill && manager.secKill < 0 ? 'Manager will NOT be stopped on project restart' : 'Seconds to kill manager on restart'}">${manager.secKill ? (manager.secKill < 0 ? `🔒 ${manager.secKill}` : manager.secKill) : ''}</td>
+			<td>${manager.restartCount || ''}</td>
+			<td>${manager.resetMin || ''}</td>
+			<td title="${manager.args || ''}" class="args-cell">${manager.args ? (manager.args.length > 30 ? manager.args.substring(0, 30) + '...' : manager.args) : ''}</td>
+			<td>${manager.startTimeStamp ? manager.startTimeStamp.toLocaleString() : ''}</td>
+			<td>
+				<button onclick="startManager(${manager.index})" class="action-btn start-btn" ${manager.runningState === 'running' ? 'disabled' : ''}>▶️</button>
+				<button onclick="stopManager(${manager.index})" class="action-btn stop-btn" ${manager.runningState === 'stopped' ? 'disabled' : ''}>⏹️</button>
+				<button onclick="killManager(${manager.index})" class="action-btn kill-btn" ${manager.runningState === 'stopped' ? 'disabled' : ''}>❌</button>
+			</td>
+		</tr>
+		`;
+	}).join('');
+
+	// Calculate summary statistics
+	const runningCount = mergedManagers.filter(m => m.runningState === 'running').length;
+	const stoppedCount = mergedManagers.filter(m => m.runningState === 'stopped').length;
+	const initCount = mergedManagers.filter(m => m.runningState === 'init').length;
+	const blockedCount = mergedManagers.filter(m => m.runningState === 'blocked').length;
+	const totalCount = mergedManagers.length;
+
+	// Project state information with health score
+	const projectStateHtml = `
+		<div class="project-state">
+			<div class="health-score-section">
+				<h3>📊 Project Health Assessment</h3>
+				<div class="health-score-container">
+					<div class="health-score-circle" style="background: conic-gradient(${getHealthScoreColor(healthScore.overallScore)} ${healthScore.overallScore}%, #e0e0e0 0%);">
+						<div class="health-score-inner">
+							<div class="health-score-number">${healthScore.overallScore}</div>
+							<div class="health-grade">${getHealthGradeIcon(healthScore.grade)} ${healthScore.grade}</div>
+						</div>
+					</div>
+					<div class="health-details">
+						<div class="health-status" style="color: ${getHealthScoreColor(healthScore.overallScore)};">
+							<strong>${healthScore.status}</strong>
+						</div>
+						<div class="health-breakdown">
+							<div class="health-metric">
+								<span class="metric-label">Managers:</span>
+								<span class="metric-value">${healthScore.details.managerHealth}%</span>
+							</div>
+							<div class="health-metric">
+								<span class="metric-label">Project State:</span>
+								<span class="metric-value">${healthScore.details.projectStateHealth}%</span>
+							</div>
+							<div class="health-metric">
+								<span class="metric-label">Performance:</span>
+								<span class="metric-value">${healthScore.details.performanceHealth}%</span>
+							</div>
+							<div class="health-metric">
+								<span class="metric-label">Reliability:</span>
+								<span class="metric-value">${healthScore.details.reliabilityHealth}%</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			
+			${projectState ? `
+			<div class="project-state-info">
+				<h3>🎯 Project State</h3>
+				<div class="state-info">
+					<span class="state-badge state-${projectState.status.toLowerCase()}">${projectState.status}</span>
+					<span class="state-text">${projectState.text}</span>
+					${projectState.emergency ? '<span class="emergency-badge">🚨 EMERGENCY</span>' : ''}
+					${projectState.demo ? '<span class="demo-badge">🧪 DEMO</span>' : ''}
+				</div>
+			</div>
+			` : ''}
+
+			${healthScore.issues.length > 0 ? `
+			<div class="health-issues">
+				<h4>⚠️ Issues Identified</h4>
+				<ul class="issue-list">
+					${healthScore.issues.map(issue => `<li>${issue}</li>`).join('')}
+				</ul>
+			</div>
+			` : ''}
+
+			${healthScore.recommendations.length > 0 ? `
+			<div class="health-recommendations">
+				<h4>💡 Recommendations</h4>
+				<ul class="recommendation-list">
+					${healthScore.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+				</ul>
+			</div>
+			` : ''}
+		</div>
+	`;
+
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manager Overview - ${project.config.name}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: var(--vscode-editor-background);
+            color: var(--vscode-editor-foreground);
+        }
+        .header {
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--vscode-panel-border);
+        }
+        .project-state {
+            background-color: var(--vscode-input-background);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        /* Health Score Styles */
+        .health-score-section h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: var(--vscode-textLink-foreground);
+        }
+        .health-score-container {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            margin-bottom: 20px;
+        }
+        .health-score-circle {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            flex-shrink: 0;
+        }
+        .health-score-inner {
+            width: 90px;
+            height: 90px;
+            background-color: var(--vscode-editor-background);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .health-score-number {
+            font-size: 28px;
+            font-weight: bold;
+            line-height: 1;
+        }
+        .health-grade {
+            font-size: 14px;
+            margin-top: 4px;
+            opacity: 0.8;
+        }
+        .health-details {
+            flex: 1;
+        }
+        .health-status {
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        .health-breakdown {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px;
+        }
+        .health-metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+        }
+        .metric-label {
+            opacity: 0.8;
+        }
+        .metric-value {
+            font-weight: bold;
+        }
+        
+        .project-state-info {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
+        .state-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .health-issues, .health-recommendations {
+            margin-top: 15px;
+        }
+        .health-issues h4, .health-recommendations h4 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+        }
+        .health-issues h4 {
+            color: #ffc107;
+        }
+        .health-recommendations h4 {
+            color: #17a2b8;
+        }
+        .issue-list, .recommendation-list {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .issue-list li, .recommendation-list li {
+            margin: 4px 0;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .issue-list li {
+            color: #ffc107;
+        }
+        .recommendation-list li {
+            color: #17a2b8;
+        }
+        .state-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        .state-down { background-color: #ffc107; color: #000; }
+        .state-starting { background-color: #17a2b8; color: #fff; }
+        .state-monitoring { background-color: #28a745; color: #fff; }
+        .state-stopping { background-color: #fd7e14; color: #fff; }
+        .state-restarting { background-color: #6f42c1; color: #fff; }
+        .state-unknown { background-color: #6c757d; color: #fff; }
+        .emergency-badge, .demo-badge {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        .emergency-badge { background-color: #dc3545; color: #fff; }
+        .demo-badge { background-color: #fd7e14; color: #fff; }
+        .summary {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .summary-card {
+            flex: 1;
+            background-color: var(--vscode-input-background);
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .summary-number {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .running { color: #28a745; }
+        .stopped { color: #ffc107; }
+        .init { color: #17a2b8; }
+        .blocked { color: #dc3545; }
+        .total { color: var(--vscode-editor-foreground); }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border: 1px solid var(--vscode-panel-border);
+        }
+        th {
+            background-color: var(--vscode-panel-background);
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+        }
+        tr:nth-child(even) {
+            background-color: var(--vscode-input-background);
+        }
+        .args-cell {
+            max-width: 200px;
+            word-wrap: break-word;
+        }
+        .action-btn {
+            margin: 0 2px;
+            padding: 4px 8px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .start-btn { background-color: #28a745; color: white; }
+        .stop-btn { background-color: #ffc107; color: black; }
+        .kill-btn { background-color: #dc3545; color: white; }
+        .fatal-error {
+            color: #dc3545 !important;
+            font-weight: bold;
+            background-color: rgba(220, 53, 69, 0.1);
+            border-left: 4px solid #dc3545;
+            padding-left: 8px;
+        }
+        .fatal-error-row {
+            background-color: rgba(220, 53, 69, 0.05) !important;
+        }
+        .no-managers {
+            text-align: center;
+            padding: 40px;
+            color: var(--vscode-descriptionForeground);
+        }
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        .header-info {
+            flex: 1;
+        }
+        .header-actions {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+        }
+        .refresh-btn {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background-color 0.2s;
+        }
+        .refresh-btn:hover {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+        .refresh-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .refresh-icon {
+            transition: transform 0.5s;
+        }
+        .refresh-btn.refreshing .refresh-icon {
+            transform: rotate(360deg);
+        }
+        .auto-refresh-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
+        }
+        .next-refresh {
+            font-style: italic;
+        }
+        .last-update {
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="header-info">
+                <h1>🛠️ Manager Overview</h1>
+                <p><strong>Project:</strong> ${project.config.name}</p>
+                <p><strong>Installation:</strong> ${project.config.installationDir}</p>
+                <p><strong>Version:</strong> ${project.version || 'Unknown'}</p>
+            </div>
+            <div class="header-actions">
+                <button id="refreshBtn" class="refresh-btn" onclick="refreshData()" title="Refresh Manager Data">
+                    <span class="refresh-icon">🔄</span> Refresh
+                </button>
+                <div class="auto-refresh-controls">
+                    <input type="checkbox" id="autoRefreshToggle" onchange="toggleAutoRefresh()">
+                    <label for="autoRefreshToggle">Auto-refresh</label>
+                    <span id="nextRefresh" class="next-refresh"></span>
+                </div>
+            </div>
+        </div>
+        <div id="lastUpdate" class="last-update">Last updated: ${new Date().toLocaleString()}</div>
+    </div>
+    
+    ${projectStateHtml}
+    
+    <div class="summary">
+        <div class="summary-card">
+            <div class="summary-number running">${runningCount}</div>
+            <div>Running</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number stopped">${stoppedCount}</div>
+            <div>Stopped</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number init">${initCount}</div>
+            <div>Initializing</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number blocked">${blockedCount}</div>
+            <div>Blocked</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number total">${totalCount}</div>
+            <div>Total</div>
+        </div>
+    </div>
+
+    ${totalCount > 0 ? `
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Manager</th>
+                <th>Status</th>
+                <th title="Process ID. ⚠️ FATAL = Manager cannot start due to critical errors (check logs)">PID</th>
+                <th>Start Mode</th>
+                <th title="Seconds to kill manager on restart. Negative values (🔒) = won't be stopped on project restart">Sec Kill</th>
+                <th>Restart Count</th>
+                <th>Reset Min</th>
+                <th>Arguments</th>
+                <th>Start Time</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${managerRows}
+        </tbody>
+    </table>
+    ` : `
+    <div class="no-managers">
+        <h3>No managers found</h3>
+        <p>This project doesn't have any configured managers.</p>
+    </div>
+    `}
+
+    <script>
+        const vscode = acquireVsCodeApi();
+        
+        function startManager(index) {
+            vscode.postMessage({
+                command: 'startManager',
+                index: index
+            });
+        }
+        
+        function stopManager(index) {
+            vscode.postMessage({
+                command: 'stopManager',
+                index: index
+            });
+        }
+        
+        function killManager(index) {
+            vscode.postMessage({
+                command: 'killManager',
+                index: index
+            });
+        }
+        
+        // Auto-refresh functionality
+        let autoRefreshTimer = null;
+        let countdownTimer = null;
+        let refreshInterval = 5000; // Default 5 seconds
+        let nextRefreshTime = 0;
+        
+        function refreshData() {
+            const refreshBtn = document.getElementById('refreshBtn');
+            const refreshIcon = refreshBtn.querySelector('.refresh-icon');
+            
+            // Show loading state
+            refreshBtn.disabled = true;
+            refreshBtn.classList.add('refreshing');
+            
+            // Send refresh command to extension
+            vscode.postMessage({
+                command: 'refreshManagerOverview'
+            });
+            
+            // Update last update time
+            document.getElementById('lastUpdate').textContent = 'Last updated: ' + new Date().toLocaleString();
+            
+            // Reset refresh button after animation
+            setTimeout(() => {
+                refreshBtn.disabled = false;
+                refreshBtn.classList.remove('refreshing');
+            }, 500);
+        }
+        
+        function toggleAutoRefresh() {
+            const toggle = document.getElementById('autoRefreshToggle');
+            const nextRefreshSpan = document.getElementById('nextRefresh');
+            
+            if (toggle.checked) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+                nextRefreshSpan.textContent = '';
+            }
+            
+            // Save preference to extension
+            vscode.postMessage({
+                command: 'setAutoRefresh',
+                enabled: toggle.checked
+            });
+        }
+        
+        function startAutoRefresh() {
+            stopAutoRefresh(); // Clear any existing timers
+            
+            nextRefreshTime = Date.now() + refreshInterval;
+            updateCountdown();
+            
+            autoRefreshTimer = setInterval(() => {
+                refreshData();
+                nextRefreshTime = Date.now() + refreshInterval;
+            }, refreshInterval);
+            
+            countdownTimer = setInterval(updateCountdown, 1000);
+        }
+        
+        function stopAutoRefresh() {
+            if (autoRefreshTimer) {
+                clearInterval(autoRefreshTimer);
+                autoRefreshTimer = null;
+            }
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+            }
+        }
+        
+        function updateCountdown() {
+            const nextRefreshSpan = document.getElementById('nextRefresh');
+            const remaining = Math.max(0, Math.ceil((nextRefreshTime - Date.now()) / 1000));
+            
+            if (remaining > 0) {
+                nextRefreshSpan.textContent = '(next in ' + remaining + 's)';
+            } else {
+                nextRefreshSpan.textContent = '(refreshing...)';
+            }
+        }
+        
+        // Initialize auto-refresh settings from extension
+        window.addEventListener('message', event => {
+            const message = event.data;
+            switch (message.command) {
+                case 'setRefreshInterval':
+                    refreshInterval = message.interval * 1000; // Convert to milliseconds
+                    if (document.getElementById('autoRefreshToggle').checked) {
+                        startAutoRefresh(); // Restart with new interval
+                    }
+                    break;
+                case 'setAutoRefreshEnabled':
+                    document.getElementById('autoRefreshToggle').checked = message.enabled;
+                    if (message.enabled) {
+                        startAutoRefresh();
+                    } else {
+                        stopAutoRefresh();
+                    }
+                    break;
+            }
+        });
+        
+        // Request initial settings from extension
+        vscode.postMessage({
+            command: 'getAutoRefreshSettings'
+        });
+    </script>
+</body>
+</html>`;
+}
+
+function generateManagerListHTML(project: WinCCOAProject, managers: WinCCOAManager[]): string {
+	const managerRows = managers.map((manager, index) => `
+		<tr>
+			<td>${manager.index}</td>
+			<td>${manager.name}</td>
+			<td>${manager.status || 'Unknown'}</td>
+			<td>${manager.startMode || ''}</td>
+			<td title="${manager.secKill && manager.secKill < 0 ? 'Manager will NOT be stopped on project restart' : 'Seconds to kill manager on restart'}">${manager.secKill ? (manager.secKill < 0 ? `🔒 ${manager.secKill}` : manager.secKill) : ''}</td>
+			<td>${manager.restartCount || ''}</td>
+			<td>${manager.resetMin || ''}</td>
+			<td>${manager.args || ''}</td>
+		</tr>
+	`).join('');
+
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manager List - ${project.config.name}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: var(--vscode-editor-background);
+            color: var(--vscode-editor-foreground);
+        }
+        .header {
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--vscode-panel-border);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border: 1px solid var(--vscode-panel-border);
+        }
+        th {
+            background-color: var(--vscode-panel-background);
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: var(--vscode-input-background);
+        }
+        .no-managers {
+            text-align: center;
+            padding: 40px;
+            color: var(--vscode-descriptionForeground);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 Manager List</h1>
+        <p>Project: <strong>${project.config.name}</strong></p>
+        <p>Total Managers: <strong>${managers.length}</strong></p>
+    </div>
+
+    ${managers.length > 0 ? `
+    <table>
+        <thead>
+            <tr>
+                <th>Index</th>
+                <th>Manager Name</th>
+                <th>Status</th>
+                <th>Start Mode</th>
+                <th title="Seconds to kill manager on restart. Negative values (🔒) = won't be stopped on project restart">Sec Kill</th>
+                <th>Restart Count</th>
+                <th>Reset Min</th>
+                <th>Arguments</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${managerRows}
+        </tbody>
+    </table>
+    ` : `
+    <div class="no-managers">
+        <h3>No managers configured</h3>
+        <p>This project does not have any managers configured yet.</p>
+    </div>
+    `}
+</body>
+</html>`;
+}
+
+/**
+ * Generate HTML for manager status
+ */
+function generateManagerStatusHTML(project: WinCCOAProject, managers: WinCCOAManager[]): string {
+	const managerRows = managers.map((manager, index) => {
+		const statusIcon = manager.status?.toLowerCase().includes('running') || manager.status?.toLowerCase().includes('started') ? '✅' : 
+						  manager.status?.toLowerCase().includes('stopped') ? '⏹️' : '❓';
+		const statusColor = manager.status?.toLowerCase().includes('running') || manager.status?.toLowerCase().includes('started') ? '#28a745' : 
+						   manager.status?.toLowerCase().includes('stopped') ? '#ffc107' : '#dc3545';
+		
+		return `
+		<tr class="${manager.pid === -2 ? 'fatal-error-row' : ''}">
+			<td>${manager.index}</td>
+			<td class="${manager.pid === -2 ? 'fatal-error' : ''}">${manager.pid === -2 ? '⚠️ ' : ''}<strong>${manager.name}</strong></td>
+			<td style="color: ${statusColor};">${statusIcon} ${manager.status || 'Unknown'}</td>
+			<td title="${manager.pid === -2 ? 'FATAL ERROR: Manager cannot start - check WinCC OA logs for DB connection, configuration errors, etc.' : 'Process ID'}" class="${manager.pid === -2 ? 'fatal-error' : ''}">${manager.pid === -2 ? '⚠️ FATAL' : (manager.pid || '')}</td>
+			<td>${manager.startMode || ''}</td>
+			<td>
+				<button onclick="startManager(${manager.index})" class="action-btn start-btn">▶️ Start</button>
+				<button onclick="stopManager(${manager.index})" class="action-btn stop-btn">⏹️ Stop</button>
+				<button onclick="killManager(${manager.index})" class="action-btn kill-btn">❌ Kill</button>
+			</td>
+		</tr>
+		`;
+	}).join('');
+
+	const runningCount = managers.filter(m => m.status?.toLowerCase().includes('running') || m.status?.toLowerCase().includes('started')).length;
+	const stoppedCount = managers.filter(m => m.status?.toLowerCase().includes('stopped')).length;
+
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manager Status - ${project.config.name}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: var(--vscode-editor-background);
+            color: var(--vscode-editor-foreground);
+        }
+        .header {
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--vscode-panel-border);
+        }
+        .summary {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .summary-card {
+            flex: 1;
+            padding: 15px;
+            background-color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 5px;
+            text-align: center;
+        }
+        .summary-number {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border: 1px solid var(--vscode-panel-border);
+        }
+        th {
+            background-color: var(--vscode-panel-background);
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: var(--vscode-input-background);
+        }
+        .action-btn {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin: 2px;
+            font-size: 12px;
+        }
+        .action-btn:hover {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+        .start-btn { background-color: #28a745; }
+        .stop-btn { background-color: #ffc107; }
+        .kill-btn { background-color: #dc3545; }
+        .fatal-error {
+            color: #dc3545 !important;
+            font-weight: bold;
+            background-color: rgba(220, 53, 69, 0.1);
+            border-left: 4px solid #dc3545;
+            padding-left: 8px;
+        }
+        .fatal-error-row {
+            background-color: rgba(220, 53, 69, 0.05) !important;
+        }
+        .no-managers {
+            text-align: center;
+            padding: 40px;
+            color: var(--vscode-descriptionForeground);
+        }
+        .running { color: #28a745; }
+        .stopped { color: #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Manager Status</h1>
+        <p>Project: <strong>${project.config.name}</strong></p>
+    </div>
+
+    <div class="summary">
+        <div class="summary-card">
+            <div class="summary-number running">${runningCount}</div>
+            <div>Running</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number stopped">${stoppedCount}</div>
+            <div>Stopped</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number">${managers.length}</div>
+            <div>Total Managers</div>
+        </div>
+    </div>
+
+    ${managers.length > 0 ? `
+    <table>
+        <thead>
+            <tr>
+                <th>Index</th>
+                <th>Manager Name</th>
+                <th>Status</th>
+                <th title="Process ID. ⚠️ FATAL = Manager cannot start due to critical errors (check logs)">PID</th>
+                <th>Start Mode</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${managerRows}
+        </tbody>
+    </table>
+    ` : `
+    <div class="no-managers">
+        <h3>No manager status available</h3>
+        <p>Unable to retrieve manager status for this project.</p>
+    </div>
+    `}
+
+    <script>
+        function startManager(index) {
+            console.log('Start manager:', index);
+            // This would trigger VS Code command
+        }
+        
+        function stopManager(index) {
+            console.log('Stop manager:', index);
+            // This would trigger VS Code command
+        }
+        
+        function killManager(index) {
+            console.log('Kill manager:', index);
+            // This would trigger VS Code command
+        }
+    </script>
+</body>
+</html>`;
+}
+
 class ProjectCategory extends vscode.TreeItem {
 	public subCategories: ProjectCategory[] = [];
 
@@ -719,6 +2657,8 @@ class ProjectCategory extends vscode.TreeItem {
 }
 
 class WinCCOAProject extends vscode.TreeItem {
+	private _pmonStatus: PmonProjectRunningStatus = PmonProjectRunningStatus.UNKNOWN;
+	
 	constructor(
 		public readonly config: ProjectConfig,
 		public readonly installationDir: string,
@@ -730,6 +2670,16 @@ class WinCCOAProject extends vscode.TreeItem {
 		
 		this.tooltip = this.createTooltip();
 		this.description = this.createDescription();
+		this.contextValue = this.getContextValue();
+		this.iconPath = this.getIcon();
+	}
+
+	public get pmonStatus(): PmonProjectRunningStatus {
+		return this._pmonStatus;
+	}
+
+	public set pmonStatus(status: PmonProjectRunningStatus) {
+		this._pmonStatus = status;
 		this.contextValue = this.getContextValue();
 		this.iconPath = this.getIcon();
 	}
@@ -753,7 +2703,21 @@ class WinCCOAProject extends vscode.TreeItem {
 			return 'winccOAProjectProtected';
 		}
 		
-		// Regular projects that can be unregistered
+		// Differentiate between runnable and non-runnable projects with pmon status
+		if (this.isRunnable) {
+			// Add pmon status to context for runnable projects to enable/disable commands
+			switch (this._pmonStatus) {
+				case PmonProjectRunningStatus.RUNNING:
+					return 'winccOAProjectRunnableRunning';
+				case PmonProjectRunningStatus.STOPPED:
+					return 'winccOAProjectRunnableStopped';
+				case PmonProjectRunningStatus.UNKNOWN:
+				default:
+					return 'winccOAProjectRunnable';
+			}
+		}
+		
+		// Regular projects that can be unregistered but are not runnable (sub-projects)
 		return 'winccOAProject';
 	}
 
@@ -834,13 +2798,21 @@ class WinCCOAProject extends vscode.TreeItem {
 			// Unregistered projects get a warning icon
 			return new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'));
 		} else if (this.isCurrent) {
-			return new vscode.ThemeIcon('star-full');
+			return new vscode.ThemeIcon('star-full', new vscode.ThemeColor('list.highlightForeground'));
 		} else if (this.isWinCCOASystem) {
 			// WinCC OA system installations (name equals version)
 			return new vscode.ThemeIcon('gear');
 		} else if (this.isRunnable) {
-			// Runnable projects - use server/monitor icon
-			return new vscode.ThemeIcon('server-process');
+			// Runnable projects - use different icons based on pmon status
+			switch (this._pmonStatus) {
+				case PmonProjectRunningStatus.RUNNING:
+					return new vscode.ThemeIcon('play-circle', new vscode.ThemeColor('testing.iconPassed'));
+				case PmonProjectRunningStatus.STOPPED:
+					return new vscode.ThemeIcon('stop-circle', new vscode.ThemeColor('testing.iconFailed'));
+				case PmonProjectRunningStatus.UNKNOWN:
+				default:
+					return new vscode.ThemeIcon('server-process');
+			}
 		} else {
 			// Non-runnable are extensions/plugins/add-ons
 			return new vscode.ThemeIcon('extensions');
@@ -866,6 +2838,46 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
 			console.error('Error refreshing projects:', error);
 			this._onDidChangeTreeData.fire();
 		});
+	}
+
+	/**
+	 * Updates pmon status for all runnable projects and refreshes the tree view
+	 */
+	async updatePmonStatuses(): Promise<void> {
+		const runnableProjects = this.projects.filter(p => p.isRunnable && !p.isWinCCOASystem);
+		
+		for (const project of runnableProjects) {
+			try {
+				const status = await checkProjectRunningStatus(project);
+				project.pmonStatus = status;
+			} catch (error) {
+				// If we can't determine status, set to unknown
+				project.pmonStatus = PmonProjectRunningStatus.UNKNOWN;
+			}
+		}
+		
+		// Refresh tree view to show updated icons and context
+		this._onDidChangeTreeData.fire();
+	}
+
+	/**
+	 * Updates pmon status for a specific project and refreshes the tree view
+	 */
+	async updateProjectPmonStatus(project: WinCCOAProject): Promise<void> {
+		if (!project.isRunnable || project.isWinCCOASystem) {
+			return;
+		}
+		
+		try {
+			const status = await checkProjectRunningStatus(project);
+			project.pmonStatus = status;
+		} catch (error) {
+			// If we can't determine status, set to unknown
+			project.pmonStatus = PmonProjectRunningStatus.UNKNOWN;
+		}
+		
+		// Refresh tree view to show updated icons and context
+		this._onDidChangeTreeData.fire();
 	}
 
 	getProjects(): WinCCOAProject[] {
@@ -2596,14 +4608,14 @@ async function registerRunnableProject(project: WinCCOAProject): Promise<void> {
 	}
 
 	return new Promise<void>((resolve, reject) => {
-		const args = ['-config', `"${configFilePath}"`, '-status', '-log', '+stderr', '-autofreg'];
+		const args = ['-config', configFilePath, '-status', '-log', '+stderr', '-autofreg'];
 		
-		outputChannel.appendLine(`[Runnable Project Registration] Executing: "${pmonPath}" ${args.join(' ')}`);
+		outputChannel.appendLine(`[Runnable Project Registration] Executing: ${pmonPath} ${args.join(' ')}`);
 		outputChannel.show(true); // Show the output channel
 		
-		const child = childProcess.spawn(`"${pmonPath}"`, args, {
+		const child = childProcess.spawn(pmonPath, args, {
 			stdio: ['pipe', 'pipe', 'pipe'],
-			shell: true
+			shell: false
 		});
 
 		let stdout = '';
@@ -2658,14 +4670,14 @@ async function registerSubProject(project: WinCCOAProject): Promise<void> {
 	}
 
 	return new Promise<void>((resolve, reject) => {
-		const args = ['-regsubf', '-proj', `"${project.config.installationDir}"`, '-log', '+stderr'];
+		const args = ['-regsubf', '-proj', project.config.installationDir, '-log', '+stderr'];
 		
-		outputChannel.appendLine(`[Sub-Project Registration] Executing: "${pmonPath}" ${args.join(' ')}`);
+		outputChannel.appendLine(`[Sub-Project Registration] Executing: ${pmonPath} ${args.join(' ')}`);
 		outputChannel.show(true); // Show the output channel
 		
-		const child = childProcess.spawn(`"${pmonPath}"`, args, {
+		const child = childProcess.spawn(pmonPath, args, {
 			stdio: ['pipe', 'pipe', 'pipe'],
-			shell: true,
+			shell: false,
 			cwd: project.config.installationDir // Execute in project directory
 		});
 
@@ -2803,6 +4815,1271 @@ function getAvailableWinCCOAVersions(): string[] {
 }
 
 /**
+ * Pmon project running status enum based on WCCILpmon exit codes
+ */
+export enum PmonProjectRunningStatus {
+	RUNNING = 'running',           // Exit code 0: pmon is running
+	STOPPED = 'stopped',          // Exit code 3: pmon is stopped  
+	UNKNOWN = 'unknown'           // Exit code 4: unknown status
+}
+
+/**
+ * Checks if a WinCC OA project is currently running using WCCILpmon status command
+ * @param project The WinCC OA project to check
+ * @returns Promise that resolves to the project running status
+ */
+export async function checkProjectRunningStatus(project: WinCCOAProject): Promise<PmonProjectRunningStatus> {
+	// Only check status for runnable projects
+	if (!project.isRunnable || project.isWinCCOASystem) {
+		throw new Error(`Cannot check status for non-runnable project: ${project.config.name}`);
+	}
+
+	// Get the appropriate WCCILpmon path for this project's version
+	const pmonPath = getWCCILpmonPath(project.version);
+	if (!pmonPath) {
+		throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+	}
+
+	// Build command arguments: -proj <project_name> -status
+	const args = ['-proj', project.config.name, '-status'];
+	
+	outputChannel.appendLine(`[Project Status Check] Checking status for project: ${project.config.name}`);
+	outputChannel.appendLine(`[Project Status Check] Executing: ${pmonPath} ${args.join(' ')}`);
+
+	return new Promise<PmonProjectRunningStatus>((resolve, reject) => {
+		const child = childProcess.spawn(pmonPath, args, {
+			stdio: ['pipe', 'pipe', 'pipe'],
+			shell: false,
+			cwd: project.config.installationDir
+		});
+
+		let stdout = '';
+		let stderr = '';
+
+		child.stdout?.on('data', (data) => {
+			stdout += data.toString();
+		});
+
+		child.stderr?.on('data', (data) => {
+			stderr += data.toString();
+		});
+
+		child.on('error', (error) => {
+			outputChannel.appendLine(`[Project Status Check] ❌ Failed to execute WCCILpmon: ${error.message}`);
+			reject(new Error(`Failed to execute WCCILpmon: ${error.message}`));
+		});
+
+		child.on('close', (code) => {
+			outputChannel.appendLine(`[Project Status Check] WCCILpmon exited with code: ${code}`);
+			
+			if (stdout.trim()) {
+				outputChannel.appendLine(`[Project Status Check] stdout: ${stdout.trim()}`);
+			}
+			if (stderr.trim()) {
+				outputChannel.appendLine(`[Project Status Check] stderr: ${stderr.trim()}`);
+			}
+
+			// Interpret exit codes according to WCCILpmon specification
+			let status: PmonProjectRunningStatus;
+			switch (code) {
+				case 0:
+					status = PmonProjectRunningStatus.RUNNING;
+					outputChannel.appendLine(`[Project Status Check] ✅ Project '${project.config.name}' is RUNNING`);
+					break;
+				case 3:
+					status = PmonProjectRunningStatus.STOPPED;
+					outputChannel.appendLine(`[Project Status Check] ⏹️ Project '${project.config.name}' is STOPPED`);
+					break;
+				case 4:
+					status = PmonProjectRunningStatus.UNKNOWN;
+					outputChannel.appendLine(`[Project Status Check] ❓ Project '${project.config.name}' status is UNKNOWN`);
+					break;
+				default:
+					// Any other exit code is treated as an error
+					const errorMsg = `Unexpected exit code ${code} when checking project status`;
+					outputChannel.appendLine(`[Project Status Check] ❌ ${errorMsg}`);
+					reject(new Error(errorMsg));
+					return;
+			}
+
+			resolve(status);
+		});
+	});
+}
+
+/**
+ * Checks if a WinCC OA project is currently running (convenience function)
+ * @param project The WinCC OA project to check
+ * @returns Promise that resolves to true if running, false if stopped, throws error if unknown or failed
+ */
+export async function isProjectRunning(project: WinCCOAProject): Promise<boolean> {
+	const status = await checkProjectRunningStatus(project);
+	
+	switch (status) {
+		case PmonProjectRunningStatus.RUNNING:
+			return true;
+		case PmonProjectRunningStatus.STOPPED:
+			return false;
+		case PmonProjectRunningStatus.UNKNOWN:
+			throw new Error(`Project '${project.config.name}' status is unknown`);
+		default:
+			throw new Error(`Unexpected project status: ${status}`);
+	}
+}
+
+/**
+ * Interface for manager information
+ */
+export interface WinCCOAManager {
+	index: number;
+	name: string;
+	status: string;
+	pid?: number;
+	startMode?: 'manual' | 'once' | 'always';
+	secKill?: number;
+	restartCount?: number;
+	resetMin?: number;
+	args?: string;
+	// Additional fields from MGRLIST:STATI
+	runningState?: 'stopped' | 'init' | 'running' | 'blocked';
+	managerNumber?: number;
+	startTimeStamp?: Date;
+}
+
+/**
+ * Interface for detailed project state from MGRLIST:STATI
+ */
+export interface WinCCOAProjectState {
+	status: 'Unknown' | 'Down' | 'Starting' | 'Monitoring' | 'Stopping' | 'Restarting';
+	statusCode: number;
+	text: string;
+	emergency: boolean;
+	demo: boolean;
+}
+
+/**
+ * Interface for project status with managers
+ */
+export interface WinCCOAProjectStatus {
+	projectName: string;
+	isRunning: boolean;
+	managers: WinCCOAManager[];
+	pmonStatus: PmonProjectRunningStatus;
+	lastUpdate: Date;
+	projectState?: WinCCOAProjectState;
+}
+
+/**
+ * Interface for project health assessment
+ */
+export interface WinCCOAProjectHealth {
+	overallScore: number; // 0-100
+	grade: 'A' | 'B' | 'C' | 'D' | 'F';
+	status: 'Excellent' | 'Good' | 'Fair' | 'Poor' | 'Critical';
+	issues: string[];
+	recommendations: string[];
+	details: {
+		managerHealth: number;
+		projectStateHealth: number;
+		performanceHealth: number;
+		reliabilityHealth: number;
+	};
+}
+
+/**
+ * Calculates comprehensive health score for a WinCC OA project
+ * @param managers List of managers with their status
+ * @param projectState Current project state
+ * @returns Health assessment with score, grade, and recommendations
+ */
+export function calculateProjectHealth(
+	managers: WinCCOAManager[], 
+	projectState?: WinCCOAProjectState
+): WinCCOAProjectHealth {
+	const issues: string[] = [];
+	const recommendations: string[] = [];
+	
+	// 1. Manager Health Score (40% weight)
+	const managerHealth = calculateManagerHealth(managers, issues, recommendations);
+	
+	// 2. Project State Health Score (30% weight)
+	const projectStateHealth = calculateProjectStateHealth(projectState, issues, recommendations);
+	
+	// 3. Performance Health Score (20% weight)
+	const performanceHealth = calculatePerformanceHealth(managers, issues, recommendations);
+	
+	// 4. Reliability Health Score (10% weight)
+	const reliabilityHealth = calculateReliabilityHealth(managers, projectState, issues, recommendations);
+	
+	// Calculate weighted overall score
+	const overallScore = Math.round(
+		managerHealth * 0.4 +
+		projectStateHealth * 0.3 +
+		performanceHealth * 0.2 +
+		reliabilityHealth * 0.1
+	);
+	
+	// Determine grade and status
+	let grade: WinCCOAProjectHealth['grade'];
+	let status: WinCCOAProjectHealth['status'];
+	
+	if (overallScore >= 90) {
+		grade = 'A';
+		status = 'Excellent';
+	} else if (overallScore >= 80) {
+		grade = 'B';
+		status = 'Good';
+	} else if (overallScore >= 70) {
+		grade = 'C';
+		status = 'Fair';
+	} else if (overallScore >= 60) {
+		grade = 'D';
+		status = 'Poor';
+	} else {
+		grade = 'F';
+		status = 'Critical';
+	}
+	
+	return {
+		overallScore,
+		grade,
+		status,
+		issues,
+		recommendations,
+		details: {
+			managerHealth,
+			projectStateHealth,
+			performanceHealth,
+			reliabilityHealth
+		}
+	};
+}
+
+/**
+ * Calculate manager health score based on running states and error conditions
+ */
+function calculateManagerHealth(managers: WinCCOAManager[], issues: string[], recommendations: string[]): number {
+	if (managers.length === 0) {
+		issues.push("No managers configured");
+		recommendations.push("Configure project managers to enable functionality");
+		return 0;
+	}
+	
+	const runningCount = managers.filter(m => m.runningState === 'running').length;
+	const stoppedCount = managers.filter(m => m.runningState === 'stopped').length;
+	const blockedCount = managers.filter(m => m.runningState === 'blocked').length;
+	const fatalCount = managers.filter(m => m.pid === -2).length;
+	const initCount = managers.filter(m => m.runningState === 'init').length;
+	
+	let score = 100;
+	
+	// Deduct points for non-running managers
+	const nonRunningPercentage = (stoppedCount + blockedCount + fatalCount) / managers.length;
+	score -= nonRunningPercentage * 50; // Up to 50 points deduction
+	
+	// Heavy penalty for fatal errors (managers that can't start)
+	if (fatalCount > 0) {
+		score -= fatalCount * 15; // 15 points per fatal error
+		issues.push(`${fatalCount} manager(s) have fatal startup errors`);
+		recommendations.push("Check WinCC OA logs for database connections and configuration errors");
+	}
+	
+	// Penalty for blocked managers
+	if (blockedCount > 0) {
+		score -= blockedCount * 10; // 10 points per blocked manager
+		issues.push(`${blockedCount} manager(s) are blocked`);
+		recommendations.push("Investigate blocked managers - check for resource conflicts or deadlocks");
+	}
+	
+	// Minor penalty for initializing managers (if too many)
+	if (initCount > managers.length * 0.3) {
+		score -= 5;
+		issues.push("Many managers are still initializing");
+		recommendations.push("Allow more time for startup or check initialization dependencies");
+	}
+	
+	// Bonus for high availability
+	if (runningCount === managers.length && managers.length > 0) {
+		score += 5; // Bonus for 100% availability
+	}
+	
+	return Math.max(0, Math.min(100, score));
+}
+
+/**
+ * Calculate project state health score
+ */
+function calculateProjectStateHealth(projectState: WinCCOAProjectState | undefined, issues: string[], recommendations: string[]): number {
+	if (!projectState) {
+		issues.push("Project state information unavailable");
+		recommendations.push("Ensure pmon is running to get project state information");
+		return 50; // Neutral score when unknown
+	}
+	
+	let score = 100;
+	
+	switch (projectState.status) {
+		case 'Monitoring':
+			score = 100; // Perfect state
+			break;
+		case 'Starting':
+			score = 80;
+			issues.push("Project is still starting up");
+			recommendations.push("Allow time for complete startup");
+			break;
+		case 'Down':
+			score = 30;
+			issues.push("Project is down");
+			recommendations.push("Start the project to enable full functionality");
+			break;
+		case 'Stopping':
+			score = 40;
+			issues.push("Project is shutting down");
+			break;
+		case 'Restarting':
+			score = 70;
+			issues.push("Project is restarting");
+			recommendations.push("Monitor restart progress");
+			break;
+		case 'Unknown':
+		default:
+			score = 20;
+			issues.push("Project state is unknown");
+			recommendations.push("Check pmon status and project configuration");
+			break;
+	}
+	
+	// Emergency mode penalty
+	if (projectState.emergency) {
+		score -= 30;
+		issues.push("🚨 Project is running in EMERGENCY mode");
+		recommendations.push("Investigate emergency condition and resolve underlying issues");
+	}
+	
+	// Demo mode penalty (indicates licensing issues)
+	if (projectState.demo) {
+		score -= 10;
+		issues.push("Project is running with demo license");
+		recommendations.push("Install proper WinCC OA license for production use");
+	}
+	
+	return Math.max(0, Math.min(100, score));
+}
+
+/**
+ * Calculate performance health score based on manager configuration and runtime behavior
+ */
+function calculatePerformanceHealth(managers: WinCCOAManager[], issues: string[], recommendations: string[]): number {
+	if (managers.length === 0) {
+		return 50; // Neutral when no managers
+	}
+	
+	let score = 100;
+	
+	// Check for managers with negative secKill (won't be stopped on restart)
+	const noStopCount = managers.filter(m => m.secKill && m.secKill < 0).length;
+	const noStopPercentage = noStopCount / managers.length;
+	
+	if (noStopPercentage > 0.5) {
+		score -= 10;
+		issues.push("Many managers configured to persist through restarts");
+		recommendations.push("Review manager restart policies - too many persistent managers may cause issues");
+	}
+	
+	// Check for managers with high restart counts (indicating instability)
+	const highRestartCount = managers.filter(m => m.restartCount && m.restartCount > 5).length;
+	if (highRestartCount > 0) {
+		score -= highRestartCount * 5;
+		issues.push(`${highRestartCount} manager(s) configured with high restart counts`);
+		recommendations.push("High restart counts may indicate stability issues - investigate manager reliability");
+	}
+	
+	// Check start mode distribution
+	const alwaysStartCount = managers.filter(m => m.startMode === 'always').length;
+	const manualStartCount = managers.filter(m => m.startMode === 'manual').length;
+	
+	if (manualStartCount > alwaysStartCount) {
+		score -= 5;
+		recommendations.push("Consider setting critical managers to 'always' start mode for better availability");
+	}
+	
+	// Check for very recent starts (may indicate recent crashes/restarts)
+	const now = new Date();
+	const recentStartsCount = managers.filter(m => {
+		if (!m.startTimeStamp) { return false; }
+		const timeDiff = now.getTime() - m.startTimeStamp.getTime();
+		return timeDiff < 5 * 60 * 1000; // Started within last 5 minutes
+	}).length;
+	
+	if (recentStartsCount > managers.length * 0.5 && managers.length > 2) {
+		score -= 10;
+		issues.push("Many managers started recently");
+		recommendations.push("Recent mass restart detected - investigate potential system instability");
+	}
+	
+	return Math.max(0, Math.min(100, score));
+}
+
+/**
+ * Calculate reliability health score based on system stability indicators
+ */
+function calculateReliabilityHealth(
+	managers: WinCCOAManager[], 
+	projectState: WinCCOAProjectState | undefined, 
+	issues: string[], 
+	recommendations: string[]
+): number {
+	let score = 100;
+	
+	// Check for critical system managers
+	const criticalManagers = ['WCCILpmon', 'WCCILdata', 'WCCILevent'];
+	const runningCriticalCount = managers.filter(m => 
+		criticalManagers.includes(m.name) && m.runningState === 'running'
+	).length;
+	const totalCriticalCount = managers.filter(m => criticalManagers.includes(m.name)).length;
+	
+	if (totalCriticalCount > 0) {
+		const criticalHealthPercentage = runningCriticalCount / totalCriticalCount;
+		if (criticalHealthPercentage < 1.0) {
+			score -= (1.0 - criticalHealthPercentage) * 40; // Heavy penalty for non-running critical managers
+			issues.push("Critical system managers are not running");
+			recommendations.push("Ensure WCCILpmon, WCCILdata, and WCCILevent managers are running");
+		}
+	}
+	
+	// Check for UI managers (important for operator access)
+	const uiManagers = managers.filter(m => m.name.includes('WCCOAui'));
+	const runningUiCount = uiManagers.filter(m => m.runningState === 'running').length;
+	
+	if (uiManagers.length > 0 && runningUiCount === 0) {
+		score -= 15;
+		issues.push("No UI managers are running");
+		recommendations.push("Start WCCOAui managers to enable operator interfaces");
+	}
+	
+	// Stability bonus for long-running project
+	if (projectState?.status === 'Monitoring') {
+		const longRunningManagers = managers.filter(m => {
+			if (!m.startTimeStamp) { return false; }
+			const now = new Date();
+			const uptime = now.getTime() - m.startTimeStamp.getTime();
+			return uptime > 24 * 60 * 60 * 1000; // Running for more than 24 hours
+		});
+		
+		if (longRunningManagers.length === managers.length && managers.length > 0) {
+			score += 5; // Bonus for system stability
+		}
+	}
+	
+	return Math.max(0, Math.min(100, score));
+}
+
+/**
+ * Get health score color for UI display
+ */
+export function getHealthScoreColor(score: number): string {
+	if (score >= 90) { return '#28a745'; }      // Green - Excellent
+	if (score >= 80) { return '#20c997'; }      // Teal - Good  
+	if (score >= 70) { return '#ffc107'; }      // Yellow - Fair
+	if (score >= 60) { return '#fd7e14'; }      // Orange - Poor
+	return '#dc3545';                           // Red - Critical
+}
+
+/**
+ * Get health grade icon
+ */
+export function getHealthGradeIcon(grade: string): string {
+	switch (grade) {
+		case 'A': return '🟢';
+		case 'B': return '🔵'; 
+		case 'C': return '🟡';
+		case 'D': return '🟠';
+		case 'F': return '🔴';
+		default: return '⚪';
+	}
+}
+
+/**
+ * Starts WinCC OA pmon manager only (no auto start)
+ * @param project The WinCC OA project
+ */
+export async function startPmonOnly(project: WinCCOAProject): Promise<void> {
+	if (!project.isRunnable || project.isWinCCOASystem) {
+		throw new Error(`Cannot start pmon for non-runnable project: ${project.config.name}`);
+	}
+
+	const pmonPath = getWCCILpmonPath(project.version);
+	if (!pmonPath) {
+		throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+	}
+
+	const args = ['-proj', project.config.name, '-log', '+stderr', '-noAutoStart'];
+	const command = `${pmonPath} ${args.join(' ')}`;
+	
+	outputChannel.appendLine(`[Pmon Start] Starting pmon for project: ${project.config.name}`);
+	outputChannel.appendLine(`[Pmon Start] Executing: ${command}`);
+	outputChannel.show(true);
+
+	return new Promise<void>((resolve, reject) => {
+		let response = '';
+		
+		const child = childProcess.spawn(pmonPath, args, {
+			stdio: ['pipe', 'pipe', 'pipe'],
+			shell: false,
+			cwd: project.config.installationDir,
+			detached: true
+		});
+
+		child.stdout?.on('data', (data) => {
+			const output = data.toString().trim();
+			response += output + '\n';
+			outputChannel.appendLine(`[Pmon Start] ${output}`);
+		});
+
+		child.stderr?.on('data', (data) => {
+			const output = data.toString().trim();
+			response += output + '\n';
+			outputChannel.appendLine(`[Pmon Start] Error: ${output}`);
+		});
+
+		child.on('spawn', () => {
+			outputChannel.appendLine(`✅ Pmon started for project '${project.config.name}' (PID: ${child.pid})`);
+			vscode.window.showInformationMessage(`✅ Pmon started for project '${project.config.name}'`);
+			
+			// Add to history - for detached process, we consider spawn success as OK
+			addToCommandHistory(project.config.name, command, response || 'OK');
+			
+			child.unref(); // Allow process to continue independently
+			resolve();
+		});
+
+		child.on('error', (error) => {
+			const errorMsg = `Failed to start pmon: ${error.message}`;
+			outputChannel.appendLine(`❌ ${errorMsg}`);
+			vscode.window.showErrorMessage(errorMsg);
+			
+			// Add error to history
+			addToCommandHistory(project.config.name, command, `ERROR ${errorMsg}`);
+			
+			reject(error);
+		});
+	});
+}
+
+/**
+ * Starts WinCC OA project
+ * @param project The WinCC OA project
+ */
+export async function startProject(project: WinCCOAProject): Promise<void> {
+	if (!project.isRunnable || project.isWinCCOASystem) {
+		throw new Error(`Cannot start non-runnable project: ${project.config.name}`);
+	}
+
+	const pmonPath = getWCCILpmonPath(project.version);
+	if (!pmonPath) {
+		throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+	}
+
+	// Check if pmon is already running
+	let args: string[];
+	try {
+		const status = await checkProjectRunningStatus(project);
+		if (status === PmonProjectRunningStatus.RUNNING) {
+			// Pmon is running, use START_ALL command
+			args = ['-proj', project.config.name, '-command', 'START_ALL:'];
+			outputChannel.appendLine(`[Project Start] Pmon is running, sending START_ALL command`);
+		} else {
+			// Pmon not running, start normally
+			args = ['-proj', project.config.name];
+			outputChannel.appendLine(`[Project Start] Pmon not running, starting project normally`);
+		}
+	} catch (error) {
+		// If we can't determine status, try normal start
+		args = ['-proj', project.config.name];
+		outputChannel.appendLine(`[Project Start] Could not determine pmon status, trying normal start`);
+	}
+	
+	outputChannel.appendLine(`[Project Start] Starting project: ${project.config.name}`);
+	outputChannel.appendLine(`[Project Start] Executing: ${pmonPath} ${args.join(' ')}`);
+	outputChannel.show(true);
+
+	return executeWCCILpmonCommand(pmonPath, args, project, 'start project');
+}
+
+/**
+ * Stops WinCC OA project
+ * @param project The WinCC OA project
+ */
+export async function stopProject(project: WinCCOAProject): Promise<void> {
+	if (!project.isRunnable || project.isWinCCOASystem) {
+		throw new Error(`Cannot stop non-runnable project: ${project.config.name}`);
+	}
+
+	const pmonPath = getWCCILpmonPath(project.version);
+	if (!pmonPath) {
+		throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+	}
+
+	const args = ['-proj', project.config.name, '-command', 'STOP_ALL:'];
+	
+	outputChannel.appendLine(`[Project Stop] Stopping project: ${project.config.name}`);
+	outputChannel.show(true);
+
+	return executeWCCILpmonCommand(pmonPath, args, project, 'stop project');
+}
+
+/**
+ * Stops WinCC OA project and pmon
+ * @param project The WinCC OA project
+ */
+export async function stopProjectAndPmon(project: WinCCOAProject): Promise<void> {
+	if (!project.isRunnable || project.isWinCCOASystem) {
+		throw new Error(`Cannot stop non-runnable project: ${project.config.name}`);
+	}
+
+	const pmonPath = getWCCILpmonPath(project.version);
+	if (!pmonPath) {
+		throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+	}
+
+	const args = ['-proj', project.config.name, '-stopWait'];
+	
+	outputChannel.appendLine(`[Project Stop] Stopping project and pmon: ${project.config.name}`);
+	outputChannel.show(true);
+
+	return executeWCCILpmonCommand(pmonPath, args, project, 'stop project and pmon');
+}
+
+/**
+ * Restarts WinCC OA project
+ * @param project The WinCC OA project
+ */
+export async function restartProject(project: WinCCOAProject): Promise<void> {
+	if (!project.isRunnable || project.isWinCCOASystem) {
+		throw new Error(`Cannot restart non-runnable project: ${project.config.name}`);
+	}
+
+	const pmonPath = getWCCILpmonPath(project.version);
+	if (!pmonPath) {
+		throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+	}
+
+	const args = ['-proj', project.config.name, '-command', 'RESTART_ALL:'];
+	
+	outputChannel.appendLine(`[Project Restart] Restarting project: ${project.config.name}`);
+	outputChannel.show(true);
+
+	return executeWCCILpmonCommand(pmonPath, args, project, 'restart project');
+}
+
+/**
+ * Sets pmon to wait mode
+ * @param project The WinCC OA project
+ */
+export async function setPmonWaitMode(project: WinCCOAProject): Promise<void> {
+	if (!project.isRunnable || project.isWinCCOASystem) {
+		throw new Error(`Cannot set wait mode for non-runnable project: ${project.config.name}`);
+	}
+
+	const pmonPath = getWCCILpmonPath(project.version);
+	if (!pmonPath) {
+		throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+	}
+
+	const args = ['-proj', project.config.name, '-command', 'WAIT_MODE:'];
+	
+	outputChannel.appendLine(`[Pmon Wait] Setting pmon to wait mode: ${project.config.name}`);
+	outputChannel.show(true);
+
+	return executeWCCILpmonCommand(pmonPath, args, project, 'set pmon wait mode');
+}
+
+/**
+ * Gets list of managers for a project
+ * @param project The WinCC OA project
+ */
+export async function getManagerList(project: WinCCOAProject): Promise<WinCCOAManager[]> {
+	if (!project.isRunnable || project.isWinCCOASystem) {
+		throw new Error(`Cannot get managers for non-runnable project: ${project.config.name}`);
+	}
+
+	const pmonPath = getWCCILpmonPath(project.version);
+	if (!pmonPath) {
+		throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+	}
+
+	const args = ['-proj', project.config.name, '-command', 'MGRLIST:LIST', '-log', '+stdout'];
+	
+	return new Promise<WinCCOAManager[]>((resolve, reject) => {
+		const child = childProcess.spawn(pmonPath, args, {
+			stdio: ['pipe', 'pipe', 'pipe'],
+			shell: false,
+			cwd: project.config.installationDir
+		});
+
+		let output = '';
+		child.stdout?.on('data', (data) => {
+			output += data.toString();
+		});
+
+		child.stderr?.on('data', (data) => {
+			outputChannel.appendLine(`Error: ${data.toString()}`);
+		});
+
+		child.on('close', (code) => {
+			if (code === 0) {
+				const managers = parseManagerList(output);
+				resolve(managers);
+			} else {
+				reject(new Error(`Failed to get manager list. Exit code: ${code}`));
+			}
+		});
+
+		child.on('error', (error) => {
+			reject(new Error(`Failed to execute WCCILpmon: ${error.message}`));
+		});
+	});
+}
+
+/**
+ * Gets detailed status of all managers and project state
+ * @param project The WinCC OA project
+ */
+export async function getDetailedManagerStatus(project: WinCCOAProject): Promise<{ managers: WinCCOAManager[], projectState?: WinCCOAProjectState }> {
+	if (!project.isRunnable || project.isWinCCOASystem) {
+		throw new Error(`Cannot get manager status for non-runnable project: ${project.config.name}`);
+	}
+
+	const pmonPath = getWCCILpmonPath(project.version);
+	if (!pmonPath) {
+		throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+	}
+
+	const args = ['-proj', project.config.name, '-command', 'MGRLIST:STATI', '-log', '+stdout'];
+	
+	return new Promise<{ managers: WinCCOAManager[], projectState?: WinCCOAProjectState }>((resolve, reject) => {
+		const child = childProcess.spawn(pmonPath, args, {
+			stdio: ['pipe', 'pipe', 'pipe'],
+			shell: false,
+			cwd: project.config.installationDir
+		});
+
+		let output = '';
+		child.stdout?.on('data', (data) => {
+			output += data.toString();
+		});
+
+		child.stderr?.on('data', (data) => {
+			outputChannel.appendLine(`Error: ${data.toString()}`);
+		});
+
+		child.on('close', (code) => {
+			if (code === 0) {
+				const result = parseManagerStatus(output);
+				resolve(result);
+			} else {
+				reject(new Error(`Failed to get manager status. Exit code: ${code}`));
+			}
+		});
+
+		child.on('error', (error) => {
+			reject(new Error(`Failed to execute WCCILpmon: ${error.message}`));
+		});
+	});
+}
+
+/**
+ * Gets status of all managers for a project
+ * @param project The WinCC OA project
+ */
+export async function getManagerStatus(project: WinCCOAProject): Promise<WinCCOAManager[]> {
+	if (!project.isRunnable || project.isWinCCOASystem) {
+		throw new Error(`Cannot get manager status for non-runnable project: ${project.config.name}`);
+	}
+
+	const pmonPath = getWCCILpmonPath(project.version);
+	if (!pmonPath) {
+		throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+	}
+
+	const args = ['-proj', project.config.name, '-command', 'MGRLIST:STATI', '-log', '+stdout'];
+	
+	return new Promise<WinCCOAManager[]>((resolve, reject) => {
+		const child = childProcess.spawn(pmonPath, args, {
+			stdio: ['pipe', 'pipe', 'pipe'],
+			shell: false,
+			cwd: project.config.installationDir
+		});
+
+		let output = '';
+		child.stdout?.on('data', (data) => {
+			output += data.toString();
+		});
+
+		child.stderr?.on('data', (data) => {
+			outputChannel.appendLine(`Error: ${data.toString()}`);
+		});
+
+		child.on('close', (code) => {
+			if (code === 0) {
+				const result = parseManagerStatus(output);
+				resolve(result.managers);
+			} else {
+				reject(new Error(`Failed to get manager status. Exit code: ${code}`));
+			}
+		});
+
+		child.on('error', (error) => {
+			reject(new Error(`Failed to execute WCCILpmon: ${error.message}`));
+		});
+	});
+}
+
+/**
+ * Gets comprehensive project status including pmon and managers
+ * @param project The WinCC OA project
+ */
+export async function getComprehensiveProjectStatus(project: WinCCOAProject): Promise<WinCCOAProjectStatus> {
+	const [pmonStatus, managers] = await Promise.all([
+		checkProjectRunningStatus(project).catch(() => PmonProjectRunningStatus.UNKNOWN),
+		getManagerStatus(project).catch(() => [] as WinCCOAManager[])
+	]);
+
+	return {
+		projectName: project.config.name,
+		isRunning: pmonStatus === PmonProjectRunningStatus.RUNNING,
+		managers,
+		pmonStatus,
+		lastUpdate: new Date()
+	};
+}
+
+/**
+ * Manager operations
+ */
+export async function startManager(project: WinCCOAProject, index: number): Promise<void> {
+	const args = ['-proj', project.config.name, '-command', `SINGLE_MGR:START ${index}`];
+	const pmonPath = getWCCILpmonPath(project.version);
+	if (!pmonPath) {
+		throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+	}
+	
+	outputChannel.appendLine(`[Manager Start] Starting manager ${index} in project: ${project.config.name}`);
+	return executeWCCILpmonCommand(pmonPath, args, project, `start manager ${index}`);
+}
+
+export async function stopManager(project: WinCCOAProject, index: number): Promise<void> {
+	const args = ['-proj', project.config.name, '-command', `SINGLE_MGR:STOP ${index}`];
+	const pmonPath = getWCCILpmonPath(project.version);
+	if (!pmonPath) {
+		throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+	}
+	
+	outputChannel.appendLine(`[Manager Stop] Stopping manager ${index} in project: ${project.config.name}`);
+	return executeWCCILpmonCommand(pmonPath, args, project, `stop manager ${index}`);
+}
+
+export async function killManager(project: WinCCOAProject, index: number): Promise<void> {
+	const args = ['-proj', project.config.name, '-command', `SINGLE_MGR:KILL ${index}`];
+	const pmonPath = getWCCILpmonPath(project.version);
+	if (!pmonPath) {
+		throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+	}
+	
+	outputChannel.appendLine(`[Manager Kill] Killing manager ${index} in project: ${project.config.name}`);
+	return executeWCCILpmonCommand(pmonPath, args, project, `kill manager ${index}`);
+}
+
+export async function removeManager(project: WinCCOAProject, index: number): Promise<void> {
+	const args = ['-proj', project.config.name, '-command', `SINGLE_MGR:DEL ${index}`];
+	const pmonPath = getWCCILpmonPath(project.version);
+	if (!pmonPath) {
+		throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+	}
+	
+	outputChannel.appendLine(`[Manager Remove] Removing manager ${index} from project: ${project.config.name}`);
+	return executeWCCILpmonCommand(pmonPath, args, project, `remove manager ${index}`);
+}
+
+/**
+ * Helper function to execute WCCILpmon commands
+ */
+async function executeWCCILpmonCommand(pmonPath: string, args: string[], project: WinCCOAProject, operation: string): Promise<void> {
+	// Add -log +stderr to minimize project logs
+	const enhancedArgs = ['-log', '+stderr', ...args];
+	const command = `${pmonPath} ${enhancedArgs.join(' ')}`;
+	
+	return new Promise<void>((resolve, reject) => {
+		let response = '';
+		
+		const child = childProcess.spawn(pmonPath, enhancedArgs, {
+			stdio: ['pipe', 'pipe', 'pipe'],
+			shell: false,
+			cwd: project.config.installationDir,
+			detached: !args.includes('-command') // Detach only if not a command
+		});
+
+		child.stdout?.on('data', (data) => {
+			const output = data.toString().trim();
+			response += output + '\n';
+			outputChannel.appendLine(output);
+		});
+
+		child.stderr?.on('data', (data) => {
+			const output = data.toString().trim();
+			response += output + '\n';
+			outputChannel.appendLine(`Error: ${output}`);
+		});
+
+		child.on('close', (code) => {
+			if (code === 0) {
+				// Success
+				const finalResponse = response.trim() || 'OK';
+				addToCommandHistory(project.config.name, command, finalResponse);
+				
+				outputChannel.appendLine(`✅ Successfully executed: ${operation} for '${project.config.name}'`);
+				vscode.window.showInformationMessage(`✅ ${operation} completed for '${project.config.name}'`);
+				resolve();
+			} else {
+				// Error
+				const errorResponse = response.trim() || `Process exited with code ${code}`;
+				addToCommandHistory(project.config.name, command, `ERROR ${errorResponse}`);
+				
+				const errorMsg = `Failed to ${operation}: ${errorResponse}`;
+				outputChannel.appendLine(`❌ ${errorMsg}`);
+				vscode.window.showErrorMessage(errorMsg);
+				reject(new Error(errorResponse));
+			}
+		});
+
+		child.on('spawn', () => {
+			outputChannel.appendLine(`🔄 Executing: ${operation} for '${project.config.name}'`);
+			if (!args.includes('-command')) {
+				child.unref(); // Allow process to continue independently for non-command operations
+			}
+		});
+
+		child.on('error', (error) => {
+			const errorMsg = `Failed to ${operation}: ${error.message}`;
+			addToCommandHistory(project.config.name, command, `ERROR ${errorMsg}`);
+			
+			outputChannel.appendLine(`❌ ${errorMsg}`);
+			vscode.window.showErrorMessage(errorMsg);
+			reject(error);
+		});
+	});
+}
+
+/**
+ * Parse manager list output
+ */
+/**
+ * Parse manager list output from MGRLIST:LIST command
+ * 
+ * Expected format:
+ * LIST:23
+ * WCCILpmon;0;30;3;1;
+ * WCCILdata;2;30;3;1;
+ * WCCOAvalarch;2;30;3;1;-num 0
+ * ...
+ * ;
+ * 
+ * Format: Component;startmode;seckill;restartcount;resetmin;args
+ * - Component: WinCC OA manager name (executable without extension)
+ * - startmode: 0=manual, 1=once, 2=always
+ * - seckill: seconds to kill (default 60)
+ * - restartcount: count of restarts (default 3)  
+ * - resetmin: Reset start counter (default 1)
+ * - args: manager specific arguments
+ */
+export function parseManagerList(output: string): WinCCOAManager[] {
+	const managers: WinCCOAManager[] = [];
+	const lines = output.split('\n');
+	
+	let listStarted = false;
+	let managerIndex = 0;
+	
+	for (const line of lines) {
+		const trimmed = line.trim();
+		
+		// Check for list start (LIST:count)
+		if (trimmed.startsWith('LIST:')) {
+			listStarted = true;
+			continue;
+		}
+		
+		// Check for list end (line containing only ';')
+		if (trimmed === ';') {
+			break;
+		}
+		
+		// Skip if list hasn't started yet or line is empty
+		if (!listStarted || !trimmed) {
+			continue;
+		}
+		
+		// Parse manager line format: Component;startmode;seckill;restartcount;resetmin;args
+		const parts = trimmed.split(';');
+		if (parts.length >= 5) {
+			const component = parts[0];
+			const startModeNum = parseInt(parts[1], 10);
+			const secKill = parseInt(parts[2], 10);
+			const restartCount = parseInt(parts[3], 10);
+			const resetMin = parseInt(parts[4], 10);
+			const args = parts.length > 5 ? parts.slice(5).join(';') : '';
+			
+			// Convert numeric start mode to string
+			let startMode: 'manual' | 'once' | 'always';
+			switch (startModeNum) {
+				case 0:
+					startMode = 'manual';
+					break;
+				case 1:
+					startMode = 'once';
+					break;
+				case 2:
+					startMode = 'always';
+					break;
+				default:
+					startMode = 'manual';
+					break;
+			}
+			
+			managers.push({
+				index: managerIndex,
+				name: component,
+				status: 'configured', // For LIST command, we don't have runtime status
+				startMode,
+				secKill,
+				restartCount,
+				resetMin,
+				args: args || undefined
+			});
+			
+			managerIndex++;
+		}
+	}
+	
+	return managers;
+}
+
+/**
+ * Parse project state line from MGRLIST:STATI output
+ * Format: status text emergency demo
+ * Example: "0 WAIT_MODE 0 0"
+ */
+function parseProjectState(line: string): WinCCOAProjectState | null {
+	const parts = line.trim().split(/\s+/);
+	if (parts.length >= 4) {
+		const statusCode = parseInt(parts[0], 10);
+		const text = parts[1];
+		const emergency = parseInt(parts[2], 10) === 1;
+		const demo = parseInt(parts[3], 10) === 1;
+		
+		// Map status code to enum value
+		let status: WinCCOAProjectState['status'];
+		switch (statusCode) {
+			case -1:
+				status = 'Unknown';
+				break;
+			case 0:
+				status = 'Down';
+				break;
+			case 1:
+				status = 'Starting';
+				break;
+			case 2:
+				status = 'Monitoring';
+				break;
+			case 3:
+				status = 'Stopping';
+				break;
+			case 5:
+				status = 'Restarting';
+				break;
+			default:
+				status = 'Unknown';
+				break;
+		}
+		
+		return {
+			status,
+			statusCode,
+			text,
+			emergency,
+			demo
+		};
+	}
+	
+	return null;
+}
+
+/**
+ * Parse manager status output from MGRLIST:STATI command
+ * 
+ * Expected format:
+ * LIST:9
+ * 2;25404;0;2025.11.04 08:02:53.379;  1
+ * 0;   -1;0;1970.01.01 01:00:00.000;  1
+ * ...
+ * 0 WAIT_MODE 0 0
+ * ;
+ * 
+ * Manager line format: runningState;PID;startMode;startTimeStamp;managerNumber
+ * - runningState: 0=stopped, 1=init, 2=running, 3=blocked
+ * - PID: process ID (-1 if not running)
+ * - startMode: 0=manual, 1=once, 2=always (same as LIST)
+ * - startTimeStamp: when manager started
+ * - managerNumber: unique manager number from WinCC OA
+ * 
+ * Last line before ';': status text emergency demo
+ * - status: project state code (see ProjEnvProjectState enum)
+ * - text: human readable state (WAIT_MODE, START_MODE, etc.)
+ * - emergency: emergency mode (0=off, 1=on)
+ * - demo: demo version (0=off, 1=on)
+ */
+export function parseManagerStatus(output: string): { managers: WinCCOAManager[], projectState?: WinCCOAProjectState } {
+	const managers: WinCCOAManager[] = [];
+	const lines = output.split('\n');
+	
+	let listStarted = false;
+	let managerIndex = 0;
+	let projectState: WinCCOAProjectState | undefined;
+	let projectStateLineFound = false;
+	
+	for (let i = 0; i < lines.length; i++) {
+		const trimmed = lines[i].trim();
+		
+		// Check for list start (STATI:count or LIST:count)
+		if (trimmed.startsWith('STATI:') || trimmed.startsWith('LIST:')) {
+			listStarted = true;
+			continue;
+		}
+		
+		// Check for list end (line containing only ';')
+		if (trimmed === ';') {
+			break;
+		}
+		
+		// Skip if list hasn't started yet or line is empty
+		if (!listStarted || !trimmed) {
+			continue;
+		}
+		
+		// Check if this might be the project state line (just before the ';')
+		// Look ahead to see if next non-empty line is ';'
+		let isProjectStateLine = false;
+		for (let j = i + 1; j < lines.length; j++) {
+			const nextTrimmed = lines[j].trim();
+			if (nextTrimmed === ';') {
+				isProjectStateLine = true;
+				break;
+			} else if (nextTrimmed !== '') {
+				break; // Found non-empty, non-semicolon line
+			}
+		}
+		
+		if (isProjectStateLine && !projectStateLineFound) {
+			// This is the project state line
+			const parsedState = parseProjectState(trimmed);
+			if (parsedState) {
+				projectState = parsedState;
+			}
+			projectStateLineFound = true;
+			continue;
+		}
+		
+		// Parse manager status line: runningState;PID;startMode;startTimeStamp;managerNumber
+		const parts = trimmed.split(';');
+		if (parts.length >= 5) {
+			const runningStateNum = parseInt(parts[0].trim(), 10);
+			const pid = parseInt(parts[1].trim(), 10);
+			const startModeNum = parseInt(parts[2].trim(), 10);
+			const startTimeStamp = parts[3].trim();
+			const managerNumber = parseInt(parts[4].trim(), 10);
+			
+			// Convert numeric running state to string
+			let runningState: 'stopped' | 'init' | 'running' | 'blocked';
+			switch (runningStateNum) {
+				case 0:
+					runningState = 'stopped';
+					break;
+				case 1:
+					runningState = 'init';
+					break;
+				case 2:
+					runningState = 'running';
+					break;
+				case 3:
+					runningState = 'blocked';
+					break;
+				default:
+					runningState = 'stopped';
+					break;
+			}
+			
+			// Convert numeric start mode to string
+			let startMode: 'manual' | 'once' | 'always';
+			switch (startModeNum) {
+				case 0:
+					startMode = 'manual';
+					break;
+				case 1:
+					startMode = 'once';
+					break;
+				case 2:
+					startMode = 'always';
+					break;
+				default:
+					startMode = 'manual';
+					break;
+			}
+			
+			// Parse timestamp
+			let parsedTimestamp: Date | undefined;
+			if (startTimeStamp && startTimeStamp !== '0' && startTimeStamp !== '' && startTimeStamp !== '-1' && !startTimeStamp.startsWith('1970')) {
+				try {
+					// Handle different timestamp formats from WinCC OA
+					let timestampStr = startTimeStamp.trim();
+					
+					// Handle WinCC OA format: YYYY.MM.DD hh:mm:ss.ms (e.g., 2025.11.04 08:02:53.379)
+					const winccOaMatch = timestampStr.match(/^(\d{4})\.(\d{2})\.(\d{2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})$/);
+					if (winccOaMatch) {
+						const [, year, month, day, hours, minutes, seconds, milliseconds] = winccOaMatch;
+						parsedTimestamp = new Date(
+							parseInt(year, 10),
+							parseInt(month, 10) - 1, // Month is 0-indexed in JavaScript
+							parseInt(day, 10),
+							parseInt(hours, 10),
+							parseInt(minutes, 10),
+							parseInt(seconds, 10),
+							parseInt(milliseconds, 10)
+						);
+					}
+				} catch {
+					parsedTimestamp = undefined;
+				}
+			}
+			
+			managers.push({
+				index: managerIndex,
+				name: `Manager-${managerNumber}`, // We don't have the actual name in STATI, use placeholder
+				status: runningState,
+				pid: pid === -1 ? undefined : pid,
+				startMode,
+				runningState,
+				managerNumber,
+				startTimeStamp: parsedTimestamp
+			});
+			
+			managerIndex++;
+		}
+	}
+	
+	return { managers, projectState };
+}
+
+/**
  * Registers a runnable WinCC OA project from a directory path
  * @param directoryPath The path to the project directory
  * @param provider The tree data provider to refresh after registration
@@ -2904,14 +6181,14 @@ async function unregisterProject(projectName: string): Promise<void> {
 	}
 
 	return new Promise<void>((resolve, reject) => {
-		const args = ['-unreg', `"${projectName}"`, '-log', '+stderr'];
+		const args = ['-unreg', projectName, '-log', '+stderr'];
 		
-		outputChannel.appendLine(`[Project Unregistration] Executing: "${pmonPath}" ${args.join(' ')}`);
+		outputChannel.appendLine(`[Project Unregistration] Executing: ${pmonPath} ${args.join(' ')}`);
 		outputChannel.show(true); // Show the output channel
 		
-		const child = childProcess.spawn(`"${pmonPath}"`, args, {
+		const child = childProcess.spawn(pmonPath, args, {
 			stdio: ['pipe', 'pipe', 'pipe'],
-			shell: true
+			shell: false
 		});
 
 		let stdout = '';
@@ -3131,12 +6408,12 @@ export async function getDetailedVersionInfo(project: WinCCOAProject): Promise<D
 	}
 
 	return new Promise<DetailedVersionInfo>((resolve, reject) => {
-		outputChannel.appendLine(`[Version Info] Executing: "${pmonPath}" -version`);
+		outputChannel.appendLine(`[Version Info] Executing: ${pmonPath} -version`);
 		outputChannel.show(true);
 
-		const child = childProcess.spawn(`"${pmonPath}"`, ['-version'], {
+		const child = childProcess.spawn(pmonPath, ['-version'], {
 			stdio: ['pipe', 'pipe', 'pipe'],
-			shell: true
+			shell: false
 		});
 
 		let stdout = '';
