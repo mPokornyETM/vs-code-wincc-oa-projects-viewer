@@ -15,7 +15,11 @@ import {
     getWinCCOADeliveredSubProjects,
     getUserSubProjects,
     getCurrentProjects,
-    getAPI
+    getAPI,
+    parseManagerList,
+    parseManagerStatus,
+    WinCCOAManager,
+    WinCCOAProjectState
 } from '../extension';
 
 // Helper function to create mock WinCCOAProject
@@ -244,5 +248,107 @@ suite('Direct Function Tests', () => {
             installationDir: '' // Empty installation dir
         });
         assert.strictEqual(isWinCCOADeliveredSubProject(project3), false);
+    });
+
+    test('parseManagerList should parse MGRLIST:LIST output correctly', () => {
+        const sampleOutput = `LIST:5
+WCCILpmon;0;30;3;1;
+WCCILdata;2;30;3;1;
+WCCOAvalarch;2;30;3;1;-num 0
+WCCOActrl;1;30;2;2;-num 4 scheduler.ctc
+WCCOAui;0;30;3;1;-m gedi -user root:
+;`;
+
+        const managers = parseManagerList(sampleOutput);
+        
+        assert.strictEqual(managers.length, 5);
+        
+        // Check first manager (WCCILpmon)
+        assert.strictEqual(managers[0].name, 'WCCILpmon');
+        assert.strictEqual(managers[0].startMode, 'manual');
+        assert.strictEqual(managers[0].secKill, 30);
+        assert.strictEqual(managers[0].restartCount, 3);
+        assert.strictEqual(managers[0].resetMin, 1);
+        assert.strictEqual(managers[0].args, undefined);
+        
+        // Check second manager (WCCILdata)
+        assert.strictEqual(managers[1].name, 'WCCILdata');
+        assert.strictEqual(managers[1].startMode, 'always');
+        
+        // Check manager with args (WCCOAvalarch)
+        assert.strictEqual(managers[2].name, 'WCCOAvalarch');
+        assert.strictEqual(managers[2].args, '-num 0');
+        
+        // Check manager with once mode (WCCOActrl)
+        assert.strictEqual(managers[3].name, 'WCCOActrl');
+        assert.strictEqual(managers[3].startMode, 'once');
+        assert.strictEqual(managers[3].restartCount, 2);
+        assert.strictEqual(managers[3].resetMin, 2);
+        assert.strictEqual(managers[3].args, '-num 4 scheduler.ctc');
+        
+        // Check manager with complex args (WCCOAui)
+        assert.strictEqual(managers[4].name, 'WCCOAui');
+        assert.strictEqual(managers[4].args, '-m gedi -user root:');
+    });
+
+    test('parseManagerList should handle empty output', () => {
+        const emptyOutput = `LIST:0
+;`;
+        const managers = parseManagerList(emptyOutput);
+        assert.strictEqual(managers.length, 0);
+    });
+
+    test('parseManagerList should handle malformed output gracefully', () => {
+        const malformedOutput = `Some random text
+Not a proper format
+;`;
+        const managers = parseManagerList(malformedOutput);
+        assert.strictEqual(managers.length, 0);
+    });
+
+    test('parseManagerStatus should handle MGRLIST:STATI output correctly', () => {
+        // Test with real STATI format
+        const statusOutput = `LIST:3
+2;25404;0;2025.11.04 08:02:53.379;  1
+0;   -1;0;1970.01.01 01:00:00.000;  2
+1; 3048;1;2025.11.04 08:40:43.446;  3
+0 WAIT_MODE 0 0
+;`;
+
+        const result = parseManagerStatus(statusOutput);
+        
+        assert.strictEqual(result.managers.length, 3);
+        
+        // Check first manager (running)
+        assert.strictEqual(result.managers[0].runningState, 'running');
+        assert.strictEqual(result.managers[0].pid, 25404);
+        assert.strictEqual(result.managers[0].startMode, 'manual');
+        assert.strictEqual(result.managers[0].managerNumber, 1);
+        
+        // Check second manager (stopped)
+        assert.strictEqual(result.managers[1].runningState, 'stopped');
+        assert.strictEqual(result.managers[1].pid, undefined); // -1 means not running
+        assert.strictEqual(result.managers[1].managerNumber, 2);
+        
+        // Check third manager (init)
+        assert.strictEqual(result.managers[2].runningState, 'init');
+        assert.strictEqual(result.managers[2].pid, 3048);
+        assert.strictEqual(result.managers[2].startMode, 'once');
+        
+        // Check project state
+        assert.strictEqual(result.projectState?.status, 'Down');
+        assert.strictEqual(result.projectState?.text, 'WAIT_MODE');
+        assert.strictEqual(result.projectState?.emergency, false);
+        assert.strictEqual(result.projectState?.demo, false);
+    });
+
+    test('parseManagerStatus should handle empty output', () => {
+        const emptyOutput = `LIST:0
+0 WAIT_MODE 0 0
+;`;
+        const result = parseManagerStatus(emptyOutput);
+        assert.strictEqual(result.managers.length, 0);
+        assert.strictEqual(result.projectState?.status, 'Down');
+        assert.strictEqual(result.projectState?.text, 'WAIT_MODE');
     });
 });

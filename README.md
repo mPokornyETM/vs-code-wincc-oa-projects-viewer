@@ -51,6 +51,7 @@ Thx very much for supporting us.
 - **Bulk Operations**: Register all unregistered projects with a single command
 - **Project Unregistration**: Remove projects from WinCC OA configuration safely
 - **WinCC OA Version Information**: Get detailed version information using WCCILpmon -version command
+- **📊 Project Health Assessment**: Comprehensive health scoring system for WinCC OA projects with real-time monitoring
 
 ### 🌍 **Cross-Platform Support**
 - **Windows**: Full support for standard Siemens installation paths
@@ -308,6 +309,133 @@ This feature executes the `WCCILpmon.exe -version` command for WinCC OA system i
 
 ---
 
+## 📊 WinCC OA Project Health Assessment
+
+The extension includes a comprehensive **Project Health Assessment** system that provides real-time health scoring and monitoring for your WinCC OA projects through the Manager Overview interface.
+
+![Manager Health Assessment](docs/images/managers-view-health-assessment.png)
+
+### 🎯 **Health Scoring System**
+
+The health assessment uses a **weighted scoring algorithm** that evaluates multiple aspects of your WinCC OA project:
+
+#### **🔢 Overall Health Score (0-100)**
+
+- **Grade System**: A (90-100), B (80-89), C (70-79), D (60-69), F (0-59)
+- **Status Categories**: Excellent, Good, Fair, Poor, Critical
+- **Visual Indicator**: Circular progress display with color-coded status
+
+#### **📈 Health Components**
+
+| Component | Weight | Description |
+|-----------|--------|-------------|
+| **Manager Health** | 40% | Running status, fatal errors, blocked managers |
+| **Project State** | 30% | Project status, emergency mode, demo license |
+| **Performance** | 20% | Restart policies, manager stability, configuration |
+| **Reliability** | 10% | Critical system managers, UI availability, uptime |
+
+### 🩺 **Health Analysis Features**
+
+#### **⚠️ Issue Detection**
+
+- **Fatal Manager Errors**: Identifies managers with PID -2 (cannot start)
+- **Blocked Managers**: Detects resource conflicts and deadlocks
+- **Emergency Mode**: Alerts when project is in emergency state
+- **Missing Critical Managers**: Monitors WCCILpmon, WCCILdata, WCCILevent status
+- **License Issues**: Identifies demo license usage
+- **System Instability**: Detects recent mass restarts
+
+#### **💡 Intelligent Recommendations**
+
+- **Database Connection Issues**: Suggests log investigation for startup failures
+- **Resource Optimization**: Recommends manager restart policy adjustments
+- **Licensing Guidance**: Advises on proper WinCC OA license installation
+- **Stability Improvements**: Identifies potential reliability enhancements
+- **Performance Tuning**: Suggests configuration optimizations
+
+#### **🎨 Visual Health Indicators**
+
+```text
+🟢 A - Excellent (90-100%)  │  System operating optimally
+🔵 B - Good (80-89%)        │  Minor issues, good performance  
+🟡 C - Fair (70-79%)        │  Some concerns, monitoring needed
+🟠 D - Poor (60-69%)        │  Multiple issues, action required
+🔴 F - Critical (0-59%)     │  Serious problems, immediate attention
+```
+
+### 📋 **Health Assessment Details**
+
+#### **Manager Health Analysis (40% weight)**
+
+- **Running State Assessment**: Evaluates percentage of running vs stopped/blocked managers
+- **Fatal Error Detection**: Heavy penalty for managers that cannot start (PID -2)
+- **Availability Scoring**: Bonus points for 100% manager availability
+- **Initialization Monitoring**: Tracks managers stuck in initialization state
+
+#### **Project State Evaluation (30% weight)**
+
+- **Operational Status**: Scoring based on project state (Monitoring=100%, Down=30%)
+- **Emergency Mode Penalty**: -30 points for emergency operation
+- **Demo License Detection**: -10 points for demo license usage
+- **State Transition Monitoring**: Tracks Starting, Stopping, Restarting states
+
+#### **Performance Assessment (20% weight)**
+
+- **Restart Policy Analysis**: Evaluates manager restart configurations
+- **Stability Indicators**: High restart counts indicate potential issues
+- **Start Mode Distribution**: Balance between manual and automatic startup
+- **Recent Activity Detection**: Identifies potential crash/restart scenarios
+
+#### **Reliability Monitoring (10% weight)**
+
+- **Critical Manager Status**: Ensures essential system managers are running
+- **UI Manager Availability**: Monitors operator interface accessibility
+- **System Uptime Bonus**: Rewards long-running stable systems
+- **Service Continuity**: Evaluates overall system reliability
+
+### 🔄 **Real-Time Health Monitoring**
+
+The health assessment updates automatically with the **Manager Overview refresh functionality**:
+
+- **Auto-Refresh Integration**: Health scores update with configurable intervals
+- **Manual Refresh**: Instant health re-evaluation with refresh button
+- **Dynamic Scoring**: Real-time updates as manager states change
+- **Historical Context**: Considers manager start times and stability patterns
+
+### 🎯 **Use Cases and Benefits**
+
+#### **👥 For Operations Teams**
+
+- **Quick System Assessment**: Immediate understanding of project health status
+- **Proactive Issue Detection**: Early warning system for potential problems
+- **Maintenance Planning**: Identify systems requiring attention
+- **Performance Optimization**: Data-driven recommendations for improvements
+
+#### **🔧 For System Administrators**
+
+- **Health Monitoring**: Centralized view of WinCC OA project status
+- **Issue Prioritization**: Focus on critical problems first
+- **Trend Analysis**: Monitor system health over time
+- **Documentation**: Clear issue descriptions and resolution guidance
+
+#### **📊 For Management**
+
+- **System Overview**: High-level health status of WinCC OA infrastructure
+- **Risk Assessment**: Identify projects at risk of failure
+- **Resource Planning**: Understand maintenance and upgrade needs
+- **Compliance Monitoring**: Ensure proper licensing and configuration
+
+### 🛠️ **Technical Implementation**
+
+The health scoring system uses sophisticated algorithms to:
+
+- **Weighted Scoring**: Combines multiple factors with appropriate importance weights
+- **Edge Case Handling**: Gracefully manages missing data or unusual configurations
+- **Performance Optimization**: Efficient calculation suitable for real-time updates
+- **Extensible Design**: Easy to add new health metrics and assessment criteria
+
+---
+
 ## 🔍 Smart Filtering
 
 The extension provides powerful real-time filtering to quickly find projects across all categories:
@@ -367,6 +495,7 @@ Add new runnable WinCC OA projects to your system:
 ![Register Runnable Project](docs/images/proj-tree-register-runnable-project.png)
 
 **Features:**
+
 - **Structure Validation**: Ensures project has required `config/config` file
 - **Version Detection**: Automatically extracts WinCC OA version from project files
 - **Duplicate Prevention**: Prevents registering already registered projects
@@ -381,6 +510,7 @@ Remove projects from WinCC OA configuration safely:
 ![Unregister Project Command](docs/images/command-unregister-project.png)
 
 **Safety Features:**
+
 - **Confirmation Dialog**: Requires confirmation before unregistering
 - **Configuration Backup**: Safely removes entries from WinCC OA configuration
 - **Selective Removal**: Unregister individual projects without affecting others
