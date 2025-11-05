@@ -197,6 +197,97 @@ export function getAvailableWinCCOAVersions(): string[] {
     }
 }
 
+//--------------------------------------------------------------------------
+
+/**
+ * Gets WinCC OA installation path for a specific version
+ * @param version - Version string like "3.21" or "3.20.5"
+ * @returns Installation path or null if not found
+ */
+export function getWinCCOAInstallationPath(version: string): string | null {
+    if (os.platform() !== 'win32') {
+        return null;
+    }
+
+    const installPath = path.join('C:\\Program Files\\Siemens\\WinCC_OA', version);
+    
+    if (fs.existsSync(installPath)) {
+        return installPath;
+    }
+
+    return null;
+}
+
+//--------------------------------------------------------------------------
+
+/**
+ * Searches for pmon executable for a specific version
+ * @param version - WinCC OA version
+ * @returns Path to pmon executable or null if not found
+ */
+export function searchForPmonExecutable(version: string): string | null {
+    return getWCCILpmonPath(version);
+}
+
+//--------------------------------------------------------------------------
+
+/**
+ * Reads project version from config files
+ * @param projectDir - Project directory path
+ * @returns Version string or null if not found
+ */
+export function readProjectVersionFromConfig(projectDir: string): string | null {
+    try {
+        // Try to read from config/config file
+        const configPath = path.join(projectDir, 'config', 'config');
+        if (fs.existsSync(configPath)) {
+            const content = fs.readFileSync(configPath, 'utf-8');
+            
+            // Look for proj_version line
+            const versionMatch = content.match(/^proj_version\s*=\s*"?([^"\r\n]+)"?/m);
+            if (versionMatch) {
+                return versionMatch[1].trim();
+            }
+        }
+
+        // Try to read from progs/config.dat file (alternative location)
+        const altConfigPath = path.join(projectDir, 'progs', 'config.dat');
+        if (fs.existsSync(altConfigPath)) {
+            const content = fs.readFileSync(altConfigPath, 'utf-8');
+            
+            // Look for proj_version line
+            const versionMatch = content.match(/^proj_version\s*=\s*"?([^"\r\n]+)"?/m);
+            if (versionMatch) {
+                return versionMatch[1].trim();
+            }
+        }
+
+        return null;
+    } catch (error) {
+        return null;
+    }
+}
+
+//--------------------------------------------------------------------------
+
+/**
+ * Marks a project as not runnable (placeholder function)
+ * @param project - Project to mark
+ */
+export function markProjectAsNotRunnable(project: any): void {
+    if (project && typeof project === 'object') {
+        project.isRunnable = false;
+    }
+}
+
+//--------------------------------------------------------------------------
+
+/**
+ * Alias for getAvailableWinCCOAVersions for backward compatibility
+ * @returns Array of version strings sorted from highest to lowest
+ */
+export const findAvailableWinCCOAVersions = getAvailableWinCCOAVersions;
+
 /**
  * Parses manager list output from WCCILpmon
  * @param output - Raw output from MGRLIST:LIST command
