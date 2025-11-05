@@ -44,7 +44,7 @@ export function generateStatusOverviewHTML(statusList: (WinCCOAProjectStatus & {
 
             return `
 			<tr>
-				<td><strong>${status.project.config.name}</strong></td>
+				<td><strong>${status.project.name}</strong></td>
 				<td style="color: ${statusColor};">${statusIcon} ${statusText}</td>
 				<td>${managerCount}</td>
 				<td>${runningManagers}</td>
@@ -188,7 +188,7 @@ export function generateManagerOverviewHTML(
 ): string {
     // Calculate health score
     const healthScore = calculateProjectHealth({
-        project,
+        project: project.config,
         managers,
         projectState,
         runningStatus: PmonProjectRunningStatus.Unknown,
@@ -370,7 +370,7 @@ function generateHealthScoreSection(healthScore: any, projectState?: WinCCOAProj
 					</div>
 				</div>
 			</div>
-			
+
 			${
                 projectState
                     ? `
@@ -438,7 +438,7 @@ function getManagerOverviewCSS(): string {
             margin-bottom: 20px;
             border: 1px solid var(--vscode-input-border);
         }
-        
+
         /* Health Score Styles */
         .health-score-section h3 {
             margin-top: 0;
@@ -764,7 +764,7 @@ export function generateManagerListHTML(project: WinCCOAProject, managers: WinCC
 </head>
 <body>
     <h1>📋 Manager List - ${project.config.name}</h1>
-    
+
     <table>
         <thead>
             <tr>
@@ -839,7 +839,7 @@ export function generateManagerStatusHTML(project: WinCCOAProject, managers: Win
 </head>
 <body>
     <h1>🎛️ Manager Status - ${project.config.name}</h1>
-    
+
     <table>
         <thead>
             <tr>

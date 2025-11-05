@@ -210,7 +210,7 @@ export function getWinCCOAInstallationPath(version: string): string | null {
     }
 
     const installPath = path.join('C:\\Program Files\\Siemens\\WinCC_OA', version);
-    
+
     if (fs.existsSync(installPath)) {
         return installPath;
     }
@@ -242,7 +242,7 @@ export function readProjectVersionFromConfig(projectDir: string): string | null 
         const configPath = path.join(projectDir, 'config', 'config');
         if (fs.existsSync(configPath)) {
             const content = fs.readFileSync(configPath, 'utf-8');
-            
+
             // Look for proj_version line
             const versionMatch = content.match(/^proj_version\s*=\s*"?([^"\r\n]+)"?/m);
             if (versionMatch) {
@@ -254,7 +254,7 @@ export function readProjectVersionFromConfig(projectDir: string): string | null 
         const altConfigPath = path.join(projectDir, 'progs', 'config.dat');
         if (fs.existsSync(altConfigPath)) {
             const content = fs.readFileSync(altConfigPath, 'utf-8');
-            
+
             // Look for proj_version line
             const versionMatch = content.match(/^proj_version\s*=\s*"?([^"\r\n]+)"?/m);
             if (versionMatch) {

@@ -464,7 +464,7 @@ export async function getComprehensiveProjectStatus(project: WinCCOAProject): Pr
     ]);
 
     return {
-        project,
+        project: project.config,
         managers: detailedStatus.managers,
         projectState: detailedStatus.projectState,
         runningStatus,
