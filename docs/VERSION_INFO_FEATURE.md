@@ -24,16 +24,19 @@ This feature provides detailed WinCC OA version information using the `WCCILpmon
 ### Core Functions
 
 **`getDetailedVersionInfo(project)`**
+
 - Executes WCCILpmon.exe -version command
 - Parses output to extract structured information
 - Returns detailed version data object
 
 **`parseVersionOutput(output, executablePath)`**
+
 - Uses regex patterns to parse WCCILpmon output
 - Extracts version, platform, build date, commit hash
 - Handles parsing failures gracefully
 
 **`showVersionInfoDialog(versionInfo)`**
+
 - Creates formatted markdown document
 - Integrates clipboard and output channel functionality
 - Shows user-friendly summary messages
@@ -41,11 +44,13 @@ This feature provides detailed WinCC OA version information using the `WCCILpmon
 ### Project View Integration
 
 **`_getVersionInfoSection(project)`**
+
 - Generates HTML section for project view panels
 - Only executes for WinCC OA system installations
 - Includes interactive buttons and error handling
 
 **Webview Message Handling**
+
 - `copyToClipboard`: System clipboard integration
 - `showInOutput`: VS Code output channel display
 - `retryVersionInfo`: Panel refresh for retry attempts
@@ -74,13 +79,8 @@ WCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!
 The version information appears as an integrated section in project view panels:
 
 ```html
-🔧 Detailed Version Information
-Version: 3.20.5
-Platform: Windows AMD64
-Build Date: Mar 2 2025 09:51:08
-Commit Hash: faf9f4332a
-
-[📋 Copy to Clipboard] [📄 Show in Output]
+🔧 Detailed Version Information Version: 3.20.5 Platform: Windows AMD64 Build Date: Mar 2 2025 09:51:08 Commit Hash:
+faf9f4332a [📋 Copy to Clipboard] [📄 Show in Output]
 ```
 
 ### Error Handling
@@ -88,12 +88,8 @@ Commit Hash: faf9f4332a
 When version retrieval fails, users see:
 
 ```html
-⚠️ Unable to retrieve version information
-Error: WCCILpmon not found for version...
-
-This feature requires WCCILpmon.exe to be accessible.
-
-[🔄 Retry]
+⚠️ Unable to retrieve version information Error: WCCILpmon not found for version... This feature requires WCCILpmon.exe
+to be accessible. [🔄 Retry]
 ```
 
 ## Configuration

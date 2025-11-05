@@ -17,7 +17,7 @@ Every time code is pushed to the `main` branch:
 **Automated dependency management** keeps your extension secure and up-to-date:
 
 - 📅 **Weekly Updates**: Every Monday at 9:00 AM CET
-- 🏷️ **Auto-Labeled**: PRs get `dependencies` and size labels automatically  
+- 🏷️ **Auto-Labeled**: PRs get `dependencies` and size labels automatically
 - 🔒 **Security Priority**: Security updates marked as `priority/high`
 - 📦 **Grouped Updates**: Related dependencies bundled together
 - 🚀 **Auto-Release**: Dependency updates trigger patch releases
@@ -35,18 +35,18 @@ Use **conventional commit format** for all commits:
 
 Examples:
 feat: add new project sorting options
-fix: resolve config file parsing issue  
+fix: resolve config file parsing issue
 docs: update installation instructions
 ```
 
 ### Commit Types & Version Impact
 
-| Commit Type | Version Bump | Example |
-|------------|--------------|---------|
-| `feat:` | Minor (0.1.0 → 0.2.0) | `feat: add drag and drop support` |
-| `fix:` | Patch (0.1.0 → 0.1.1) | `fix: handle missing config files` |
-| `docs:` | Patch (0.1.0 → 0.1.1) | `docs: update README examples` |
-| `BREAKING CHANGE:` | Major (0.1.0 → 1.0.0) | `feat: redesign API` |
+| Commit Type        | Version Bump          | Example                            |
+| ------------------ | --------------------- | ---------------------------------- |
+| `feat:`            | Minor (0.1.0 → 0.2.0) | `feat: add drag and drop support`  |
+| `fix:`             | Patch (0.1.0 → 0.1.1) | `fix: handle missing config files` |
+| `docs:`            | Patch (0.1.0 → 0.1.1) | `docs: update README examples`     |
+| `BREAKING CHANGE:` | Major (0.1.0 → 1.0.0) | `feat: redesign API`               |
 
 ### Helper Script
 
@@ -85,7 +85,7 @@ Project maintainers can trigger releases manually:
 ## 🎉 Benefits
 
 - 🤖 **Zero manual work** - Everything automated
-- 📝 **Consistent changelog** - Generated from commits  
+- 📝 **Consistent changelog** - Generated from commits
 - 🏷️ **Proper versioning** - Semantic versioning
 - 🚀 **Fast distribution** - Immediate availability
 - 🔄 **CI/CD integration** - Quality checks included

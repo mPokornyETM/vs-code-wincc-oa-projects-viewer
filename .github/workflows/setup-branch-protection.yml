@@ -1,57 +1,156 @@
-name: Setup Branch Protection
+name: Setup Git Flow Branch Protection
 
 on:
-  workflow_dispatch:  # Allow manual trigger
-  push:
-    branches: 
-      - main
-    paths:
-      - '.github/workflows/setup-branch-protection.yml'
+    workflow_dispatch: # Allow manual trigger
+    push:
+        branches:
+            - main
+        paths:
+            - ".github/workflows/setup-branch-protection.yml"
 
 permissions:
-  contents: read
+    contents: read
+    repository-projects: write
+    issues: write
+    pull-requests: write
 
 jobs:
-  setup-protection:
-    runs-on: ubuntu-latest
-    if: github.repository_owner == 'mPokornyETM'
-    
-    steps:
-    - name: Setup Branch Protection
-      uses: actions/github-script@v7
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const owner = context.repo.owner;
-          const repo = context.repo.repo;
-          const branch = 'main';
-          
-          try {
-            await github.rest.repos.updateBranchProtection({
-              owner,
-              repo,
-              branch,
-              required_status_checks: {
-                strict: true,
-                contexts: [
-                  'test (18.x)',
-                  'test (20.x)', 
-                  'package'
-                ]
-              },
-              enforce_admins: false,
-              required_pull_request_reviews: {
-                required_approving_review_count: 1,
-                dismiss_stale_reviews: true,
-                require_code_owner_reviews: false
-              },
-              restrictions: null, // No restrictions on who can push
-              allow_force_pushes: false,
-              allow_deletions: false
-            });
-            
-            console.log('Branch protection rules updated successfully');
-          } catch (error) {
-            console.error('Failed to update branch protection:', error);
-            // Don't fail the job if branch protection fails
-          }
+    setup-protection:
+        runs-on: ubuntu-latest
+        if: github.repository_owner == 'mPokornyETM'
+
+        steps:
+            - name: Setup Main Branch Protection
+              uses: actions/github-script@v8
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  script: |
+                      const owner = context.repo.owner;
+                      const repo = context.repo.repo;
+
+                      try {
+                        await github.rest.repos.updateBranchProtection({
+                          owner,
+                          repo,
+                          branch: 'main',
+                          required_status_checks: {
+                            strict: true,
+                            contexts: [
+                              'test (18.x)',
+                              'test (20.x)',
+                              'package'
+                            ]
+                          },
+                          enforce_admins: false,
+                          required_pull_request_reviews: {
+                            required_approving_review_count: 1,
+                            dismiss_stale_reviews: true,
+                            require_code_owner_reviews: false,
+                            require_last_push_approval: true
+                          },
+                          restrictions: null,
+                          allow_force_pushes: false,
+                          allow_deletions: false,
+                          block_creations: false,
+                          required_conversation_resolution: true,
+                          required_linear_history: true
+                        });
+
+                        // Disable squash merging to maintain Git Flow history
+                        await github.rest.repos.update({
+                          owner,
+                          repo,
+                          allow_squash_merge: false,
+                          allow_merge_commit: true,
+                          allow_rebase_merge: true
+                        });
+
+                        console.log('✅ Main branch protection rules updated successfully');
+                        console.log('🛡️ Main branch rules: Strict protection for production');
+                        console.log('🚫 Squash merging disabled to preserve Git Flow history');
+                      } catch (error) {
+                        console.error('❌ Failed to update main branch protection:', error);
+                        // Don't fail the job if branch protection fails
+                      }
+
+            - name: Setup Develop Branch Protection
+              uses: actions/github-script@v8
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  script: |
+                      const owner = context.repo.owner;
+                      const repo = context.repo.repo;
+
+                      try {
+                        await github.rest.repos.updateBranchProtection({
+                          owner,
+                          repo,
+                          branch: 'develop',
+                          required_status_checks: {
+                            strict: true,
+                            contexts: [
+                              'test (18.x)',
+                              'test (20.x)',
+                              'package'
+                            ]
+                          },
+                          enforce_admins: false,
+                          required_pull_request_reviews: {
+                            required_approving_review_count: 1,
+                            dismiss_stale_reviews: false,
+                            require_code_owner_reviews: false,
+                            require_last_push_approval: false
+                          },
+                          restrictions: null,
+                          allow_force_pushes: true, // Allow for rebasing and cleanup
+                          allow_deletions: false,
+                          block_creations: false,
+                          required_conversation_resolution: false,
+                          required_linear_history: false
+                        });
+
+                        console.log('✅ Develop branch protection rules updated successfully');
+                        console.log('🔧 Develop branch rules: Flexible for integration work');
+                      } catch (error) {
+                        console.error('❌ Failed to update develop branch protection:', error);
+                        // Don't fail the job if branch protection fails
+                      }
+
+            - name: Display Git Flow Summary
+              uses: actions/github-script@v8
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  script: |
+                      console.log('🌳 Git Flow Branch Protection Summary');
+                      console.log('=====================================');
+                      console.log('');
+                      console.log('📋 Main Branch (Production):');
+                      console.log('  ✅ Required PR reviews (1+ reviewer)');
+                      console.log('  ✅ Required status checks (CI/CD)');
+                      console.log('  ✅ Dismiss stale reviews');
+                      console.log('  ✅ Require conversation resolution');
+                      console.log('  ✅ Require linear history');
+                      console.log('  ✅ Require fresh approvals after push');
+                      console.log('  🚫 No force pushes');
+                      console.log('  🚫 No deletions');
+                      console.log('  🚫 No squash merging (preserves Git Flow history)');
+                      console.log('  ✅ Merge commits and rebase allowed');
+                      console.log('');
+                      console.log('🔧 Develop Branch (Integration):');
+                      console.log('  ✅ Required PR reviews (1+ reviewer)');
+                      console.log('  ✅ Required status checks (CI/CD)');
+                      console.log('  ✅ Allow force pushes (for rebasing)');
+                      console.log('  ✅ More flexible review process');
+                      console.log('  🚫 No deletions');
+                      console.log('');
+                      console.log('📖 Git Flow Workflow:');
+                      console.log('  • feature/* → develop (via PR)');
+                      console.log('  • release/* → main + develop (via PR)');
+                      console.log('  • hotfix/* → main + develop (via PR)');
+                      console.log('  • develop → main (via release PR)');
+                      console.log('');
+                      console.log('🧪 Automated Releases:');
+                      console.log('  • develop push → pre-release (alpha/beta/rc)');
+                      console.log('  • main push → stable release');
+                      console.log('');
+                      console.log('📚 Documentation: docs/GITFLOW_WORKFLOW.md');

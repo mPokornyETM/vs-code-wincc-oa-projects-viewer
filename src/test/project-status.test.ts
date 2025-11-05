@@ -10,7 +10,7 @@ class MockWinCCOAProject extends vscode.TreeItem {
         installationDate: '2023-01-01',
         notRunnable: false
     };
-    
+
     public readonly isRunnable = true;
     public readonly isWinCCOASystem = false;
     public readonly version = '3.20';
@@ -21,7 +21,6 @@ class MockWinCCOAProject extends vscode.TreeItem {
 }
 
 suite('WinCC OA Project Status Check Tests', () => {
-
     test('PmonProjectRunningStatus enum should have correct values', () => {
         assert.strictEqual(PmonProjectRunningStatus.RUNNING, 'running');
         assert.strictEqual(PmonProjectRunningStatus.STOPPED, 'stopped');
@@ -59,7 +58,7 @@ suite('WinCC OA Project Status Check Tests', () => {
     test('isProjectRunning should handle WCCILpmon execution', async () => {
         // This test would need WCCILpmon to be available and a valid project
         const mockProject = new MockWinCCOAProject();
-        
+
         // Since we can't guarantee a specific project exists, we'll test that the function
         // either succeeds or fails with a meaningful error message
         try {
@@ -67,7 +66,7 @@ suite('WinCC OA Project Status Check Tests', () => {
             // If it succeeds, that's fine - it means WCCILpmon is working
         } catch (error) {
             assert.ok(error instanceof Error);
-            // Should be either "WCCILpmon executable not found" or "Failed to execute WCCILpmon" 
+            // Should be either "WCCILpmon executable not found" or "Failed to execute WCCILpmon"
             // or some other meaningful error
             assert.ok((error as Error).message.length > 0);
         }
@@ -94,11 +93,11 @@ suite('WinCC OA Project Status Check Tests', () => {
     test('isProjectRunning should throw for unknown status', async () => {
         // Mock checkProjectRunningStatus to return UNKNOWN
         const originalCheck = checkProjectRunningStatus;
-        
+
         // This is more of a unit test for the logic - in practice we'd need actual WCCILpmon
         // But we can test the interface and error handling
         const mockProject = new MockWinCCOAProject();
-        
+
         try {
             await isProjectRunning(mockProject as any);
         } catch (error) {

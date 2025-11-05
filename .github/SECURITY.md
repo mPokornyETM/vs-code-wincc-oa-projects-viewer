@@ -4,11 +4,11 @@
 
 We actively provide security updates for the following versions of the WinCC OA VS Code Extension:
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.5.x   | ✅ Yes             |
-| 1.0.x   | ✅ Yes             |
-| < 1.0   | ❌ No              |
+| Version | Supported |
+| ------- | --------- |
+| 1.5.x   | ✅ Yes    |
+| 1.0.x   | ✅ Yes    |
+| < 1.0   | ❌ No     |
 
 ## 🚨 **Reporting a Vulnerability**
 
@@ -65,12 +65,12 @@ Implement proper path validation and sanitization...
 
 ## ⏰ **Response Timeline**
 
-| Phase | Timeline | Description |
-|-------|----------|-------------|
-| **Initial Response** | 48 hours | Acknowledgment of report |
-| **Assessment** | 5 business days | Vulnerability validation and severity assessment |
-| **Fix Development** | 2-4 weeks | Develop and test security fix |
-| **Disclosure** | Coordinated | Public disclosure after fix is released |
+| Phase                | Timeline        | Description                                      |
+| -------------------- | --------------- | ------------------------------------------------ |
+| **Initial Response** | 48 hours        | Acknowledgment of report                         |
+| **Assessment**       | 5 business days | Vulnerability validation and severity assessment |
+| **Fix Development**  | 2-4 weeks       | Develop and test security fix                    |
+| **Disclosure**       | Coordinated     | Public disclosure after fix is released          |
 
 ## 🛡️ **Security Measures**
 
@@ -142,13 +142,13 @@ The extension reads Windows registry for project discovery:
 
 We recognize and thank security researchers who help make our extension more secure:
 
-<!-- 
+<!--
 Add contributors here as they report vulnerabilities:
 
 - **[Researcher Name]** - Discovered and reported [vulnerability description] (Date)
 -->
 
-*No security reports have been received yet. Be the first to help us improve security!*
+_No security reports have been received yet. Be the first to help us improve security!_
 
 ## 📚 **Additional Resources**
 
@@ -175,4 +175,4 @@ Add contributors here as they report vulnerabilities:
 **Last Updated:** January 2024  
 **Next Review:** April 2024
 
-*This security policy is reviewed and updated quarterly to ensure it remains current with best practices and emerging threats.*
+_This security policy is reviewed and updated quarterly to ensure it remains current with best practices and emerging threats._

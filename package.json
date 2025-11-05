@@ -1,505 +1,512 @@
 {
-  "name": "wincc-oa-projects",
-  "displayName": "WinCC OA Projects",
-  "description": "View and manage WinCC OA projects in VS Code",
-  "version": "2.0.0",
-  "publisher": "mPokornyETM",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer.git"
-  },
-  "bugs": {
-    "url": "https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/issues"
-  },
-  "homepage": "https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer#readme",
-  "license": "MIT",
-  "icon": "images/icon.png",
-  "keywords": [
-    "wincc-oa",
-    "scada",
-    "hmi",
-    "wincc-oa-project-admin",
-    "wincc-oa-engineering",
-    "wincc-oa-runtime",
-    "siemens",
-    "etm",
-    "industrial",
-    "automation"
-  ],
-  "engines": {
-    "vscode": "^1.105.0"
-  },
-  "categories": [
-    "Other"
-  ],
-  "activationEvents": [
-    "onStartupFinished"
-  ],
-  "main": "./out/extension.js",
-  "contributes": {
-    "views": {
-      "winccOAExplorer": [
-        {
-          "id": "winccOAProjects",
-          "name": "Locale Projects",
-          "when": "true",
-          "icon": "$(folder)"
-        }
-      ]
+    "name": "wincc-oa-projects",
+    "displayName": "WinCC OA Projects",
+    "description": "View and manage WinCC OA projects in VS Code",
+    "version": "2.0.0",
+    "publisher": "mPokornyETM",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer.git"
     },
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "winccOAExplorer",
-          "title": "WinCC OA Projects",
-          "icon": "$(folder-library)"
-        }
-      ]
+    "bugs": {
+        "url": "https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/issues"
     },
-    "commands": [
-      {
-        "command": "winccOAProjects.refresh",
-        "title": "WinCC OA: Refresh Projects",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "winccOAProjects.openProject",
-        "title": "WinCC OA: Open Project",
-        "icon": "$(folder-opened)"
-      },
-      {
-        "command": "winccOAProjects.openProjectNewWindow",
-        "title": "WinCC OA: Open Project in New Window",
-        "icon": "$(window)"
-      },
-      {
-        "command": "winccOAProjects.openInExplorer",
-        "title": "WinCC OA: Open in Explorer",
-        "icon": "$(file-directory)"
-      },
-      {
-        "command": "winccOAProjects.showProjectView",
-        "title": "WinCC OA: Show Project Details",
-        "icon": "$(info)"
-      },
-      {
-        "command": "winccOAProjects.registerProject",
-        "title": "WinCC OA: Register Project",
-        "icon": "$(plus)"
-      },
-      {
-        "command": "winccOAProjects.scanForProjects",
-        "title": "WinCC OA: Scan for Unregistered Projects",
-        "icon": "$(search)"
-      },
-      {
-        "command": "winccOAProjects.registerAllUnregistered",
-        "title": "WinCC OA: Register All Unregistered Projects",
-        "icon": "$(add)"
-      },
-      {
-        "command": "winccOAProjects.unregisterProject",
-        "title": "WinCC OA: Unregister Project",
-        "icon": "$(remove)"
-      },
-      {
-        "command": "winccOAProjects.filterProjects",
-        "title": "WinCC OA: Filter Projects",
-        "icon": "$(filter)"
-      },
-      {
-        "command": "winccOAProjects.clearFilter",
-        "title": "WinCC OA: Clear Filter",
-        "icon": "$(clear-all)"
-      },
-      {
-        "command": "winccOAProjects.registerSubProject",
-        "title": "WinCC OA: Register Sub Project",
-        "icon": "$(add)"
-      },
-      {
-        "command": "winccOAProjects.registerRunnableProject",
-        "title": "WinCC OA: Register Runnable Project",
-        "icon": "$(play)"
-      },
-      {
-        "command": "winccOAProjects.getVersionInfo",
-        "title": "WinCC OA: Show Detailed Version Information",
-        "icon": "$(info)"
-      },
-      {
-        "command": "winccOAProjects.checkPmonProjectStatus",
-        "title": "WinCC OA: Check Pmon Project Status",
-        "icon": "$(pulse)"
-      },
-      {
-        "command": "winccOAProjects.refreshAllStatus",
-        "title": "WinCC OA: Refresh All Project Status",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "winccOAProjects.showAllRunnableStatus",
-        "title": "WinCC OA: Show All Runnable Project Status",
-        "icon": "$(list-unordered)"
-      },
-      {
-        "command": "winccOAProjects.startPmonOnly",
-        "title": "WinCC OA: Start Pmon (Monitoring Only)",
-        "icon": "$(debug-start)"
-      },
-      {
-        "command": "winccOAProjects.startProject",
-        "title": "WinCC OA: Start Project",
-        "icon": "$(play)"
-      },
-      {
-        "command": "winccOAProjects.stopProject",
-        "title": "WinCC OA: Stop Project",
-        "icon": "$(stop)"
-      },
-      {
-        "command": "winccOAProjects.stopProjectAndPmon",
-        "title": "WinCC OA: Stop Project + Pmon",
-        "icon": "$(debug-stop)"
-      },
-      {
-        "command": "winccOAProjects.restartProject",
-        "title": "WinCC OA: Restart Project",
-        "icon": "$(debug-restart)"
-      },
-      {
-        "command": "winccOAProjects.setPmonWaitMode",
-        "title": "WinCC OA: Set Pmon Wait Mode",
-        "icon": "$(watch)"
-      },
-      {
-        "command": "winccOAProjects.showManagerOverview",
-        "title": "WinCC OA: Manager Overview",
-        "icon": "$(dashboard)"
-      },
-      {
-        "command": "winccOAProjects.showCommandHistory",
-        "title": "WinCC OA: Pmon Command History",
-        "icon": "$(history)"
-      },
-      {
-        "command": "winccOAProjects.startManager",
-        "title": "WinCC OA: Start Manager",
-        "icon": "$(play-circle)"
-      },
-      {
-        "command": "winccOAProjects.stopManager",
-        "title": "WinCC OA: Stop Manager",
-        "icon": "$(stop-circle)"
-      },
-      {
-        "command": "winccOAProjects.killManager",
-        "title": "WinCC OA: Kill Manager",
-        "icon": "$(close)"
-      },
-      {
-        "command": "winccOAProjects.removeManager",
-        "title": "WinCC OA: Remove Manager",
-        "icon": "$(trash)"
-      }
+    "homepage": "https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer#readme",
+    "license": "MIT",
+    "icon": "images/icon.png",
+    "keywords": [
+        "wincc-oa",
+        "scada",
+        "hmi",
+        "wincc-oa-project-admin",
+        "wincc-oa-engineering",
+        "wincc-oa-runtime",
+        "siemens",
+        "etm",
+        "industrial",
+        "automation"
     ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "winccOAProjects.refresh",
-          "when": "view == winccOAProjects",
-          "group": "navigation@1"
-        },
-        {
-          "command": "winccOAProjects.scanForProjects",
-          "when": "view == winccOAProjects",
-          "group": "navigation@2"
-        },
-        {
-          "command": "winccOAProjects.filterProjects",
-          "when": "view == winccOAProjects",
-          "group": "navigation@3"
-        },
-        {
-          "command": "winccOAProjects.clearFilter",
-          "when": "view == winccOAProjects",
-          "group": "navigation@4"
-        },
-        {
-          "command": "winccOAProjects.refreshAllStatus",
-          "when": "view == winccOAProjects",
-          "group": "status@1"
-        },
-        {
-          "command": "winccOAProjects.showAllRunnableStatus",
-          "when": "view == winccOAProjects",
-          "group": "status@2"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "winccOAProjects.openProject",
-          "when": "view == winccOAProjects && (viewItem == winccOAProject || viewItem =~ /winccOAProjectRunnable.*/)",
-          "group": "inline@1"
-        },
-        {
-          "command": "winccOAProjects.openProjectNewWindow",
-          "when": "view == winccOAProjects && (viewItem == winccOAProject || viewItem =~ /winccOAProjectRunnable.*/)",
-          "group": "inline@2"
-        },
-        {
-          "command": "winccOAProjects.checkPmonProjectStatus",
-          "when": "view == winccOAProjects && viewItem =~ /winccOAProjectRunnable.*/",
-          "group": "inline@3"
-        },
-        {
-          "command": "winccOAProjects.getVersionInfo",
-          "when": "view == winccOAProjects && viewItem == winccOASystemProject",
-          "group": "inline@4"
-        },
-        {
-          "command": "winccOAProjects.openInExplorer",
-          "when": "view == winccOAProjects && (viewItem == winccOAProject || viewItem =~ /winccOAProjectRunnable.*/)",
-          "group": "navigation@1"
-        },
-        {
-          "command": "winccOAProjects.getVersionInfo",
-          "when": "view == winccOAProjects && viewItem == winccOASystemProject",
-          "group": "navigation@1"
-        },
-        {
-          "command": "winccOAProjects.registerProject",
-          "when": "view == winccOAProjects && viewItem == winccOAProjectUnregistered",
-          "group": "inline@1"
-        },
-        {
-          "command": "winccOAProjects.unregisterProject",
-          "when": "view == winccOAProjects && (viewItem == winccOAProject || viewItem =~ /winccOAProjectRunnable.*/)",
-          "group": "navigation@2"
-        },
-        {
-          "command": "winccOAProjects.checkPmonProjectStatus",
-          "when": "view == winccOAProjects && viewItem =~ /winccOAProjectRunnable.*/",
-          "group": "navigation@3"
-        },
-        {
-          "command": "winccOAProjects.startPmonOnly",
-          "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableStopped)",
-          "group": "pmon@1"
-        },
-        {
-          "command": "winccOAProjects.startProject",
-          "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableStopped)",
-          "group": "pmon@2"
-        },
-        {
-          "command": "winccOAProjects.stopProject",
-          "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
-          "group": "pmon@3"
-        },
-        {
-          "command": "winccOAProjects.stopProjectAndPmon",
-          "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
-          "group": "pmon@4"
-        },
-        {
-          "command": "winccOAProjects.restartProject",
-          "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
-          "group": "pmon@5"
-        },
-        {
-          "command": "winccOAProjects.setPmonWaitMode",
-          "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
-          "group": "pmon@6"
-        },
-        {
-          "command": "winccOAProjects.showManagerOverview",
-          "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
-          "group": "managers@1"
-        },
-        {
-          "command": "winccOAProjects.startManager",
-          "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
-          "group": "managers@2"
-        },
-        {
-          "command": "winccOAProjects.stopManager",
-          "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
-          "group": "managers@3"
-        },
-        {
-          "command": "winccOAProjects.killManager",
-          "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
-          "group": "managers@4"
-        },
-        {
-          "command": "winccOAProjects.removeManager",
-          "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
-          "group": "managers@5"
-        },
-        {
-          "command": "winccOAProjects.registerAllUnregistered",
-          "when": "view == winccOAProjects && viewItem == projectCategory",
-          "group": "navigation@1"
-        }
-      ],
-      "explorer/context": [
-        {
-          "command": "winccOAProjects.registerSubProject",
-          "when": "explorerResourceIsFolder",
-          "group": "2_workspace@1"
-        },
-        {
-          "command": "winccOAProjects.registerRunnableProject",
-          "when": "explorerResourceIsFolder",
-          "group": "2_workspace@2"
-        }
-      ],
-      "editor/title/context": [
-        {
-          "command": "winccOAProjects.registerSubProject",
-          "when": "resourceScheme == file && explorerResourceIsFolder",
-          "group": "2_workspace@1"
-        },
-        {
-          "command": "winccOAProjects.registerRunnableProject",
-          "when": "resourceScheme == file && explorerResourceIsFolder",
-          "group": "2_workspace@2"
-        }
-      ],
-      "commandPalette": [
-        {
-          "command": "winccOAProjects.showProjectView"
-        },
-        {
-          "command": "winccOAProjects.refresh"
-        },
-        {
-          "command": "winccOAProjects.openProject"
-        },
-        {
-          "command": "winccOAProjects.openProjectNewWindow"
-        },
-        {
-          "command": "winccOAProjects.openInExplorer"
-        },
-        {
-          "command": "winccOAProjects.registerProject"
-        },
-        {
-          "command": "winccOAProjects.scanForProjects"
-        },
-        {
-          "command": "winccOAProjects.registerAllUnregistered"
-        },
-        {
-          "command": "winccOAProjects.unregisterProject"
-        },
-        {
-          "command": "winccOAProjects.filterProjects"
-        },
-        {
-          "command": "winccOAProjects.clearFilter"
-        },
-        {
-          "command": "winccOAProjects.registerSubProject"
-        },
-        {
-          "command": "winccOAProjects.registerRunnableProject"
-        },
-        {
-          "command": "winccOAProjects.getVersionInfo"
-        },
-        {
-          "command": "winccOAProjects.checkPmonProjectStatus"
-        },
-        {
-          "command": "winccOAProjects.showCommandHistory"
-        }
-      ]
+    "engines": {
+        "vscode": "^1.105.0"
     },
-    "keybindings": [
-      {
-        "command": "winccOAProjects.filterProjects",
-        "key": "ctrl+shift+f",
-        "when": "view == winccOAProjects && focusedView == winccOAProjects"
-      },
-      {
-        "command": "winccOAProjects.registerSubProject",
-        "key": "ctrl+shift+r",
-        "when": "explorerResourceIsFolder"
-      },
-      {
-        "command": "winccOAProjects.registerRunnableProject",
-        "key": "ctrl+shift+p",
-        "when": "explorerResourceIsFolder"
-      }
+    "categories": [
+        "Other"
     ],
-    "extensionPoints": [
-      {
-        "name": "winccOAProjectActions",
-        "description": "Contribute custom actions for WinCC OA projects"
-      },
-      {
-        "name": "winccOAProjectView",
-        "description": "Contribute custom views to WinCC OA project details panel"
-      }
+    "activationEvents": [
+        "onStartupFinished"
     ],
-    "configuration": {
-      "title": "WinCC OA Projects",
-      "properties": {
-        "winccOAProjects.managerOverview.autoRefreshInterval": {
-          "type": "number",
-          "default": 5,
-          "minimum": 1,
-          "maximum": 300,
-          "description": "Auto-refresh interval for Manager Overview in seconds (1-300). Set to 0 to disable auto-refresh."
+    "main": "./out/extension.js",
+    "contributes": {
+        "views": {
+            "winccOAExplorer": [
+                {
+                    "id": "winccOAProjects",
+                    "name": "Locale Projects",
+                    "when": "true",
+                    "icon": "$(folder)"
+                }
+            ]
         },
-        "winccOAProjects.managerOverview.enableAutoRefresh": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable automatic refresh of Manager Overview"
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "winccOAExplorer",
+                    "title": "WinCC OA Projects",
+                    "icon": "$(folder-library)"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "winccOAProjects.refresh",
+                "title": "WinCC OA: Refresh Projects",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "winccOAProjects.openProject",
+                "title": "WinCC OA: Open Project",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "winccOAProjects.openProjectNewWindow",
+                "title": "WinCC OA: Open Project in New Window",
+                "icon": "$(window)"
+            },
+            {
+                "command": "winccOAProjects.openInExplorer",
+                "title": "WinCC OA: Open in Explorer",
+                "icon": "$(file-directory)"
+            },
+            {
+                "command": "winccOAProjects.showProjectView",
+                "title": "WinCC OA: Show Project Details",
+                "icon": "$(info)"
+            },
+            {
+                "command": "winccOAProjects.registerProject",
+                "title": "WinCC OA: Register Project",
+                "icon": "$(plus)"
+            },
+            {
+                "command": "winccOAProjects.scanForProjects",
+                "title": "WinCC OA: Scan for Unregistered Projects",
+                "icon": "$(search)"
+            },
+            {
+                "command": "winccOAProjects.registerAllUnregistered",
+                "title": "WinCC OA: Register All Unregistered Projects",
+                "icon": "$(add)"
+            },
+            {
+                "command": "winccOAProjects.unregisterProject",
+                "title": "WinCC OA: Unregister Project",
+                "icon": "$(remove)"
+            },
+            {
+                "command": "winccOAProjects.filterProjects",
+                "title": "WinCC OA: Filter Projects",
+                "icon": "$(filter)"
+            },
+            {
+                "command": "winccOAProjects.clearFilter",
+                "title": "WinCC OA: Clear Filter",
+                "icon": "$(clear-all)"
+            },
+            {
+                "command": "winccOAProjects.registerSubProject",
+                "title": "WinCC OA: Register Sub Project",
+                "icon": "$(add)"
+            },
+            {
+                "command": "winccOAProjects.registerRunnableProject",
+                "title": "WinCC OA: Register Runnable Project",
+                "icon": "$(play)"
+            },
+            {
+                "command": "winccOAProjects.getVersionInfo",
+                "title": "WinCC OA: Show Detailed Version Information",
+                "icon": "$(info)"
+            },
+            {
+                "command": "winccOAProjects.checkPmonProjectStatus",
+                "title": "WinCC OA: Check Pmon Project Status",
+                "icon": "$(pulse)"
+            },
+            {
+                "command": "winccOAProjects.refreshAllStatus",
+                "title": "WinCC OA: Refresh All Project Status",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "winccOAProjects.showAllRunnableStatus",
+                "title": "WinCC OA: Show All Runnable Project Status",
+                "icon": "$(list-unordered)"
+            },
+            {
+                "command": "winccOAProjects.startPmonOnly",
+                "title": "WinCC OA: Start Pmon (Monitoring Only)",
+                "icon": "$(debug-start)"
+            },
+            {
+                "command": "winccOAProjects.startProject",
+                "title": "WinCC OA: Start Project",
+                "icon": "$(play)"
+            },
+            {
+                "command": "winccOAProjects.stopProject",
+                "title": "WinCC OA: Stop Project",
+                "icon": "$(stop)"
+            },
+            {
+                "command": "winccOAProjects.stopProjectAndPmon",
+                "title": "WinCC OA: Stop Project + Pmon",
+                "icon": "$(debug-stop)"
+            },
+            {
+                "command": "winccOAProjects.restartProject",
+                "title": "WinCC OA: Restart Project",
+                "icon": "$(debug-restart)"
+            },
+            {
+                "command": "winccOAProjects.setPmonWaitMode",
+                "title": "WinCC OA: Set Pmon Wait Mode",
+                "icon": "$(watch)"
+            },
+            {
+                "command": "winccOAProjects.showManagerOverview",
+                "title": "WinCC OA: Manager Overview",
+                "icon": "$(dashboard)"
+            },
+            {
+                "command": "winccOAProjects.showCommandHistory",
+                "title": "WinCC OA: Pmon Command History",
+                "icon": "$(history)"
+            },
+            {
+                "command": "winccOAProjects.startManager",
+                "title": "WinCC OA: Start Manager",
+                "icon": "$(play-circle)"
+            },
+            {
+                "command": "winccOAProjects.stopManager",
+                "title": "WinCC OA: Stop Manager",
+                "icon": "$(stop-circle)"
+            },
+            {
+                "command": "winccOAProjects.killManager",
+                "title": "WinCC OA: Kill Manager",
+                "icon": "$(close)"
+            },
+            {
+                "command": "winccOAProjects.removeManager",
+                "title": "WinCC OA: Remove Manager",
+                "icon": "$(trash)"
+            }
+        ],
+        "menus": {
+            "view/title": [
+                {
+                    "command": "winccOAProjects.refresh",
+                    "when": "view == winccOAProjects",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "winccOAProjects.scanForProjects",
+                    "when": "view == winccOAProjects",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "winccOAProjects.filterProjects",
+                    "when": "view == winccOAProjects",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "winccOAProjects.clearFilter",
+                    "when": "view == winccOAProjects",
+                    "group": "navigation@4"
+                },
+                {
+                    "command": "winccOAProjects.refreshAllStatus",
+                    "when": "view == winccOAProjects",
+                    "group": "status@1"
+                },
+                {
+                    "command": "winccOAProjects.showAllRunnableStatus",
+                    "when": "view == winccOAProjects",
+                    "group": "status@2"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "winccOAProjects.openProject",
+                    "when": "view == winccOAProjects && (viewItem == winccOAProject || viewItem =~ /winccOAProjectRunnable.*/)",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "winccOAProjects.openProjectNewWindow",
+                    "when": "view == winccOAProjects && (viewItem == winccOAProject || viewItem =~ /winccOAProjectRunnable.*/)",
+                    "group": "inline@2"
+                },
+                {
+                    "command": "winccOAProjects.checkPmonProjectStatus",
+                    "when": "view == winccOAProjects && viewItem =~ /winccOAProjectRunnable.*/",
+                    "group": "inline@3"
+                },
+                {
+                    "command": "winccOAProjects.getVersionInfo",
+                    "when": "view == winccOAProjects && viewItem == winccOASystemProject",
+                    "group": "inline@4"
+                },
+                {
+                    "command": "winccOAProjects.openInExplorer",
+                    "when": "view == winccOAProjects && (viewItem == winccOAProject || viewItem =~ /winccOAProjectRunnable.*/)",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "winccOAProjects.getVersionInfo",
+                    "when": "view == winccOAProjects && viewItem == winccOASystemProject",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "winccOAProjects.registerProject",
+                    "when": "view == winccOAProjects && viewItem == winccOAProjectUnregistered",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "winccOAProjects.unregisterProject",
+                    "when": "view == winccOAProjects && (viewItem == winccOAProject || viewItem =~ /winccOAProjectRunnable.*/)",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "winccOAProjects.checkPmonProjectStatus",
+                    "when": "view == winccOAProjects && viewItem =~ /winccOAProjectRunnable.*/",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "winccOAProjects.startPmonOnly",
+                    "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableStopped)",
+                    "group": "pmon@1"
+                },
+                {
+                    "command": "winccOAProjects.startProject",
+                    "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableStopped)",
+                    "group": "pmon@2"
+                },
+                {
+                    "command": "winccOAProjects.stopProject",
+                    "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
+                    "group": "pmon@3"
+                },
+                {
+                    "command": "winccOAProjects.stopProjectAndPmon",
+                    "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
+                    "group": "pmon@4"
+                },
+                {
+                    "command": "winccOAProjects.restartProject",
+                    "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
+                    "group": "pmon@5"
+                },
+                {
+                    "command": "winccOAProjects.setPmonWaitMode",
+                    "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
+                    "group": "pmon@6"
+                },
+                {
+                    "command": "winccOAProjects.showManagerOverview",
+                    "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
+                    "group": "managers@1"
+                },
+                {
+                    "command": "winccOAProjects.startManager",
+                    "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
+                    "group": "managers@2"
+                },
+                {
+                    "command": "winccOAProjects.stopManager",
+                    "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
+                    "group": "managers@3"
+                },
+                {
+                    "command": "winccOAProjects.killManager",
+                    "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
+                    "group": "managers@4"
+                },
+                {
+                    "command": "winccOAProjects.removeManager",
+                    "when": "view == winccOAProjects && (viewItem == winccOAProjectRunnable || viewItem == winccOAProjectRunnableRunning)",
+                    "group": "managers@5"
+                },
+                {
+                    "command": "winccOAProjects.registerAllUnregistered",
+                    "when": "view == winccOAProjects && viewItem == projectCategory",
+                    "group": "navigation@1"
+                }
+            ],
+            "explorer/context": [
+                {
+                    "command": "winccOAProjects.registerSubProject",
+                    "when": "explorerResourceIsFolder",
+                    "group": "2_workspace@1"
+                },
+                {
+                    "command": "winccOAProjects.registerRunnableProject",
+                    "when": "explorerResourceIsFolder",
+                    "group": "2_workspace@2"
+                }
+            ],
+            "editor/title/context": [
+                {
+                    "command": "winccOAProjects.registerSubProject",
+                    "when": "resourceScheme == file && explorerResourceIsFolder",
+                    "group": "2_workspace@1"
+                },
+                {
+                    "command": "winccOAProjects.registerRunnableProject",
+                    "when": "resourceScheme == file && explorerResourceIsFolder",
+                    "group": "2_workspace@2"
+                }
+            ],
+            "commandPalette": [
+                {
+                    "command": "winccOAProjects.showProjectView"
+                },
+                {
+                    "command": "winccOAProjects.refresh"
+                },
+                {
+                    "command": "winccOAProjects.openProject"
+                },
+                {
+                    "command": "winccOAProjects.openProjectNewWindow"
+                },
+                {
+                    "command": "winccOAProjects.openInExplorer"
+                },
+                {
+                    "command": "winccOAProjects.registerProject"
+                },
+                {
+                    "command": "winccOAProjects.scanForProjects"
+                },
+                {
+                    "command": "winccOAProjects.registerAllUnregistered"
+                },
+                {
+                    "command": "winccOAProjects.unregisterProject"
+                },
+                {
+                    "command": "winccOAProjects.filterProjects"
+                },
+                {
+                    "command": "winccOAProjects.clearFilter"
+                },
+                {
+                    "command": "winccOAProjects.registerSubProject"
+                },
+                {
+                    "command": "winccOAProjects.registerRunnableProject"
+                },
+                {
+                    "command": "winccOAProjects.getVersionInfo"
+                },
+                {
+                    "command": "winccOAProjects.checkPmonProjectStatus"
+                },
+                {
+                    "command": "winccOAProjects.showCommandHistory"
+                }
+            ]
+        },
+        "keybindings": [
+            {
+                "command": "winccOAProjects.filterProjects",
+                "key": "ctrl+shift+f",
+                "when": "view == winccOAProjects && focusedView == winccOAProjects"
+            },
+            {
+                "command": "winccOAProjects.registerSubProject",
+                "key": "ctrl+shift+r",
+                "when": "explorerResourceIsFolder"
+            },
+            {
+                "command": "winccOAProjects.registerRunnableProject",
+                "key": "ctrl+shift+p",
+                "when": "explorerResourceIsFolder"
+            }
+        ],
+        "configuration": {
+            "title": "WinCC OA Projects",
+            "properties": {
+                "winccOAProjects.managerOverview.autoRefreshInterval": {
+                    "type": "number",
+                    "default": 5,
+                    "minimum": 1,
+                    "maximum": 300,
+                    "description": "Auto-refresh interval for Manager Overview in seconds (1-300). Set to 0 to disable auto-refresh."
+                },
+                "winccOAProjects.managerOverview.enableAutoRefresh": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable automatic refresh of Manager Overview"
+                }
+            }
         }
-      }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "lint": "eslint src/**/*.ts",
+        "lint:fix": "eslint src/**/*.ts --fix",
+        "lint:md": "markdownlint \"**/*.md\" --ignore node_modules",
+        "lint:md:fix": "markdownlint \"**/*.md\" --ignore node_modules --fix",
+        "format": "prettier --write src/**/*.ts",
+        "format:check": "prettier --check src/**/*.ts",
+        "format:md": "prettier --write \"**/*.md\"",
+        "format:md:check": "prettier --check \"**/*.md\"",
+        "style-check": "npm run lint && npm run format:check && npm run lint:md && npm run format:md:check",
+        "style-fix": "npm run lint:fix && npm run format && npm run lint:md:fix && npm run format:md",
+        "pre-commit": "npm run style-fix",
+        "version:check": "node scripts/version.js check",
+        "version:patch": "node scripts/version.js patch",
+        "version:minor": "node scripts/version.js minor",
+        "version:major": "node scripts/version.js major",
+        "test": "vscode-test",
+        "test:coverage": "c8 --reporter=lcov --reporter=text --reporter=json --reporter=json-summary --all --src src --exclude 'src/test/**' npm test",
+        "coverage": "npm run test:coverage",
+        "build:vsix": "npm run compile && vsce package",
+        "package": "vsce package",
+        "release": "standard-version",
+        "release:minor": "standard-version --release-as minor",
+        "release:major": "standard-version --release-as major",
+        "release:patch": "standard-version --release-as patch"
+    },
+    "devDependencies": {
+        "@types/mocha": "^10.0.10",
+        "@types/node": "24.x",
+        "@types/sinon": "^17.0.4",
+        "@types/vscode": "^1.105.0",
+        "@typescript-eslint/eslint-plugin": "^8.46.2",
+        "@typescript-eslint/parser": "^8.45.0",
+        "@vscode/test-cli": "^0.0.12",
+        "@vscode/test-electron": "^2.5.2",
+        "c8": "^10.1.3",
+        "canvas": "^3.2.0",
+        "eslint": "^9.39.0",
+        "eslint-plugin-jsdoc": "^50.8.0",
+        "markdownlint-cli": "^0.45.0",
+        "prettier": "^3.6.2",
+        "sinon": "^21.0.0",
+        "typescript": "^5.9.3"
+    },
+    "dependencies": {
+        "@types/dompurify": "^3.2.0",
+        "@types/jsdom": "^27.0.0",
+        "@types/marked": "^6.0.0",
+        "dompurify": "^3.3.0",
+        "jsdom": "^27.1.0",
+        "marked": "^16.4.1"
     }
-  },
-  "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test",
-    "test:coverage": "c8 --reporter=lcov --reporter=text --reporter=json --reporter=json-summary --all --src src --exclude 'src/test/**' npm test",
-    "coverage": "npm run test:coverage",
-    "build:vsix": "npm run compile && vsce package",
-    "package": "vsce package",
-    "release": "standard-version",
-    "release:minor": "standard-version --release-as minor",
-    "release:major": "standard-version --release-as major",
-    "release:patch": "standard-version --release-as patch"
-  },
-  "devDependencies": {
-    "@types/mocha": "^10.0.10",
-    "@types/node": "24.x",
-    "@types/sinon": "^17.0.4",
-    "@types/vscode": "^1.105.0",
-    "@typescript-eslint/eslint-plugin": "^8.46.2",
-    "@typescript-eslint/parser": "^8.45.0",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2",
-    "c8": "^10.1.3",
-    "canvas": "^3.2.0",
-    "eslint": "^9.39.0",
-    "sinon": "^21.0.0",
-    "typescript": "^5.9.3"
-  },
-  "dependencies": {
-    "@types/dompurify": "^3.2.0",
-    "@types/jsdom": "^27.0.0",
-    "@types/marked": "^6.0.0",
-    "dompurify": "^3.3.0",
-    "jsdom": "^27.1.0",
-    "marked": "^16.4.1"
-  }
 }

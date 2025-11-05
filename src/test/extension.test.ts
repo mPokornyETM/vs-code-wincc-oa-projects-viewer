@@ -2,12 +2,12 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 
 // Import functions from extension
-import { 
-    getPvssInstConfPath, 
-    extractVersionFromProject, 
+import {
+    getPvssInstConfPath,
+    extractVersionFromProject,
     isWinCCOADeliveredSubProject,
     WinCCOAProjectProvider,
-    ProjectCategory 
+    ProjectCategory
 } from '../extension';
 
 // Helper function to create mock WinCCOA project
@@ -35,11 +35,11 @@ suite('WinCC OA Projects Extension Test Suite', () => {
             // Mock Windows platform
             const originalPlatform = process.platform;
             Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
-            
+
             const path = getPvssInstConfPath();
             assert.ok(path.includes('C:\\ProgramData\\Siemens\\WinCC_OA'), 'Should return Windows path');
             assert.ok(path.endsWith('pvssInst.conf'), 'Should end with config filename');
-            
+
             // Restore original platform
             Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
         });
@@ -48,11 +48,11 @@ suite('WinCC OA Projects Extension Test Suite', () => {
             // Mock Unix platform
             const originalPlatform = process.platform;
             Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
-            
+
             const path = getPvssInstConfPath();
             assert.ok(path.includes('/etc/opt/pvss'), 'Should return Unix path');
             assert.ok(path.endsWith('pvssInst.conf'), 'Should end with config filename');
-            
+
             // Restore original platform
             Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
         });
@@ -77,8 +77,7 @@ suite('WinCC OA Projects Extension Test Suite', () => {
             testCases.forEach(testCase => {
                 const project = createMockProject({ name: testCase.name });
                 const version = extractVersionFromProject(project);
-                assert.strictEqual(version, testCase.expected, 
-                    `Version extraction failed for ${testCase.name}`);
+                assert.strictEqual(version, testCase.expected, `Version extraction failed for ${testCase.name}`);
             });
         });
 
@@ -87,7 +86,7 @@ suite('WinCC OA Projects Extension Test Suite', () => {
                 name: 'TestProject',
                 installationDir: 'C:\\WinCC_OA\\3.20\\projects\\TestProject'
             });
-            
+
             const version = extractVersionFromProject(project);
             assert.strictEqual(version, '3.20', 'Should extract version from path');
         });
@@ -133,16 +132,19 @@ suite('WinCC OA Projects Extension Test Suite', () => {
         test('should create category with correct properties', () => {
             const mockProjects: any[] = [];
             const category = new ProjectCategory('Test Category', mockProjects, 'runnable');
-            
+
             assert.strictEqual(category.label, 'Test Category', 'Label should match');
-            assert.strictEqual(category.collapsibleState, vscode.TreeItemCollapsibleState.Expanded, 
-                'Should be expanded by default');
+            assert.strictEqual(
+                category.collapsibleState,
+                vscode.TreeItemCollapsibleState.Expanded,
+                'Should be expanded by default'
+            );
         });
 
         test('should handle version categories', () => {
             const mockProjects: any[] = [];
             const versionCategory = new ProjectCategory('Version 3.20', mockProjects, 'version', '3.20');
-            
+
             assert.strictEqual(versionCategory.label, 'Version 3.20', 'Label should match');
             assert.strictEqual(versionCategory.version, '3.20', 'Version should match');
         });
@@ -164,7 +166,7 @@ suite('WinCC OA Projects Extension Test Suite', () => {
         test('should handle getTreeItem calls', () => {
             const mockProjects: any[] = [];
             const category = new ProjectCategory('Test Category', mockProjects, 'runnable');
-            
+
             const treeItem = provider.getTreeItem(category);
             assert.ok(treeItem, 'Should return tree item');
             assert.strictEqual(treeItem.label, 'Test Category', 'Should preserve label');
@@ -172,13 +174,13 @@ suite('WinCC OA Projects Extension Test Suite', () => {
 
         test('should refresh project data', () => {
             let refreshEventFired = false;
-            
+
             provider.onDidChangeTreeData(() => {
                 refreshEventFired = true;
             });
-            
+
             provider.refresh();
-            
+
             // The refresh event should be fired
             setTimeout(() => {
                 assert.ok(refreshEventFired, 'Refresh event should be fired');
@@ -200,8 +202,8 @@ suite('WinCC OA Projects Extension Test Suite', () => {
         });
 
         test('should handle classification edge cases', () => {
-            const project = createMockProject({ 
-                installationDir: 'C:\\UnknownPath\\TestProject' 
+            const project = createMockProject({
+                installationDir: 'C:\\UnknownPath\\TestProject'
             });
             const isDelivered = isWinCCOADeliveredSubProject(project);
             assert.strictEqual(isDelivered, false, 'Should classify unknown paths as user projects');
@@ -212,20 +214,20 @@ suite('WinCC OA Projects Extension Test Suite', () => {
         test('should handle real world project configurations', () => {
             // Test with realistic project configurations
             const projects = [
-                createMockProject({ 
+                createMockProject({
                     name: 'MyProject_3.20',
                     installationDir: 'C:\\Projects\\MyProject_3.20'
                 }),
-                createMockProject({ 
+                createMockProject({
                     name: 'BACnet',
                     installationDir: 'C:\\ProgramData\\Siemens\\WinCC_OA\\3.20\\projects\\BACnet'
                 })
             ];
-            
+
             projects.forEach(project => {
                 const version = extractVersionFromProject(project);
                 const isDelivered = isWinCCOADeliveredSubProject(project);
-                
+
                 assert.ok(version !== undefined || version === null, 'Version extraction should work');
                 assert.ok(typeof isDelivered === 'boolean', 'Classification should return boolean');
             });
