@@ -35,7 +35,7 @@
     "activationEvents": [
         "onStartupFinished"
     ],
-    "main": "./out/extension.js",
+    "main": "./dist/extension.js",
     "contributes": {
         "views": {
             "winccOAExplorer": [
@@ -454,10 +454,16 @@
         }
     },
     "scripts": {
-        "vscode:prepublish": "npm run compile",
-        "compile": "tsc -p ./",
-        "watch": "tsc -watch -p ./",
-        "pretest": "npm run compile && npm run lint",
+        "vscode:prepublish": "npm run package",
+        "compile": "npm run check-types && node esbuild.js",
+        "check-types": "tsc --noEmit",
+        "watch": "npm-run-all -p watch:*",
+        "watch:esbuild": "node esbuild.js --watch",
+        "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+        "package": "npm run check-types && node esbuild.js --production",
+        "compile-tests": "tsc -p . --outDir out",
+        "watch-tests": "tsc -p . -w --outDir out",
+        "pretest": "npm run compile-tests && npm run compile && npm run lint",
         "lint": "eslint src/**/*.ts",
         "lint:fix": "eslint src/**/*.ts --fix",
         "lint:md": "markdownlint \"**/*.md\" --ignore node_modules",
@@ -476,8 +482,8 @@
         "test": "vscode-test",
         "test:coverage": "c8 --reporter=lcov --reporter=text --reporter=json --reporter=json-summary --all --src src --exclude 'src/test/**' npm test",
         "coverage": "npm run test:coverage",
-        "build:vsix": "npm run compile && vsce package",
-        "package": "vsce package",
+        "build:vsix": "npm run package && vsce package",
+        "package:vsix": "vsce package",
         "release": "standard-version",
         "release:minor": "standard-version --release-as minor",
         "release:major": "standard-version --release-as major",
@@ -494,9 +500,11 @@
         "@vscode/test-electron": "^2.5.2",
         "c8": "^10.1.3",
         "canvas": "^3.2.0",
+        "esbuild": "^0.25.12",
         "eslint": "^9.39.0",
         "eslint-plugin-jsdoc": "^50.8.0",
         "markdownlint-cli": "^0.45.0",
+        "npm-run-all": "^4.1.5",
         "prettier": "^3.6.2",
         "sinon": "^21.0.0",
         "typescript": "^5.9.3"

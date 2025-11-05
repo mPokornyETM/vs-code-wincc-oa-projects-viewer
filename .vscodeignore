@@ -1,11 +1,71 @@
+# Ignore source files - only include compiled output
 .vscode/**
 .vscode-test/**
 src/**
+test/**
+out/**
+!dist/**
+
+# Git and GitHub files
+.git/**
+.github/**
 .gitignore
+.gitattributes
+
+# Build and development files
+node_modules/**
+*.map
+**/*.ts
+!out/**/*.js
+tsconfig.json
+.eslintrc.json
+.eslintignore
+.prettierrc.json
+.prettierignore
+.markdownlint.json
+
+# Test files
+**/.vscode-test.*
+**/test/**
+**/*.test.js
+**/*.test.ts
+coverage/**
+.nyc_output/**
+
+# Documentation (optional - uncomment to exclude)
+# docs/**
+# *.md
+# !README.md
+
+# Development scripts
+scripts/**
+esbuild.js
+.editorconfig
 .yarnrc
 vsc-extension-quickstart.md
-**/tsconfig.json
-**/eslint.config.mjs
-**/*.map
-**/*.ts
-**/.vscode-test.*
+
+# CI/CD files
+.azure-pipelines.yml
+.travis.yml
+.circleci/**
+
+# Temporary files
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Package files we don't need in the extension
+package-lock.json
+yarn.lock
+.npmrc
+
+# PR and issue templates (already in .github)
+.pr-body*.md
+CONTRIBUTING.md
+CHANGELOG-*.md
+
+# Old/backup files
+*-old.*
+*.bak
+*.backup
