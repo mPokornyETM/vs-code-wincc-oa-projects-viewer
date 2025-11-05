@@ -36,7 +36,7 @@ Community chat and general WinCC OA related discussions.
 Include your environment details:
 
 - Extension Version: (e.g., 1.0.0)
-- VS Code Version: (e.g., 1.85.0)  
+- VS Code Version: (e.g., 1.85.0)
 - WinCC OA Version: (e.g., 3.19)
 - Operating System: (e.g., Windows 11)
 

@@ -5,8 +5,9 @@ This document explains how to work with the automated changelog and release syst
 ## 🚀 Overview
 
 The project uses **pull request labels** and **standard-version** for:
+
 - ✅ Automatic version bumping (semantic versioning)
-- ✅ Automatic changelog generation  
+- ✅ Automatic changelog generation
 - ✅ Automatic GitHub releases with VSIX files
 - ✅ Automatic VS Code Marketplace publishing
 - 🏷️ **Label-based release control** - Version determined by PR labels
@@ -23,12 +24,12 @@ The release version is now determined by **pull request labels** instead of just
 
 ### Label Types & Release Impact
 
-| Label | Version Bump | Use For |
-|-------|-------------|---------|
-| `breaking-change` | **Major** (1.0.0 → 2.0.0) | API breaking changes |
-| `enhancement` | **Minor** (1.0.0 → 1.1.0) | New features |
-| `bug` | **Patch** (1.0.0 → 1.0.1) | Bug fixes |
-| `documentation` | **Patch** (1.0.0 → 1.0.1) | Documentation updates |
+| Label             | Version Bump              | Use For               |
+| ----------------- | ------------------------- | --------------------- |
+| `breaking-change` | **Major** (1.0.0 → 2.0.0) | API breaking changes  |
+| `enhancement`     | **Minor** (1.0.0 → 1.1.0) | New features          |
+| `bug`             | **Patch** (1.0.0 → 1.0.1) | Bug fixes             |
+| `documentation`   | **Patch** (1.0.0 → 1.0.1) | Documentation updates |
 
 **Full documentation**: See [LABEL_RELEASES.md](LABEL_RELEASES.md)
 
@@ -46,18 +47,18 @@ Use conventional commit format for better changelog generation:
 
 ### Commit Types
 
-| Type | Description | Version Impact | Changelog Section |
-|------|-------------|----------------|------------------|
-| `feat` | A new feature | Minor bump | 🚀 Features |
-| `fix` | A bug fix | Patch bump | 🐛 Bug Fixes |
-| `docs` | Documentation changes | Patch bump | 📚 Documentation |
-| `style` | Code style changes | Patch bump | 💄 Code Style |
-| `refactor` | Code refactoring | Patch bump | ♻️ Code Refactoring |
-| `perf` | Performance improvements | Patch bump | ⚡ Performance Improvements |
-| `test` | Adding/updating tests | Patch bump | 🧪 Tests |
-| `build` | Build system changes | Patch bump | 🔧 Build System |
-| `ci` | CI/CD changes | Patch bump | 👷 CI/CD |
-| `chore` | Maintenance tasks | Patch bump | 🔨 Maintenance |
+| Type       | Description              | Version Impact | Changelog Section           |
+| ---------- | ------------------------ | -------------- | --------------------------- |
+| `feat`     | A new feature            | Minor bump     | 🚀 Features                 |
+| `fix`      | A bug fix                | Patch bump     | 🐛 Bug Fixes                |
+| `docs`     | Documentation changes    | Patch bump     | 📚 Documentation            |
+| `style`    | Code style changes       | Patch bump     | 💄 Code Style               |
+| `refactor` | Code refactoring         | Patch bump     | ♻️ Code Refactoring         |
+| `perf`     | Performance improvements | Patch bump     | ⚡ Performance Improvements |
+| `test`     | Adding/updating tests    | Patch bump     | 🧪 Tests                    |
+| `build`    | Build system changes     | Patch bump     | 🔧 Build System             |
+| `ci`       | CI/CD changes            | Patch bump     | 👷 CI/CD                    |
+| `chore`    | Maintenance tasks        | Patch bump     | 🔨 Maintenance              |
 
 ### Breaking Changes
 
@@ -98,6 +99,7 @@ Use the interactive commit helper:
 ```
 
 **Features:**
+
 - Interactive prompts for all commit parts
 - Validation of commit types
 - Preview before committing
@@ -105,6 +107,7 @@ Use the interactive commit helper:
 - Dry-run mode
 
 **Parameters:**
+
 ```powershell
 # Direct mode
 .\scripts\commit.ps1 -Type feat -Scope ui -Description "Add new icons"
@@ -138,26 +141,29 @@ npm run release:major   # 0.1.0 → 1.0.0
 **Triggers:** Push to `develop`, `feature/*` branches, PRs to `main`/`develop`
 
 **Jobs:**
+
 1. **Test** - Runs on Windows with Node.js 18.x and 20.x
-   - Linting
-   - TypeScript compilation
-   - Unit tests
+    - Linting
+    - TypeScript compilation
+    - Unit tests
 2. **Package** - Creates VSIX file as artifact
 
 ### Release Pipeline (`release.yml`)
 
-**Triggers:** 
+**Triggers:**
+
 - Push to `main`/`master` branch (automatic release)
 - Manual workflow dispatch (choose version bump type)
 
 **Jobs:**
+
 1. **Test** - Same as CI/CD pipeline
 2. **Release** - Creates version, changelog, and GitHub release
-   - Bumps version using standard-version
-   - Updates CHANGELOG.md
-   - Creates git tag
-   - Pushes changes
-   - Creates GitHub release with VSIX
+    - Bumps version using standard-version
+    - Updates CHANGELOG.md
+    - Creates git tag
+    - Pushes changes
+    - Creates GitHub release with VSIX
 3. **Publish** - Publishes to VS Code Marketplace (if configured)
 
 ## 📝 Changelog Management
@@ -173,12 +179,12 @@ The changelog is automatically generated from conventional commits:
 
 ### 🚀 Features
 
-* **ui**: add project tree icons ([abc1234](https://github.com/.../commit/abc1234))
-* **api**: new project filtering options ([def5678](https://github.com/.../commit/def5678))
+- **ui**: add project tree icons ([abc1234](https://github.com/.../commit/abc1234))
+- **api**: new project filtering options ([def5678](https://github.com/.../commit/def5678))
 
 ### 🐛 Bug Fixes
 
-* **parser**: handle missing config files correctly ([ghi9012](https://github.com/.../commit/ghi9012))
+- **parser**: handle missing config files correctly ([ghi9012](https://github.com/.../commit/ghi9012))
 ```
 
 ### Manual Editing
@@ -198,6 +204,7 @@ The project follows [SemVer](https://semver.org/):
 ### Automatic Bumping
 
 Version bumping is automatic based on commit types:
+
 - `feat` → Minor bump
 - `fix`, `docs`, `style`, etc. → Patch bump
 - `BREAKING CHANGE` → Major bump
@@ -207,25 +214,26 @@ Version bumping is automatic based on commit types:
 ### Automatic Release (Recommended)
 
 1. **Development:**
-   ```bash
-   # Make changes
-   git checkout -b feature/new-feature
-   # ... make changes ...
-   .\scripts\commit.ps1  # Use helper for conventional commits
-   git push origin feature/new-feature
-   ```
+
+    ```bash
+    # Make changes
+    git checkout -b feature/new-feature
+    # ... make changes ...
+    .\scripts\commit.ps1  # Use helper for conventional commits
+    git push origin feature/new-feature
+    ```
 
 2. **Pull Request:**
-   - Create PR to `main` branch
-   - CI/CD runs automatically
-   - Review and merge
+    - Create PR to `main` branch
+    - CI/CD runs automatically
+    - Review and merge
 
 3. **Automatic Release:**
-   - Push to `main` triggers release workflow
-   - Version bumped automatically
-   - Changelog updated
-   - GitHub release created with VSIX
-   - Marketplace publication (if configured)
+    - Push to `main` triggers release workflow
+    - Version bumped automatically
+    - Changelog updated
+    - GitHub release created with VSIX
+    - Marketplace publication (if configured)
 
 ### Manual Release
 
@@ -257,8 +265,9 @@ Add your Personal Access Token as a repository secret:
 ### Workflow Customization
 
 Modify `.github/workflows/release.yml` to customize:
+
 - Release triggers
-- Changelog format  
+- Changelog format
 - Release notes template
 - Marketplace publishing behavior
 
@@ -267,6 +276,7 @@ Modify `.github/workflows/release.yml` to customize:
 ### Commit Messages
 
 ✅ **Good:**
+
 ```
 feat(ui): add drag and drop support for projects
 fix(parser): handle empty configuration files
@@ -274,6 +284,7 @@ docs: update installation instructions
 ```
 
 ❌ **Bad:**
+
 ```
 added new feature
 bug fix
@@ -290,7 +301,7 @@ update docs
 ### Release Strategy
 
 - **Patch releases** - Weekly for bug fixes
-- **Minor releases** - Monthly for new features  
+- **Minor releases** - Monthly for new features
 - **Major releases** - Quarterly for breaking changes
 
 ### Pre-release Testing
@@ -351,6 +362,7 @@ Monitor marketplace at: `https://marketplace.visualstudio.com/items?itemName=mPo
 ## 🎉 Summary
 
 This automated system provides:
+
 - 🤖 Zero-manual-work releases
 - 📝 Consistent changelog generation
 - 🏷️ Proper semantic versioning

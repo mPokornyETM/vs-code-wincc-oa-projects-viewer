@@ -7,6 +7,7 @@ This repository follows the **Git Flow** branching model as described in [Atlass
 ### Main Branches
 
 #### `main` (Production)
+
 - **Purpose**: Contains production-ready code
 - **Stability**: Always stable and deployable
 - **Protection**: Protected branch with required reviews and CI/CD checks
@@ -14,6 +15,7 @@ This repository follows the **Git Flow** branching model as described in [Atlass
 - **Direct commits**: ❌ Not allowed
 
 #### `develop` (Integration)
+
 - **Purpose**: Integration branch for ongoing development
 - **Stability**: Generally stable, contains latest development features
 - **Merges from**: `feature/*`, `release/*`, and `hotfix/*` branches
@@ -22,6 +24,7 @@ This repository follows the **Git Flow** branching model as described in [Atlass
 ### Supporting Branches
 
 #### `feature/*` (Feature Development)
+
 - **Purpose**: Develop new features for upcoming releases
 - **Naming**: `feature/feature-name` or `feature/ticket-number`
 - **Branch from**: `develop`
@@ -29,6 +32,7 @@ This repository follows the **Git Flow** branching model as described in [Atlass
 - **Lifetime**: Until feature is complete
 
 **Examples:**
+
 ```
 feature/user-authentication
 feature/project-filtering
@@ -36,6 +40,7 @@ feature/PROJ-123-api-enhancement
 ```
 
 #### `release/*` (Release Preparation)
+
 - **Purpose**: Prepare new production releases
 - **Naming**: `release/version-number`
 - **Branch from**: `develop`
@@ -43,12 +48,14 @@ feature/PROJ-123-api-enhancement
 - **Activities**: Bug fixes, documentation updates, version bumping
 
 **Examples:**
+
 ```
 release/1.2.0
 release/2.0.0-beta
 ```
 
 #### `hotfix/*` (Production Fixes)
+
 - **Purpose**: Quick fixes for critical production issues
 - **Naming**: `hotfix/version-number` or `hotfix/issue-description`
 - **Branch from**: `main`
@@ -56,6 +63,7 @@ release/2.0.0-beta
 - **Urgency**: High priority, immediate deployment
 
 **Examples:**
+
 ```
 hotfix/1.1.1
 hotfix/critical-security-patch
@@ -120,16 +128,19 @@ git push origin hotfix/1.1.1
 ## 📋 Branch Naming Conventions
 
 ### Feature Branches
+
 - `feature/description` - General feature
 - `feature/PROJ-123-description` - Feature with ticket number
 - `feature/component-enhancement` - Component-specific feature
 
 ### Release Branches
+
 - `release/1.2.0` - Standard semantic version
 - `release/1.2.0-beta` - Pre-release version
 - `release/v2.0.0` - Version with 'v' prefix
 
 ### Hotfix Branches
+
 - `hotfix/1.1.1` - Version-based hotfix
 - `hotfix/critical-bug-fix` - Description-based hotfix
 - `hotfix/PROJ-789-security-patch` - Ticket-based hotfix
@@ -137,6 +148,7 @@ git push origin hotfix/1.1.1
 ## 🔒 Branch Protection Rules
 
 ### `main` Branch Protection
+
 - ✅ Require pull request reviews (1+ reviewer)
 - ✅ Require status checks to pass
 - ✅ Require branches to be up to date
@@ -145,6 +157,7 @@ git push origin hotfix/1.1.1
 - ✅ No deletions allowed
 
 ### `develop` Branch Protection
+
 - ✅ Require pull request reviews (1+ reviewer)
 - ✅ Require status checks to pass
 - ✅ Allow force pushes (for rebasing)
@@ -155,6 +168,7 @@ git push origin hotfix/1.1.1
 ### Using Git Flow Extension (Optional)
 
 Install Git Flow extension:
+
 ```bash
 # Windows (via Git for Windows)
 # Git Flow is included by default
@@ -167,17 +181,19 @@ sudo apt-get install git-flow
 ```
 
 Initialize Git Flow:
+
 ```bash
 git flow init
 ```
 
 Git Flow commands:
+
 ```bash
 # Features
 git flow feature start my-feature
 git flow feature finish my-feature
 
-# Releases  
+# Releases
 git flow release start 1.2.0
 git flow release finish 1.2.0
 
@@ -233,6 +249,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ```
 
 **Types:**
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation only changes
@@ -244,6 +261,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 - `ci`: CI/CD related changes
 
 **Examples:**
+
 ```bash
 git commit -m "feat(auth): add user login functionality"
 git commit -m "fix: resolve null pointer exception in project loader"
@@ -256,6 +274,7 @@ git commit -m "chore(release): bump version to 1.2.0"
 ### Automated Workflows
 
 **On `main` branch:**
+
 - ✅ Full test suite
 - ✅ Security scans
 - ✅ Build and package
@@ -264,17 +283,20 @@ git commit -m "chore(release): bump version to 1.2.0"
 - ✅ Publish to VS Code Marketplace
 
 **On `develop` branch:**
+
 - ✅ Full test suite
 - ✅ Build verification
 - ✅ Deploy to staging
 - ✅ Integration tests
 
 **On `feature/*` branches:**
+
 - ✅ Lint and compile checks
 - ✅ Unit tests
 - ✅ Build verification
 
 **On `release/*` branches:**
+
 - ✅ Full test suite
 - ✅ Security scans
 - ✅ Build and package
@@ -282,6 +304,7 @@ git commit -m "chore(release): bump version to 1.2.0"
 - ✅ Create release candidate
 
 **On `hotfix/*` branches:**
+
 - ✅ Critical path tests
 - ✅ Security scans
 - ✅ Fast-track deployment
@@ -289,6 +312,7 @@ git commit -m "chore(release): bump version to 1.2.0"
 ## 📊 Git Flow Benefits
 
 ### ✅ Advantages
+
 - **Clear separation** of concerns between branches
 - **Parallel development** of features without conflicts
 - **Stable main branch** always ready for production
@@ -297,6 +321,7 @@ git commit -m "chore(release): bump version to 1.2.0"
 - **Historical clarity** - easy to track features and releases
 
 ### ⚠️ Considerations
+
 - **More complex** than simple workflows
 - **Requires discipline** from all team members
 - **Branch management overhead** - more branches to maintain
@@ -305,18 +330,21 @@ git commit -m "chore(release): bump version to 1.2.0"
 ## 🎯 Best Practices
 
 ### Feature Development
+
 1. **Keep features small** - easier to review and merge
 2. **Regular rebasing** - keep feature branches up to date with develop
 3. **Clean commit history** - squash or rebase before merging
 4. **Comprehensive testing** - ensure features work in isolation
 
 ### Release Management
+
 1. **Feature freeze** - no new features during release preparation
 2. **Version bumping** - follow semantic versioning
 3. **Changelog updates** - document all changes
 4. **Testing phases** - thorough testing before production
 
 ### Hotfix Protocol
+
 1. **Immediate assessment** - verify the issue is critical
 2. **Minimal changes** - fix only the critical issue
 3. **Fast-track testing** - focused testing on the fix
@@ -325,6 +353,7 @@ git commit -m "chore(release): bump version to 1.2.0"
 ## 🔧 Repository Configuration
 
 This repository is configured with:
+
 - **Branch protection rules** for `main` and `develop`
 - **Required status checks** for all merges
 - **Automated CI/CD pipelines** for each branch type
@@ -334,6 +363,7 @@ This repository is configured with:
 ## 📞 Support and Questions
 
 For questions about the Git Flow process:
+
 1. **Check this documentation** first
 2. **Review existing pull requests** for examples
 3. **Ask in repository discussions** or issues

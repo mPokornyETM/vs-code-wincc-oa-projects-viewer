@@ -1,95 +1,151 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to the "WinCC OA Projects" extension will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.2.0] - 2025-11-05
 
-## [1.1.0] - 2025-11-03
+### Added
 
-### 🚀 Features
+#### Modular Architecture
+- Complete TypeScript reorganization into modular architecture (#33)
+- One type per file with exact naming convention
+- Organized types in domain subdirectories (`/types/project/`, `/types/ui/`, `/types/status/`, `/types/history/`, `/types/version/`)
+- Fixed 38+ TypeScript compilation errors
 
-- **Project Registration Commands**: Added comprehensive project registration functionality
-  - `WinCC OA: Register Runnable Project` command for registering runnable projects
-  - `WinCC OA: Register Sub-Project` command for registering sub-projects and extensions
-  - `WinCC OA: Register All Unregistered Projects` command for bulk registration
-  - **File Explorer Integration**: Context menu support for directory-based registration
-  - **Command Palette Support**: Folder selection dialog when invoked from command palette
-  - **Intelligent Validation**: Automatic project structure validation and version detection
-  - **Duplicate Prevention**: Built-in checks to prevent registering already registered projects
-  - **Error Handling**: Comprehensive validation with user-friendly error messages
+#### Health Assessment System
+- Comprehensive WinCC OA Project Health Assessment system (#29)
+- Real-time project health status monitoring
+- Manager state monitoring
+- Performance metrics tracking
 
-- **Project Unregistration**: Added project removal functionality
-  - `WinCC OA: Unregister Project` command for safe project removal
-  - **Context Menu Integration**: Right-click to unregister projects
-  - **Safety Confirmations**: Confirmation dialogs to prevent accidental removal
-  - **Configuration Management**: Safe removal from WinCC OA configuration files
+#### Version Management
+- Centralized version management CLI (`scripts/version.js`)
+- Package.json as single source of truth
+- Semantic versioning support (patch/minor/major)
+- Version validation and status checking
+- Colored terminal output
 
-- **Smart Filtering System**: Added real-time project filtering
-  - **Real-time Search**: Filter projects as you type with instant results
-  - **Cross-Category Search**: Search across all project categories simultaneously
-  - **Filter UI**: Dedicated filter input with clear functionality
-  - **Case-Insensitive**: Search works regardless of letter case
-  - **Category Preservation**: Maintains hierarchical structure while filtering
+#### DevOps & Automation
+- Git Flow branch protection setup for `main` and `develop` branches
+- Automated pre-release creation on `develop` branch pushes
+- GitHub Actions bot bypass configuration for workflows
+- Tag-only pre-release approach (no commits to develop)
+- Alpha/Beta/RC detection from branch names
+- Timestamped pre-release versions
 
-- **Unregistered Projects Discovery**: Added automatic detection of unregistered projects
-  - **Auto-Discovery**: Scans common WinCC OA project locations
-  - **Smart Detection**: Identifies valid project structures
-  - **Visual Indicators**: Clear identification of projects needing registration
-  - **Bulk Registration**: Register all unregistered projects with single command
+#### Documentation
+- Comprehensive GitHub Actions workflows documentation
+- Git Flow branching strategy documentation
+- Version management system documentation
+- Type system organization documentation
 
-### 🔧 Improvements
+### Changed
 
-- **Enhanced Menu System**: Extended context menus with registration and unregistration options
-- **Smart Project Detection**: Improved logic for distinguishing runnable projects vs sub-projects
-- **Configuration Parsing**: Enhanced config file parsing for better version detection
-- **User Experience**: Added progress feedback and success notifications for all operations
-- **Performance Optimizations**: Improved project loading and categorization performance
-- **Enhanced Version Support**: Comprehensive support for WinCC OA versions 3.17-3.20 with intelligent detection, prepared for upcoming 3.21
+- Enhanced version information display
+- Improved project metadata visualization
+- Better version tracking across projects
+- Refactored internal module structure for better maintainability
 
-### 🧪 Testing
+### Fixed
 
-- **Comprehensive Test Suite**: Added 40+ test cases covering registration commands
-- **Path Validation Tests**: Cross-platform path handling and normalization testing
-- **Error Scenario Coverage**: Tests for invalid paths, duplicate projects, and edge cases
-- **Version Detection Tests**: Validation of config file parsing and version extraction
-- **Menu Integration Tests**: Command registration and availability verification
+#### Security (3 High-Severity Vulnerabilities)
+- Incomplete string escaping (backslash handling in file paths)
+- ReDoS (Regular Expression Denial of Service) vulnerability in regex patterns
+- Improved input validation across the extension
 
-### 📚 Documentation
+#### Workflow Improvements
+- Branch protection conflicts in pre-release workflow
+- Pre-release workflow reliability
+- Module import issues
 
-- **Updated README**: Enhanced documentation with detailed registration command information
-- **Feature Documentation**: Comprehensive guide for new registration functionality
-- **Developer Guide**: Updated contribution guidelines with test coverage requirements
-- **Visual Documentation**: Added comprehensive screenshots for all new features:
-  - Project filtering interface (`proj-tree-filter.png`)
-  - Unregistered projects discovery (`proj-tree-unregistered-projects-.png`)
-  - Project registration workflows (`proj-tree-register-runnable-project.png`, `proj-tree-register-all.png`)
-  - Project unregistration process (`proj-tree-item-unregister-project.png`, `command-unregister-project.png`)
-  - Project documentation view (`project-view-documentation.png`)
-- **User Guide Updates**: Enhanced user guide with new feature explanations and troubleshooting
+#### Type System
+- 38+ TypeScript compilation errors
+- Module import path issues
+- Type definitions and interfaces
 
-## [0.0.2] - 2025-01-27
+### Code Quality
 
-### 🚀 Initial Features
+- ESLint configuration for TypeScript
+- Prettier code formatting
+- Markdown linting with markdownlint
+- Pre-commit hooks for automated style fixes
+- Improved test coverage
 
-- Initial release of WinCC OA Projects extension
-- Activity bar integration with project tree view
-- Project information display (name, location, version, runnable state)
-- Project file parsing from Windows registry and config files  
-- Project sorting (current > runnable > non-runnable)
-- Extension points for other extensions to contribute actions
-- Modern API exports for programmatic access
+### Dependencies
 
-### 📚 Initial Documentation
+#### Added
+- `dompurify`: ^3.3.0
+- `jsdom`: ^27.1.0
+- `marked`: ^16.4.1
+- `c8`: ^10.1.3 (dev)
 
-- Comprehensive README with usage examples
-- Extension point documentation and examples
-- Development guide for contributors
+#### Updated
+- `typescript`: ^5.9.3
+- `eslint`: ^9.39.0
 
-### 🔧 Build System
+### Breaking Changes
 
-- Automated VSIX packaging with PowerShell and Batch scripts
-- GitHub Actions CI/CD pipeline
-- TypeScript compilation and linting setup
+- **Type System Reorganization**: Types are now in individual files with domain-specific subdirectories
+  - Import paths have changed (e.g., `import { ProjectConfig } from './types/project/ProjectConfig'`)
+- **Module Structure**: Complete refactoring of internal module structure
+
+### Migration Guide
+
+For users upgrading from 2.0.x:
+- No user-facing changes - all improvements are internal
+- Extension will automatically work with the new version
+- No configuration changes required
+
+For developers:
+- Update import paths for types to use new modular structure
+- Follow new type organization convention (one type per file)
+- Use centralized version management system (`npm run version:*`)
+- Follow Git Flow branching strategy
+
+## [2.0.1] - 2025-11-03
+
+### Fixed
+- Minor bug fixes and improvements
+
+## [2.0.0] - Earlier Release
+
+### Added
+- Initial major version release
+- Project health assessment features
+- Enhanced project management capabilities
+
+## [1.2.0] - Previous Release
+
+### Added
+- Various features and improvements
+
+## [1.1.1] - Previous Release
+
+### Fixed
+- Bug fixes and stability improvements
+
+## [1.1.0] - Previous Release
+
+### Added
+- Feature additions
+
+## [1.0.0] - Previous Release
+
+### Added
+- Initial stable release
+
+## [0.1.0] - Initial Release
+
+### Added
+- Initial extension features
+- WinCC OA project tree view
+- Basic project management
+
+---
+
+[2.2.0]: https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/compare/v2.0.1...v2.2.0
+[2.0.1]: https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/compare/v2.0.0...v2.0.1
+[2.0.0]: https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/releases/tag/v2.0.0

@@ -1,0 +1,11 @@
+# Prettier ignore patterns
+out/
+dist/
+node_modules/
+*.d.ts
+.vscode-test/
+coverage/
+
+# Generated files
+*.min.js
+*.min.css

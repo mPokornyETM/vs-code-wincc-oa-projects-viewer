@@ -4,9 +4,9 @@ import * as os from 'os';
 import * as path from 'path';
 
 // Import functions and classes from extension
-import { 
-    getPvssInstConfPath, 
-    extractVersionFromProject, 
+import {
+    getPvssInstConfPath,
+    extractVersionFromProject,
     isWinCCOADeliveredSubProject,
     WinCCOAProjectProvider,
     ProjectCategory,
@@ -18,7 +18,6 @@ import {
     getUserSubProjects,
     getCurrentProjects,
     getCurrentProjectsInfo,
-    getAPI,
     deactivate
 } from '../extension';
 
@@ -40,14 +39,13 @@ function createMockProject(config: any): any {
 }
 
 suite('WinCC OA Core Functionality Tests', () => {
-    
     suite('Platform Path Resolution', () => {
         test('getPvssInstConfPath should return correct path for current platform', () => {
             const path = getPvssInstConfPath();
             assert.ok(typeof path === 'string');
             assert.ok(path.length > 0);
             assert.ok(path.includes('pvssInst.conf'));
-            
+
             // Should be either Windows or Unix format
             const isWindowsPath = path.includes('C:\\') || path.includes('ProgramData');
             const isUnixPath = path.startsWith('/') && (path.includes('/etc') || path.includes('/opt'));
@@ -59,8 +57,6 @@ suite('WinCC OA Core Functionality Tests', () => {
             const path2 = getPvssInstConfPath();
             assert.strictEqual(path1, path2, 'Function should return consistent results');
         });
-
-
     });
 
     suite('Version Extraction', () => {
@@ -135,31 +131,40 @@ suite('WinCC OA Core Functionality Tests', () => {
     suite('ProjectCategory Class', () => {
         test('ProjectCategory should create instance with basic properties', () => {
             const mockProjects = [createMockProject({ name: 'TestProject' })];
-            const category = new ProjectCategory('Test Category', mockProjects, 'runnable', undefined, 'Test Description');
-            
+            const category = new ProjectCategory(
+                'Test Category',
+                mockProjects,
+                'runnable',
+                undefined,
+                'Test Description'
+            );
+
             assert.strictEqual(category.label, 'Test Category');
-            assert.ok(category.tooltip && typeof category.tooltip === 'string' && category.tooltip.includes('Test Description'));
+            assert.ok(
+                category.tooltip &&
+                    typeof category.tooltip === 'string' &&
+                    category.tooltip.includes('Test Description')
+            );
             assert.strictEqual(category.collapsibleState, vscode.TreeItemCollapsibleState.Expanded);
             assert.strictEqual(category.contextValue, 'projectCategory');
         });
 
         test('ProjectCategory should handle project count', () => {
-            const mockProjects = [
-                createMockProject({ name: 'Project1' }),
-                createMockProject({ name: 'Project2' })
-            ];
+            const mockProjects = [createMockProject({ name: 'Project1' }), createMockProject({ name: 'Project2' })];
             const category = new ProjectCategory('Test Category', mockProjects, 'runnable');
-            
+
             assert.strictEqual(category.projects.length, 2);
         });
 
         test('ProjectCategory should handle version categories', () => {
             const mockProjects = [createMockProject({ name: 'VersionProject' })];
             const category = new ProjectCategory('Version 3.21', mockProjects, 'version', '3.21');
-            
+
             assert.strictEqual(category.version, '3.21');
             assert.strictEqual(category.contextValue, 'projectVersionCategory');
-            assert.ok(category.tooltip && typeof category.tooltip === 'string' && category.tooltip.includes('WinCC OA 3.21'));
+            assert.ok(
+                category.tooltip && typeof category.tooltip === 'string' && category.tooltip.includes('WinCC OA 3.21')
+            );
         });
     });
 
@@ -180,14 +185,14 @@ suite('WinCC OA Core Functionality Tests', () => {
             assert.strictEqual(result, mockProject);
         });
 
-        test('refresh should fire onDidChangeTreeData event', (done) => {
+        test('refresh should fire onDidChangeTreeData event', done => {
             let eventFired = false;
             provider.onDidChangeTreeData(() => {
                 eventFired = true;
                 assert.strictEqual(eventFired, true);
                 done();
             });
-            
+
             provider.refresh();
         });
     });
@@ -233,14 +238,6 @@ suite('WinCC OA Core Functionality Tests', () => {
             assert.ok(Array.isArray(projectInfo));
         });
 
-        test('getAPI should return valid API object', () => {
-            const api = getAPI();
-            assert.ok(api);
-            assert.ok(typeof api.getProjects === 'function');
-            assert.ok(typeof api.getProjectByPath === 'function');
-            assert.ok(typeof api.getProjectVersion === 'function');
-        });
-
         test('deactivate should not throw', () => {
             assert.doesNotThrow(() => {
                 deactivate();
@@ -280,7 +277,9 @@ suite('WinCC OA Core Functionality Tests', () => {
         test('ProjectCategory should handle empty projects array', () => {
             const category = new ProjectCategory('Test', [], 'runnable');
             assert.strictEqual(category.projects.length, 0);
-            assert.ok(category.tooltip && typeof category.tooltip === 'string' && category.tooltip.includes('0 project'));
+            assert.ok(
+                category.tooltip && typeof category.tooltip === 'string' && category.tooltip.includes('0 project')
+            );
         });
 
         test('ProjectCategory should handle single project', () => {

@@ -8,13 +8,12 @@ import * as os from 'os';
 import { WinCCOAProject, ProjectConfig, ProjectCategory } from '../extension';
 
 suite('WinCC OA Project Provider Tests', () => {
-    
     suite('Cross-Platform Path Resolution', () => {
         test('getPvssInstConfPath returns correct Windows path', () => {
             // Since we can't mock os.platform reliably, we'll test the current platform behavior
             const { getPvssInstConfPath } = require('../extension');
             const actualPath = getPvssInstConfPath();
-            
+
             // Test that we get a valid path (either Windows or Unix format)
             assert.ok(typeof actualPath === 'string');
             assert.ok(actualPath.length > 0);
@@ -25,7 +24,7 @@ suite('WinCC OA Project Provider Tests', () => {
             // Since we can't mock os.platform reliably, we'll test the current platform behavior
             const { getPvssInstConfPath } = require('../extension');
             const actualPath = getPvssInstConfPath();
-            
+
             // Test that we get a valid path (either Windows or Unix format)
             assert.ok(typeof actualPath === 'string');
             assert.ok(actualPath.length > 0);
@@ -53,7 +52,7 @@ InstallationDir="C:\\Siemens\\Automation\\WinCC_OA\\3.20"
 InstallationDate="2024-01-01 08:00:00"
 NotRunnable=true
 `;
-            
+
             // We would need to create a temporary file and test the parsing
             // This is a placeholder for the actual implementation
             assert.ok(true, 'Config parsing test placeholder');
@@ -66,7 +65,7 @@ InstallationDir=MissingQuotes
 RandomLine without equals
 =ValueWithoutKey
 `;
-            
+
             // Test that malformed config doesn't crash the parser
             assert.ok(true, 'Malformed config handling test placeholder');
         });
@@ -165,17 +164,17 @@ RandomLine without equals
 
         test('extracts version from installation path', () => {
             const testCases = [
-                { 
-                    path: 'C:\\Siemens\\Automation\\WinCC_OA\\3.20\\BACnet_3.20', 
-                    expected: '3.20' 
+                {
+                    path: 'C:\\Siemens\\Automation\\WinCC_OA\\3.20\\BACnet_3.20',
+                    expected: '3.20'
                 },
-                { 
-                    path: '/opt/wincc_oa/3.21/OPC_UA', 
-                    expected: '3.21' 
+                {
+                    path: '/opt/wincc_oa/3.21/OPC_UA',
+                    expected: '3.21'
                 },
-                { 
-                    path: 'C:\\CustomPath\\Project', 
-                    expected: null 
+                {
+                    path: 'C:\\CustomPath\\Project',
+                    expected: null
                 }
             ];
 
@@ -190,18 +189,42 @@ RandomLine without equals
             const mockProjects: WinCCOAProject[] = [
                 // Runnable projects
                 new WinCCOAProject(
-                    { name: 'Project1', installationDir: 'C:\\Projects\\Project1', installationDate: '2024-01-01', notRunnable: false },
-                    'C:\\Projects\\Project1', true, true, '3.21'
+                    {
+                        name: 'Project1',
+                        installationDir: 'C:\\Projects\\Project1',
+                        installationDate: '2024-01-01',
+                        notRunnable: false
+                    },
+                    'C:\\Projects\\Project1',
+                    true,
+                    true,
+                    '3.21'
                 ),
                 // WinCC OA delivered sub-projects
                 new WinCCOAProject(
-                    { name: 'BACnet_3.20', installationDir: 'C:\\Siemens\\Automation\\WinCC_OA\\3.20\\BACnet_3.20', installationDate: '2024-01-01', notRunnable: false },
-                    'C:\\Siemens\\Automation\\WinCC_OA\\3.20\\BACnet_3.20', false, false, '3.20'
+                    {
+                        name: 'BACnet_3.20',
+                        installationDir: 'C:\\Siemens\\Automation\\WinCC_OA\\3.20\\BACnet_3.20',
+                        installationDate: '2024-01-01',
+                        notRunnable: false
+                    },
+                    'C:\\Siemens\\Automation\\WinCC_OA\\3.20\\BACnet_3.20',
+                    false,
+                    false,
+                    '3.20'
                 ),
                 // User sub-projects
                 new WinCCOAProject(
-                    { name: 'CustomExt', installationDir: 'D:\\Extensions\\CustomExt', installationDate: '2024-01-01', notRunnable: false },
-                    'D:\\Extensions\\CustomExt', false, false, '3.21'
+                    {
+                        name: 'CustomExt',
+                        installationDir: 'D:\\Extensions\\CustomExt',
+                        installationDate: '2024-01-01',
+                        notRunnable: false
+                    },
+                    'D:\\Extensions\\CustomExt',
+                    false,
+                    false,
+                    '3.21'
                 )
             ];
 
