@@ -27,6 +27,8 @@ permissions:
     actions: write
     checks: write
     issues: write
+    # Need to bypass branch protection for automated version commits
+    # This requires repository admin access or using a PAT
 
 jobs:
     test:
@@ -196,27 +198,19 @@ jobs:
 
                   rm temp_changelog.md
 
-            - name: Commit and Push Pre-Release
+            - name: Push Pre-Release Tag
               run: |
                   VERSION="${{ steps.release.outputs.version }}"
 
-                  # Commit version change directly to develop
-                  if git diff --staged --quiet; then
-                    echo "No changes to commit"
-                  else
-                    git commit -m "chore(pre-release): $VERSION
+                  # For pre-releases, we DON'T push version changes back to develop
+                  # This avoids branch protection conflicts since we don't need to commit to develop
+                  # The version bump is only in package.json for building the release artifact
+                  
+                  echo "ℹ️  Pre-release version $VERSION is tag-only (not committed to develop)"
+                  echo "📌 This prevents branch protection conflicts"
+                  echo "✅ The develop branch package.json remains unchanged"
 
-                    - Update version to pre-release $VERSION
-                    - Generated from develop branch for testing
-
-                    [skip ci]"
-
-                    # Push commit and tag
-                    git push origin develop
-                    echo "✅ Pushed pre-release commit to develop"
-                  fi
-
-                  # Push tag (force push if exists remotely)
+                  # Push tag only (no commit to develop needed)
                   if git ls-remote --tags origin "v$VERSION" | grep -q "v$VERSION"; then
                     echo "⚠️  Tag v$VERSION exists remotely, force pushing"
                     git push --force origin "v$VERSION"

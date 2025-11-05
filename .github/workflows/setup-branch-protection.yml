@@ -99,7 +99,10 @@ jobs:
                             required_approving_review_count: 1,
                             dismiss_stale_reviews: false,
                             require_code_owner_reviews: false,
-                            require_last_push_approval: false
+                            require_last_push_approval: false,
+                            bypass_pull_request_allowances: {
+                              apps: ['github-actions'] // Allow GitHub Actions bot to bypass PR requirement
+                            }
                           },
                           restrictions: null,
                           allow_force_pushes: true, // Allow for rebasing and cleanup
