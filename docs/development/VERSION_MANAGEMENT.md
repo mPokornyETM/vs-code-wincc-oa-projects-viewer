@@ -87,17 +87,17 @@ The workflows now include automatic checks to ensure:
 
 ### **DO:**
 
-✅ Always use `npm run version:check` first  
-✅ Use semantic versioning (X.Y.Z)  
-✅ Commit version changes before pushing  
-✅ Let GitHub Actions handle releases  
+✅ Always use `npm run version:check` first
+✅ Use semantic versioning (X.Y.Z)
+✅ Commit version changes before pushing
+✅ Let GitHub Actions handle releases
 ✅ Test pre-releases from `develop` branch
 
 ### **DON'T:**
 
-❌ Manually edit version in workflows  
-❌ Create releases with pre-release versions  
-❌ Skip version validation checks  
+❌ Manually edit version in workflows
+❌ Create releases with pre-release versions
+❌ Skip version validation checks
 ❌ Mix pre-release and stable versions
 
 ## 🔄 Complete Workflow Example

@@ -1,49 +1,49 @@
 // Place your settings in this file to overwrite default and user settings.
 {
-    "files.exclude": {
-        "out": false // set this to true to hide the "out" folder with the compiled JS files
-    },
-    "search.exclude": {
-        "out": true // set this to false to include "out" folder in search results
-    },
-    // Turn off tsc task auto detection since we have the necessary tasks as npm scripts
-    "typescript.tsc.autoDetect": "off",
-    
-    // Code Style Enforcement
-    "editor.insertSpaces": true,
-    "editor.tabSize": 4,
-    "editor.detectIndentation": false,
-    "editor.trimAutoWhitespace": true,
-    "files.trimTrailingWhitespace": true,
-    "files.insertFinalNewline": true,
-    "editor.rulers": [80, 120],
-    
-    // Formatting
-    "editor.formatOnSave": true,
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
-    "editor.codeActionsOnSave": {
-        "source.fixAll.eslint": "explicit"
-    },
-    
-    // ESLint Configuration
-    "eslint.validate": ["typescript"],
-    "eslint.format.enable": true,
-    
-    // TypeScript Specific
-    "typescript.preferences.quoteStyle": "single",
-    "typescript.format.insertSpaceAfterFunctionKeywordForAnonymousFunctions": true,
-    "typescript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces": true,
-    
-    // File Associations
-    "files.associations": {
-        "*.ts": "typescript"
-    },
-    
-    // Extensions Recommendations
-    "extensions.recommendations": [
-        "esbenp.prettier-vscode",
-        "ms-vscode.vscode-eslint",
-        "@typescript-eslint/eslint-plugin",
-        "davidanson.vscode-markdownlint"
-    ]
+  "files.exclude": {
+    "out": false // set this to true to hide the "out" folder with the compiled JS files
+  },
+  "search.exclude": {
+    "out": true // set this to false to include "out" folder in search results
+  },
+  // Turn off tsc task auto detection since we have the necessary tasks as npm scripts
+  "typescript.tsc.autoDetect": "off",
+
+  // Code Style Enforcement
+  "editor.insertSpaces": true,
+  "editor.tabSize": 4,
+  "editor.detectIndentation": false,
+  "editor.trimAutoWhitespace": true,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "editor.rulers": [80, 120],
+
+  // Formatting
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // ESLint Configuration
+  "eslint.validate": ["typescript"],
+  "eslint.format.enable": true,
+
+  // TypeScript Specific
+  "typescript.preferences.quoteStyle": "single",
+  "typescript.format.insertSpaceAfterFunctionKeywordForAnonymousFunctions": true,
+  "typescript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces": true,
+
+  // File Associations
+  "files.associations": {
+    "*.ts": "typescript"
+  },
+
+  // Extensions Recommendations
+  "extensions.recommendations": [
+    "esbenp.prettier-vscode",
+    "ms-vscode.vscode-eslint",
+    "@typescript-eslint/eslint-plugin",
+    "davidanson.vscode-markdownlint"
+  ]
 }

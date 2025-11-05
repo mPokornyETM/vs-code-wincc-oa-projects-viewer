@@ -1,93 +1,101 @@
 {
-    "env": {
-        "browser": true,
-        "es6": true,
-        "node": true
-    },
-    "extends": [
-        "eslint:recommended",
-        "@typescript-eslint/recommended",
-        "@typescript-eslint/recommended-requiring-type-checking"
+  "env": {
+    "browser": true,
+    "es6": true,
+    "node": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "@typescript-eslint/recommended",
+    "@typescript-eslint/recommended-requiring-type-checking"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": 2020,
+    "sourceType": "module",
+    "project": "./tsconfig.json"
+  },
+  "plugins": ["@typescript-eslint", "jsdoc"],
+  "rules": {
+    // Code Style Rules
+    "indent": ["error", 4, { "SwitchCase": 1 }],
+    "no-trailing-spaces": "error",
+    "no-multiple-empty-lines": ["error", { "max": 2, "maxEOF": 1 }],
+    "eol-last": ["error", "always"],
+    "semi": ["error", "always"],
+    "quotes": ["error", "single"],
+    "comma-dangle": ["error", "never"],
+
+    // JSDoc Documentation Rules
+    "jsdoc/check-alignment": "error",
+    "jsdoc/check-indentation": "error",
+    "jsdoc/check-param-names": "error",
+    "jsdoc/check-syntax": "error",
+    "jsdoc/check-tag-names": "error",
+    "jsdoc/check-types": "error",
+    "jsdoc/newline-after-description": "error",
+    "jsdoc/no-undefined-types": "error",
+    "jsdoc/require-description": [
+      "error",
+      {
+        "contexts": ["MethodDefinition", "FunctionDeclaration", "FunctionExpression"]
+      }
     ],
-    "parser": "@typescript-eslint/parser",
-    "parserOptions": {
-        "ecmaVersion": 2020,
-        "sourceType": "module",
-        "project": "./tsconfig.json"
-    },
-    "plugins": [
-        "@typescript-eslint",
-        "jsdoc"
+    "jsdoc/require-param": "error",
+    "jsdoc/require-param-description": "error",
+    "jsdoc/require-param-name": "error",
+    "jsdoc/require-returns": [
+      "error",
+      {
+        "forceRequireReturn": false,
+        "forceReturnsWithAsync": false
+      }
     ],
-    "rules": {
-        // Code Style Rules
-        "indent": ["error", 4, { "SwitchCase": 1 }],
-        "no-trailing-spaces": "error",
-        "no-multiple-empty-lines": ["error", { "max": 2, "maxEOF": 1 }],
-        "eol-last": ["error", "always"],
-        "semi": ["error", "always"],
-        "quotes": ["error", "single"],
-        "comma-dangle": ["error", "never"],
-        
-        // JSDoc Documentation Rules
-        "jsdoc/check-alignment": "error",
-        "jsdoc/check-indentation": "error",
-        "jsdoc/check-param-names": "error",
-        "jsdoc/check-syntax": "error",
-        "jsdoc/check-tag-names": "error",
-        "jsdoc/check-types": "error",
-        "jsdoc/newline-after-description": "error",
-        "jsdoc/no-undefined-types": "error",
-        "jsdoc/require-description": ["error", {
-            "contexts": ["MethodDefinition", "FunctionDeclaration", "FunctionExpression"]
-        }],
-        "jsdoc/require-param": "error",
-        "jsdoc/require-param-description": "error",
-        "jsdoc/require-param-name": "error",
-        "jsdoc/require-returns": ["error", {
-            "forceRequireReturn": false,
-            "forceReturnsWithAsync": false
-        }],
-        "jsdoc/require-returns-description": "error",
-        "jsdoc/valid-types": "error",
-        
-        // TypeScript Specific Rules
-        "@typescript-eslint/no-unused-vars": "error",
-        "@typescript-eslint/no-explicit-any": "warn",
-        "@typescript-eslint/explicit-function-return-type": ["error", {
-            "allowExpressions": true,
-            "allowTypedFunctionExpressions": true
-        }],
-        "@typescript-eslint/no-non-null-assertion": "warn",
-        "@typescript-eslint/prefer-readonly": "error",
-        "@typescript-eslint/prefer-readonly-parameter-types": "off",
-        
-        // Function Documentation Requirements
-        "require-jsdoc": ["error", {
-            "require": {
-                "FunctionDeclaration": true,
-                "MethodDefinition": true,
-                "ClassDeclaration": true,
-                "ArrowFunctionExpression": false,
-                "FunctionExpression": false
-            }
-        }],
-        
-        // Custom Rules for Our Standards
-        "lines-between-class-members": ["error", "always", { 
-            "exceptAfterSingleLine": false 
-        }],
-        "padding-line-between-statements": [
-            "error",
-            { "blankLine": "always", "prev": "function", "next": "function" },
-            { "blankLine": "always", "prev": "class", "next": "*" },
-            { "blankLine": "always", "prev": "*", "next": "class" }
-        ]
-    },
-    "ignorePatterns": [
-        "out/**/*",
-        "dist/**/*",
-        "node_modules/**/*",
-        "*.d.ts"
+    "jsdoc/require-returns-description": "error",
+    "jsdoc/valid-types": "error",
+
+    // TypeScript Specific Rules
+    "@typescript-eslint/no-unused-vars": "error",
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/explicit-function-return-type": [
+      "error",
+      {
+        "allowExpressions": true,
+        "allowTypedFunctionExpressions": true
+      }
+    ],
+    "@typescript-eslint/no-non-null-assertion": "warn",
+    "@typescript-eslint/prefer-readonly": "error",
+    "@typescript-eslint/prefer-readonly-parameter-types": "off",
+
+    // Function Documentation Requirements
+    "require-jsdoc": [
+      "error",
+      {
+        "require": {
+          "FunctionDeclaration": true,
+          "MethodDefinition": true,
+          "ClassDeclaration": true,
+          "ArrowFunctionExpression": false,
+          "FunctionExpression": false
+        }
+      }
+    ],
+
+    // Custom Rules for Our Standards
+    "lines-between-class-members": [
+      "error",
+      "always",
+      {
+        "exceptAfterSingleLine": false
+      }
+    ],
+    "padding-line-between-statements": [
+      "error",
+      { "blankLine": "always", "prev": "function", "next": "function" },
+      { "blankLine": "always", "prev": "class", "next": "*" },
+      { "blankLine": "always", "prev": "*", "next": "class" }
     ]
+  },
+  "ignorePatterns": ["out/**/*", "dist/**/*", "node_modules/**/*", "*.d.ts"]
 }

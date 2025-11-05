@@ -484,10 +484,10 @@ export class ProjectViewPanel {
 						</div>
 					</div>
 				</div>
-				
+
 				<script>
 					const vscodeApi = acquireVsCodeApi();
-					
+
 					function copyVersionInfo() {
 						const versionText = \`${versionInfo.rawOutput.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`;
 						vscodeApi.postMessage({
@@ -495,7 +495,7 @@ export class ProjectViewPanel {
 							text: versionText
 						});
 					}
-					
+
 					function showInOutput() {
 						vscodeApi.postMessage({
 							command: 'showInOutput',
@@ -518,10 +518,10 @@ export class ProjectViewPanel {
 						<button onclick="retryVersionInfo()" style="background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer;">🔄 Retry</button>
 					</div>
 				</div>
-				
+
 				<script>
 					const vscodeApi = acquireVsCodeApi();
-					
+
 					function retryVersionInfo() {
 						vscodeApi.postMessage({
 							command: 'retryVersionInfo'
@@ -650,17 +650,17 @@ export class ProjectViewPanel {
 				// Hide all tab contents
 				const contents = document.querySelectorAll('.tab-content');
 				contents.forEach(content => content.classList.remove('active'));
-				
+
 				// Remove active class from all buttons
 				const buttons = document.querySelectorAll('.tab-button');
 				buttons.forEach(button => button.classList.remove('active'));
-				
+
 				// Show selected tab content
 				const selectedContent = document.getElementById(tabId);
 				if (selectedContent) {
 					selectedContent.classList.add('active');
 				}
-				
+
 				// Activate selected button
 				const selectedButton = document.querySelector(\`[data-tab="\${tabId}"]\`);
 				if (selectedButton) {
@@ -933,8 +933,8 @@ export class ProjectViewPanel {
 									${configFile.description}
 								</div>
 								<div style="font-size: 0.9em;">
-									<a href="${configFile.officialLink}" style="color: var(--vscode-textLink-foreground); text-decoration: none;" 
-									   onmouseover="this.style.textDecoration='underline'" 
+									<a href="${configFile.officialLink}" style="color: var(--vscode-textLink-foreground); text-decoration: none;"
+									   onmouseover="this.style.textDecoration='underline'"
 									   onmouseout="this.style.textDecoration='none'">
 										🔗 View Official Documentation →
 									</a>
@@ -967,8 +967,8 @@ export class ProjectViewPanel {
 									${configFile.description}
 								</div>
 								<div style="font-size: 0.9em;">
-									<a href="${configFile.officialLink}" style="color: var(--vscode-textLink-foreground); text-decoration: none;" 
-									   onmouseover="this.style.textDecoration='underline'" 
+									<a href="${configFile.officialLink}" style="color: var(--vscode-textLink-foreground); text-decoration: none;"
+									   onmouseover="this.style.textDecoration='underline'"
 									   onmouseout="this.style.textDecoration='none'">
 										🔗 View Official Documentation →
 									</a>
@@ -1020,17 +1020,17 @@ export class ProjectViewPanel {
 				// Hide all config tab contents
 				const configContents = document.querySelectorAll('[id^="config-"]');
 				configContents.forEach(content => content.classList.remove('active'));
-				
+
 				// Remove active class from all config buttons
 				const configButtons = document.querySelectorAll('[data-tab^="config-"]');
 				configButtons.forEach(button => button.classList.remove('active'));
-				
+
 				// Show selected config tab content
 				const selectedContent = document.getElementById(tabId);
 				if (selectedContent) {
 					selectedContent.classList.add('active');
 				}
-				
+
 				// Activate selected config button
 				const selectedButton = document.querySelector(\`[data-tab="\${tabId}"]\`);
 				if (selectedButton) {

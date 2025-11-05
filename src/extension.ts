@@ -293,20 +293,20 @@ function generateCommandHistoryHTML(): string {
 
     <script>
         const vscode = acquireVsCodeApi();
-        
+
         function refreshHistory() {
             const refreshBtn = document.getElementById('refreshBtn');
             const refreshIcon = refreshBtn.querySelector('.refresh-icon');
-            
+
             // Show loading state
             refreshBtn.disabled = true;
             refreshBtn.classList.add('refreshing');
-            
+
             // Send refresh command to extension
             vscode.postMessage({
                 command: 'refreshHistory'
             });
-            
+
             // Reset button after animation
             setTimeout(() => {
                 refreshBtn.disabled = false;
@@ -1941,7 +1941,7 @@ function generateManagerOverviewHTML(
 					</div>
 				</div>
 			</div>
-			
+
 			${
                 projectState
                     ? `
@@ -2010,7 +2010,7 @@ function generateManagerOverviewHTML(
             border-radius: 8px;
             margin-bottom: 20px;
         }
-        
+
         /* Health Score Styles */
         .health-score-section h3 {
             margin-top: 0;
@@ -2076,7 +2076,7 @@ function generateManagerOverviewHTML(
         .metric-value {
             font-weight: bold;
         }
-        
+
         .project-state-info {
             margin-bottom: 20px;
             padding-bottom: 15px;
@@ -2087,7 +2087,7 @@ function generateManagerOverviewHTML(
             align-items: center;
             gap: 10px;
         }
-        
+
         .health-issues, .health-recommendations {
             margin-top: 15px;
         }
@@ -2292,9 +2292,9 @@ function generateManagerOverviewHTML(
         </div>
         <div id="lastUpdate" class="last-update">Last updated: ${new Date().toLocaleString()}</div>
     </div>
-    
+
     ${projectStateHtml}
-    
+
     <div class="summary">
         <div class="summary-card">
             <div class="summary-number running">${runningCount}</div>
@@ -2352,89 +2352,89 @@ function generateManagerOverviewHTML(
 
     <script>
         const vscode = acquireVsCodeApi();
-        
+
         function startManager(index) {
             vscode.postMessage({
                 command: 'startManager',
                 index: index
             });
         }
-        
+
         function stopManager(index) {
             vscode.postMessage({
                 command: 'stopManager',
                 index: index
             });
         }
-        
+
         function killManager(index) {
             vscode.postMessage({
                 command: 'killManager',
                 index: index
             });
         }
-        
+
         // Auto-refresh functionality
         let autoRefreshTimer = null;
         let countdownTimer = null;
         let refreshInterval = 5000; // Default 5 seconds
         let nextRefreshTime = 0;
-        
+
         function refreshData() {
             const refreshBtn = document.getElementById('refreshBtn');
             const refreshIcon = refreshBtn.querySelector('.refresh-icon');
-            
+
             // Show loading state
             refreshBtn.disabled = true;
             refreshBtn.classList.add('refreshing');
-            
+
             // Send refresh command to extension
             vscode.postMessage({
                 command: 'refreshManagerOverview'
             });
-            
+
             // Update last update time
             document.getElementById('lastUpdate').textContent = 'Last updated: ' + new Date().toLocaleString();
-            
+
             // Reset refresh button after animation
             setTimeout(() => {
                 refreshBtn.disabled = false;
                 refreshBtn.classList.remove('refreshing');
             }, 500);
         }
-        
+
         function toggleAutoRefresh() {
             const toggle = document.getElementById('autoRefreshToggle');
             const nextRefreshSpan = document.getElementById('nextRefresh');
-            
+
             if (toggle.checked) {
                 startAutoRefresh();
             } else {
                 stopAutoRefresh();
                 nextRefreshSpan.textContent = '';
             }
-            
+
             // Save preference to extension
             vscode.postMessage({
                 command: 'setAutoRefresh',
                 enabled: toggle.checked
             });
         }
-        
+
         function startAutoRefresh() {
             stopAutoRefresh(); // Clear any existing timers
-            
+
             nextRefreshTime = Date.now() + refreshInterval;
             updateCountdown();
-            
+
             autoRefreshTimer = setInterval(() => {
                 refreshData();
                 nextRefreshTime = Date.now() + refreshInterval;
             }, refreshInterval);
-            
+
             countdownTimer = setInterval(updateCountdown, 1000);
         }
-        
+
         function stopAutoRefresh() {
             if (autoRefreshTimer) {
                 clearInterval(autoRefreshTimer);
@@ -2445,18 +2445,18 @@ function generateManagerOverviewHTML(
                 countdownTimer = null;
             }
         }
-        
+
         function updateCountdown() {
             const nextRefreshSpan = document.getElementById('nextRefresh');
             const remaining = Math.max(0, Math.ceil((nextRefreshTime - Date.now()) / 1000));
-            
+
             if (remaining > 0) {
                 nextRefreshSpan.textContent = '(next in ' + remaining + 's)';
             } else {
                 nextRefreshSpan.textContent = '(refreshing...)';
             }
         }
-        
+
         // Initialize auto-refresh settings from extension
         window.addEventListener('message', event => {
             const message = event.data;
@@ -2477,7 +2477,7 @@ function generateManagerOverviewHTML(
                     break;
             }
         });
-        
+
         // Request initial settings from extension
         vscode.postMessage({
             command: 'getAutoRefreshSettings'
@@ -2768,12 +2768,12 @@ function generateManagerStatusHTML(project: WinCCOAProject, managers: WinCCOAMan
             console.log('Start manager:', index);
             // This would trigger VS Code command
         }
-        
+
         function stopManager(index) {
             console.log('Stop manager:', index);
             // This would trigger VS Code command
         }
-        
+
         function killManager(index) {
             console.log('Kill manager:', index);
             // This would trigger VS Code command
@@ -4251,10 +4251,10 @@ class ProjectViewPanel {
 						</div>
 					</div>
 				</div>
-				
+
 				<script>
 					const vscodeApi = acquireVsCodeApi();
-					
+
 					function copyVersionInfo() {
 						const versionText = \`${versionInfo.rawOutput.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`;
 						vscodeApi.postMessage({
@@ -4262,7 +4262,7 @@ class ProjectViewPanel {
 							text: versionText
 						});
 					}
-					
+
 					function showInOutput() {
 						vscodeApi.postMessage({
 							command: 'showInOutput',
@@ -4285,10 +4285,10 @@ class ProjectViewPanel {
 						<button onclick="retryVersionInfo()" style="background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer;">🔄 Retry</button>
 					</div>
 				</div>
-				
+
 				<script>
 					const vscodeApi = acquireVsCodeApi();
-					
+
 					function retryVersionInfo() {
 						vscodeApi.postMessage({
 							command: 'retryVersionInfo'
@@ -4414,17 +4414,17 @@ class ProjectViewPanel {
 				// Hide all tab contents
 				const contents = document.querySelectorAll('.tab-content');
 				contents.forEach(content => content.classList.remove('active'));
-				
+
 				// Remove active class from all buttons
 				const buttons = document.querySelectorAll('.tab-button');
 				buttons.forEach(button => button.classList.remove('active'));
-				
+
 				// Show selected tab content
 				const selectedContent = document.getElementById(tabId);
 				if (selectedContent) {
 					selectedContent.classList.add('active');
 				}
-				
+
 				// Activate selected button
 				const selectedButton = document.querySelector(\`[data-tab="\${tabId}"]\`);
 				if (selectedButton) {
@@ -4679,8 +4679,8 @@ class ProjectViewPanel {
 									${configFile.description}
 								</div>
 								<div style="font-size: 0.9em;">
-									<a href="${configFile.officialLink}" style="color: var(--vscode-textLink-foreground); text-decoration: none;" 
-									   onmouseover="this.style.textDecoration='underline'" 
+									<a href="${configFile.officialLink}" style="color: var(--vscode-textLink-foreground); text-decoration: none;"
+									   onmouseover="this.style.textDecoration='underline'"
 									   onmouseout="this.style.textDecoration='none'">
 										🔗 View Official Documentation →
 									</a>
@@ -4713,8 +4713,8 @@ class ProjectViewPanel {
 									${configFile.description}
 								</div>
 								<div style="font-size: 0.9em;">
-									<a href="${configFile.officialLink}" style="color: var(--vscode-textLink-foreground); text-decoration: none;" 
-									   onmouseover="this.style.textDecoration='underline'" 
+									<a href="${configFile.officialLink}" style="color: var(--vscode-textLink-foreground); text-decoration: none;"
+									   onmouseover="this.style.textDecoration='underline'"
 									   onmouseout="this.style.textDecoration='none'">
 										🔗 View Official Documentation →
 									</a>
@@ -4766,17 +4766,17 @@ class ProjectViewPanel {
 				// Hide all config tab contents
 				const configContents = document.querySelectorAll('[id^="config-"]');
 				configContents.forEach(content => content.classList.remove('active'));
-				
+
 				// Remove active class from all config buttons
 				const configButtons = document.querySelectorAll('[data-tab^="config-"]');
 				configButtons.forEach(button => button.classList.remove('active'));
-				
+
 				// Show selected config tab content
 				const selectedContent = document.getElementById(tabId);
 				if (selectedContent) {
 					selectedContent.classList.add('active');
 				}
-				
+
 				// Activate selected config button
 				const selectedButton = document.querySelector(\`[data-tab="\${tabId}"]\`);
 				if (selectedButton) {

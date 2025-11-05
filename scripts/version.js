@@ -2,19 +2,19 @@
 
 /**
  * Version Management Script for WinCC OA Projects Extension
- * 
+ *
  * This script helps maintain version consistency between:
  * - package.json
- * - GitHub releases  
+ * - GitHub releases
  * - VS Code Marketplace
- * 
+ *
  * Usage:
  *   node scripts/version.js [version]
- *   
+ *
  * Examples:
  *   node scripts/version.js 2.1.0     # Set specific version
  *   node scripts/version.js patch     # Increment patch (2.0.0 -> 2.0.1)
- *   node scripts/version.js minor     # Increment minor (2.0.0 -> 2.1.0)  
+ *   node scripts/version.js minor     # Increment minor (2.0.0 -> 2.1.0)
  *   node scripts/version.js major     # Increment major (2.0.0 -> 3.0.0)
  *   node scripts/version.js check     # Check current version status
  */
@@ -47,17 +47,17 @@ function getCurrentVersion() {
 function setVersion(newVersion) {
     const packagePath = path.join(process.cwd(), 'package.json');
     const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
-    
+
     packageJson.version = newVersion;
     fs.writeFileSync(packagePath, JSON.stringify(packageJson, null, 2) + '\n');
-    
+
     log(colors.green, `✅ Updated package.json to version ${newVersion}`);
 }
 
 function incrementVersion(type) {
     const current = getCurrentVersion();
     const parts = current.split('.').map(Number);
-    
+
     switch (type) {
         case 'patch':
             parts[2]++;
@@ -74,7 +74,7 @@ function incrementVersion(type) {
         default:
             throw new Error(`Invalid increment type: ${type}`);
     }
-    
+
     return parts.join('.');
 }
 
@@ -85,12 +85,12 @@ function validateVersion(version) {
 
 function checkVersionStatus() {
     const currentVersion = getCurrentVersion();
-    
+
     log(colors.bright + colors.blue, '\n🔍 Version Status Check');
     log(colors.cyan, '========================');
-    
+
     log(colors.yellow, `📦 Current package.json version: ${currentVersion}`);
-    
+
     // Check if version is a pre-release
     if (currentVersion.includes('-')) {
         log(colors.red, '⚠️  WARNING: This is a pre-release version!');
@@ -98,14 +98,14 @@ function checkVersionStatus() {
     } else {
         log(colors.green, '✅ Version is clean (no pre-release identifiers)');
     }
-    
+
     // Check version format
     if (validateVersion(currentVersion)) {
         log(colors.green, '✅ Version format is valid (semantic versioning)');
     } else {
         log(colors.red, '❌ Invalid version format (expected: X.Y.Z)');
     }
-    
+
     // Check for uncommitted changes
     try {
         execSync('git diff --quiet', { stdio: 'ignore' });
@@ -114,7 +114,7 @@ function checkVersionStatus() {
     } catch {
         log(colors.yellow, '⚠️  Uncommitted changes detected');
     }
-    
+
     // Show recent tags
     try {
         const recentTags = execSync('git tag --sort=-version:refname | head -5', { encoding: 'utf8' }).trim();
@@ -127,7 +127,7 @@ function checkVersionStatus() {
     } catch {
         log(colors.yellow, '⚠️  No Git tags found');
     }
-    
+
     console.log('\n');
 }
 
@@ -148,7 +148,7 @@ Examples:
   ${colors.yellow}node scripts/version.js check${colors.reset}      # Check current status
   ${colors.yellow}node scripts/version.js 2.1.0${colors.reset}     # Set to 2.1.0
   ${colors.yellow}node scripts/version.js patch${colors.reset}     # Increment patch
-  
+
 ${colors.bright}Best Practices:${colors.reset}
   1. Always run 'check' first to see current status
   2. Use semantic versioning (X.Y.Z)
@@ -160,41 +160,41 @@ ${colors.bright}Best Practices:${colors.reset}
 // Main script execution
 function main() {
     const args = process.argv.slice(2);
-    
+
     if (args.length === 0) {
         showUsage();
         return;
     }
-    
+
     const command = args[0];
-    
+
     try {
         switch (command) {
             case 'check':
                 checkVersionStatus();
                 break;
-                
+
             case 'patch':
             case 'minor':
             case 'major':
                 const currentVersion = getCurrentVersion();
                 const newVersion = incrementVersion(command);
-                
+
                 log(colors.yellow, `📋 Incrementing ${command} version:`);
                 log(colors.cyan, `   ${currentVersion} -> ${newVersion}`);
-                
+
                 setVersion(newVersion);
                 log(colors.green, `\n🎯 Ready to commit and release version ${newVersion}`);
                 break;
-                
+
             default:
                 // Assume it's a specific version
                 if (validateVersion(command)) {
                     const currentVersion = getCurrentVersion();
-                    
+
                     log(colors.yellow, `📋 Setting specific version:`);
                     log(colors.cyan, `   ${currentVersion} -> ${command}`);
-                    
+
                     setVersion(command);
                     log(colors.green, `\n🎯 Ready to commit and release version ${command}`);
                 } else {

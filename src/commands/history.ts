@@ -146,23 +146,23 @@ function generateCommandHistoryHTML(): string {
 					margin: 0;
 					padding: 20px;
 				}
-				
+
 				.header {
 					margin-bottom: 20px;
 					border-bottom: 1px solid var(--vscode-panel-border);
 					padding-bottom: 10px;
 				}
-				
+
 				.header h1 {
 					margin: 0 0 5px 0;
 					color: var(--vscode-foreground);
 				}
-				
+
 				.header p {
 					margin: 0;
 					color: var(--vscode-descriptionForeground);
 				}
-				
+
 				.history-item {
 					margin-bottom: 15px;
 					padding: 12px;
@@ -170,57 +170,57 @@ function generateCommandHistoryHTML(): string {
 					background-color: var(--vscode-editor-background);
 					border-radius: 4px;
 				}
-				
+
 				.history-item.success {
 					border-left-color: #28a745;
 					background-color: rgba(40, 167, 69, 0.1);
 				}
-				
+
 				.history-item.error {
 					border-left-color: #dc3545;
 					background-color: rgba(220, 53, 69, 0.1);
 				}
-				
+
 				.history-header {
 					display: flex;
 					align-items: center;
 					margin-bottom: 8px;
 					gap: 10px;
 				}
-				
+
 				.status-icon {
 					font-size: 1.1em;
 				}
-				
+
 				.project-name {
 					font-weight: bold;
 					color: var(--vscode-symbolIcon-namespaceForeground);
 				}
-				
+
 				.timestamp {
 					margin-left: auto;
 					font-size: 0.9em;
 					color: var(--vscode-descriptionForeground);
 				}
-				
+
 				.command-info, .response-info {
 					margin-bottom: 5px;
 					font-size: 0.95em;
 				}
-				
+
 				code {
 					background-color: var(--vscode-textBlockQuote-background);
 					padding: 2px 6px;
 					border-radius: 3px;
 					font-family: var(--vscode-editor-font-family);
 				}
-				
+
 				.empty-state {
 					text-align: center;
 					padding: 40px 20px;
 					color: var(--vscode-descriptionForeground);
 				}
-				
+
 				.empty-state .icon {
 					font-size: 3em;
 					margin-bottom: 15px;
@@ -232,7 +232,7 @@ function generateCommandHistoryHTML(): string {
 				<h1>📋 Pmon Command History</h1>
 				<p>History of WinCC OA pmon commands executed through VS Code</p>
 			</div>
-			
+
 			<div class="history-container">
 				${
                     pmonCommandHistory.length > 0
