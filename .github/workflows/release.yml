@@ -374,11 +374,8 @@ jobs:
             - name: Checkout repository
               uses: actions/checkout@v5
               with:
-                  ref: ${{ github.ref }}
+                  fetch-depth: 0
                   token: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Pull latest changes
-              run: git pull origin HEAD
 
             - name: Use Node.js 20.x
               uses: actions/setup-node@v6
