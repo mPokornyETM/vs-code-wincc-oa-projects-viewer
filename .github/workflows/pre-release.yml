@@ -2,7 +2,12 @@ name: Pre-Release (Develop)
 
 on:
     push:
-        branches: [develop]
+        branches:
+            - develop
+        paths-ignore:
+            - "**.md"
+            - ".github/**"
+            - "!.github/workflows/pre-release.yml"
     workflow_dispatch:
         inputs:
             pre_release_type:
@@ -137,7 +142,11 @@ jobs:
                   echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
                   echo "New pre-release version: $NEW_VERSION"
 
-                  # Create tag locally
+                  # Create tag locally (delete if exists)
+                  if git rev-parse "v$NEW_VERSION" >/dev/null 2>&1; then
+                    echo "⚠️ Tag v$NEW_VERSION already exists, deleting it first"
+                    git tag -d "v$NEW_VERSION"
+                  fi
                   git tag "v$NEW_VERSION"
                   echo "📌 Created pre-release tag: v$NEW_VERSION"
 
@@ -207,8 +216,13 @@ jobs:
                     echo "✅ Pushed pre-release commit to develop"
                   fi
 
-                  # Push tag
-                  git push origin "v$VERSION"
+                  # Push tag (force push if exists remotely)
+                  if git ls-remote --tags origin "v$VERSION" | grep -q "v$VERSION"; then
+                    echo "⚠️  Tag v$VERSION exists remotely, force pushing"
+                    git push --force origin "v$VERSION"
+                  else
+                    git push origin "v$VERSION"
+                  fi
                   echo "✅ Pushed pre-release tag: v$VERSION"
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
