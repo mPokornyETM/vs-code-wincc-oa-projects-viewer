@@ -201,6 +201,16 @@
                 "command": "winccOAProjects.removeManager",
                 "title": "WinCC OA: Remove Manager",
                 "icon": "$(trash)"
+            },
+            {
+                "command": "winccOAProjects.formatCtrlFile",
+                "title": "WinCC OA: Format CTRL File",
+                "icon": "$(code)"
+            },
+            {
+                "command": "winccOAProjects.formatAllCtrlFiles",
+                "title": "WinCC OA: Format All CTRL Files",
+                "icon": "$(file-code)"
             }
         ],
         "menus": {
@@ -415,6 +425,19 @@
                 },
                 {
                     "command": "winccOAProjects.showCommandHistory"
+                },
+                {
+                    "command": "winccOAProjects.formatCtrlFile"
+                },
+                {
+                    "command": "winccOAProjects.formatAllCtrlFiles"
+                }
+            ],
+            "editor/context": [
+                {
+                    "command": "winccOAProjects.formatCtrlFile",
+                    "when": "resourceExtname == .ctl",
+                    "group": "1_modification@1"
                 }
             ]
         },
@@ -449,6 +472,11 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Enable automatic refresh of Manager Overview"
+                },
+                "winccOAProjects.astylePath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Path to astyle.exe for formatting CTRL files. If not set, the extension will try to find it automatically from WinCC OA installation."
                 }
             }
         }

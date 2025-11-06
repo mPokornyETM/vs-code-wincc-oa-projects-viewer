@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as childProcess from 'child_process';
+import * as formatting from './formatting';
 // import { JSDOM } from 'jsdom';
 // import * as DOMPurify from 'dompurify';
 
@@ -1497,6 +1498,18 @@ export function activate(context: vscode.ExtensionContext) {
         showCommandHistory();
     });
 
+    // Code Formatting Commands
+    const formatCtrlFileCommand = vscode.commands.registerCommand('winccOAProjects.formatCtrlFile', async () => {
+        await formatting.formatActiveCtrlFile();
+    });
+
+    const formatAllCtrlFilesCommand = vscode.commands.registerCommand(
+        'winccOAProjects.formatAllCtrlFiles',
+        async () => {
+            await formatting.formatAllCtrlFiles();
+        }
+    );
+
     context.subscriptions.push(
         treeView,
         watcher,
@@ -1528,7 +1541,9 @@ export function activate(context: vscode.ExtensionContext) {
         startManagerCommand,
         stopManagerCommand,
         killManagerCommand,
-        removeManagerCommand
+        removeManagerCommand,
+        formatCtrlFileCommand,
+        formatAllCtrlFilesCommand
     );
 
     // Auto-refresh when extension starts
