@@ -11,8 +11,19 @@ import { promisify } from 'util';
 
 const execFileAsync = promisify(execFile);
 
+// Create output channel for astyle logs
+let outputChannel: vscode.OutputChannel | undefined;
+
+function getOutputChannel(): vscode.OutputChannel {
+    if (!outputChannel) {
+        outputChannel = vscode.window.createOutputChannel('WinCC OA Formatting');
+    }
+    return outputChannel;
+}
+
 interface AStyleConfig {
     executable: string;
+    configFile: string | null;
     version: string;
 }
 
@@ -69,10 +80,12 @@ export async function findAStyleExecutable(projectPath: string): Promise<AStyleC
         }
 
         const astylePath = path.join(binPath, 'bin', 'astyle.exe');
+        const astyleConfigPath = path.join(binPath, 'config', 'astyle.config');
 
         if (fs.existsSync(astylePath)) {
             return {
                 executable: astylePath,
+                configFile: fs.existsSync(astyleConfigPath) ? astyleConfigPath : null,
                 version: version
             };
         }
@@ -126,29 +139,76 @@ export async function promptForAStylePath(version: string): Promise<string | und
 /**
  * Format a .ctl file using astyle
  */
-export async function formatCtrlFile(filePath: string, astylePath: string): Promise<boolean> {
+export async function formatCtrlFile(filePath: string, astylePath: string, configFilePath?: string): Promise<boolean> {
     try {
-        // AStyle options for WinCC OA CTRL code formatting
-        const astyleOptions = [
-            '--style=allman', // Allman bracket style (commonly used in WinCC OA)
-            '--indent=spaces=2', // 2-space indentation
-            '--indent-switches', // Indent switch cases
-            '--indent-cases', // Indent case statements
-            '--pad-oper', // Pad operators with spaces
-            '--pad-header', // Pad headers (if, for, while, etc.)
-            '--unpad-paren', // Remove padding around parentheses
-            '--align-pointer=name', // Align pointer/reference to variable name
-            '--break-blocks', // Add blank lines around blocks
-            '--convert-tabs', // Convert tabs to spaces
-            '--max-code-length=120', // Max line length
-            '--mode=c', // C/C++ mode (CTRL is C-like)
-            filePath // File to format (in-place)
-        ];
+        const output = getOutputChannel();
+        output.appendLine(`\n${'='.repeat(80)}`);
+        output.appendLine(`Formatting: ${filePath}`);
+        output.appendLine(`astyle.exe: ${astylePath}`);
 
-        await execFileAsync(astylePath, astyleOptions);
+        const astyleOptions: string[] = [];
+
+        // Check if user wants to create backup files (.orig)
+        const createBackup = vscode.workspace
+            .getConfiguration('winccOAProjects')
+            .get<boolean>('astyleCreateBackup', false);
+
+        if (!createBackup) {
+            // Don't create .orig backup files
+            astyleOptions.push('--suffix=none');
+            output.appendLine('Backup files: Disabled');
+        } else {
+            output.appendLine('Backup files: Enabled (.orig)');
+        }
+
+        // Use config file if provided or available
+        if (configFilePath && fs.existsSync(configFilePath)) {
+            astyleOptions.push(`--options=${configFilePath}`);
+            output.appendLine(`Config file: ${configFilePath}`);
+        } else {
+            output.appendLine('Config file: None (using default options)');
+            // Fallback to default options if no config file
+            astyleOptions.push(
+                '--style=allman', // Allman bracket style (commonly used in WinCC OA)
+                '--indent=spaces=2', // 2-space indentation
+                '--indent-switches', // Indent switch cases
+                '--indent-cases', // Indent case statements
+                '--pad-oper', // Pad operators with spaces
+                '--pad-header', // Pad headers (if, for, while, etc.)
+                '--unpad-paren', // Remove padding around parentheses
+                '--align-pointer=name', // Align pointer/reference to variable name
+                '--break-blocks', // Add blank lines around blocks
+                '--convert-tabs', // Convert tabs to spaces
+                '--max-code-length=120', // Max line length
+                '--mode=c' // C/C++ mode (CTRL is C-like)
+            );
+        }
+
+        astyleOptions.push(filePath); // File to format (in-place)
+
+        output.appendLine(`Command: ${astylePath} ${astyleOptions.join(' ')}`);
+        output.appendLine('');
+
+        const { stdout, stderr } = await execFileAsync(astylePath, astyleOptions);
+
+        if (stdout) {
+            output.appendLine('STDOUT:');
+            output.appendLine(stdout);
+        }
+
+        if (stderr) {
+            output.appendLine('STDERR:');
+            output.appendLine(stderr);
+        }
+
+        output.appendLine('✓ Formatting completed successfully');
+        output.show(true); // Show output channel (preserveFocus = true)
 
         return true;
     } catch (error) {
+        const output = getOutputChannel();
+        output.appendLine(`✗ Error formatting file: ${error}`);
+        output.show(true);
         console.error('Error formatting file:', error);
         throw error;
     }
@@ -168,9 +228,18 @@ export async function formatActiveCtrlFile(): Promise<void> {
     const document = editor.document;
 
     // Check if it's a .ctl file
-    if (path.extname(document.fileName).toLowerCase() !== '.ctl') {
-        vscode.window.showInformationMessage('Active file is not a WinCC OA CTRL file (.ctl)');
-        return;
+    const fileExtension = path.extname(document.fileName).toLowerCase();
+    if (fileExtension !== '.ctl') {
+        const fileName = path.basename(document.fileName);
+        const message = fileExtension
+            ? `File "${fileName}" has extension "${fileExtension}" instead of ".ctl". Format anyway?`
+            : `File "${fileName}" has no extension. Format as CTRL file anyway?`;
+
+        const selection = await vscode.window.showWarningMessage(message, 'Yes', 'No');
+
+        if (selection !== 'Yes') {
+            return;
+        }
     }
 
     // Save the file before formatting
@@ -181,6 +250,7 @@ export async function formatActiveCtrlFile(): Promise<void> {
     try {
         // Try to get astyle path from workspace settings
         let astylePath = vscode.workspace.getConfiguration('winccOAProjects').get<string>('astylePath');
+        let astyleConfigPath = vscode.workspace.getConfiguration('winccOAProjects').get<string>('astyleConfigPath');
 
         // If not in settings, try to find it automatically
         if (!astylePath) {
@@ -195,11 +265,18 @@ export async function formatActiveCtrlFile(): Promise<void> {
 
             if (astyleConfig) {
                 astylePath = astyleConfig.executable;
+                astyleConfigPath = astyleConfig.configFile || undefined;
 
                 // Store for future use
                 await vscode.workspace
                     .getConfiguration('winccOAProjects')
                     .update('astylePath', astylePath, vscode.ConfigurationTarget.Workspace);
+
+                if (astyleConfigPath) {
+                    await vscode.workspace
+                        .getConfiguration('winccOAProjects')
+                        .update('astyleConfigPath', astyleConfigPath, vscode.ConfigurationTarget.Workspace);
+                }
             } else {
                 // Prompt user to select
                 astylePath = await promptForAStylePath('unknown');
@@ -230,7 +307,7 @@ export async function formatActiveCtrlFile(): Promise<void> {
                 cancellable: false
             },
             async () => {
-                await formatCtrlFile(document.fileName, astylePath!);
+                await formatCtrlFile(document.fileName, astylePath!, astyleConfigPath);
             }
         );
 
@@ -238,6 +315,108 @@ export async function formatActiveCtrlFile(): Promise<void> {
         await vscode.commands.executeCommand('workbench.action.files.revert');
 
         vscode.window.showInformationMessage('CTRL code formatted successfully');
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to format CTRL code: ${error}`);
+    }
+}
+
+/**
+ * Format a CTRL file from URI (called from explorer context menu)
+ */
+export async function formatCtrlFileFromUri(uri: vscode.Uri): Promise<void> {
+    const filePath = uri.fsPath;
+
+    // Check if it's a .ctl file
+    const fileExtension = path.extname(filePath).toLowerCase();
+    if (fileExtension !== '.ctl') {
+        const fileName = path.basename(filePath);
+        const message = fileExtension
+            ? `File "${fileName}" has extension "${fileExtension}" instead of ".ctl". Format anyway?`
+            : `File "${fileName}" has no extension. Format as CTRL file anyway?`;
+
+        const selection = await vscode.window.showWarningMessage(message, 'Yes', 'No');
+
+        if (selection !== 'Yes') {
+            return;
+        }
+    }
+
+    // Check if file is open and dirty
+    const openDocument = vscode.workspace.textDocuments.find(doc => doc.uri.fsPath === filePath);
+    if (openDocument && openDocument.isDirty) {
+        await openDocument.save();
+    }
+
+    try {
+        // Try to get astyle path from workspace settings
+        let astylePath = vscode.workspace.getConfiguration('winccOAProjects').get<string>('astylePath');
+        let astyleConfigPath = vscode.workspace.getConfiguration('winccOAProjects').get<string>('astyleConfigPath');
+
+        // If not in settings, try to find it automatically
+        if (!astylePath) {
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (!workspaceFolders || workspaceFolders.length === 0) {
+                vscode.window.showErrorMessage('No workspace folder open');
+                return;
+            }
+
+            const projectPath = workspaceFolders[0].uri.fsPath;
+            const astyleConfig = await findAStyleExecutable(projectPath);
+
+            if (astyleConfig) {
+                astylePath = astyleConfig.executable;
+                astyleConfigPath = astyleConfig.configFile || undefined;
+
+                // Store for future use
+                await vscode.workspace
+                    .getConfiguration('winccOAProjects')
+                    .update('astylePath', astylePath, vscode.ConfigurationTarget.Workspace);
+
+                if (astyleConfigPath) {
+                    await vscode.workspace
+                        .getConfiguration('winccOAProjects')
+                        .update('astyleConfigPath', astyleConfigPath, vscode.ConfigurationTarget.Workspace);
+                }
+            } else {
+                // Prompt user to select
+                astylePath = await promptForAStylePath('unknown');
+            }
+        }
+
+        if (!astylePath) {
+            return; // User cancelled
+        }
+
+        // Verify astyle.exe exists
+        if (!fs.existsSync(astylePath)) {
+            vscode.window.showErrorMessage(`astyle.exe not found at: ${astylePath}`);
+
+            // Clear invalid path
+            await vscode.workspace
+                .getConfiguration('winccOAProjects')
+                .update('astylePath', undefined, vscode.ConfigurationTarget.Workspace);
+
+            return;
+        }
+
+        // Format the file
+        await vscode.window.withProgress(
+            {
+                location: vscode.ProgressLocation.Notification,
+                title: `Formatting ${path.basename(filePath)}...`,
+                cancellable: false
+            },
+            async () => {
+                await formatCtrlFile(filePath, astylePath!, astyleConfigPath);
+            }
+        );
+
+        // If file is open, reload it
+        if (openDocument) {
+            await vscode.commands.executeCommand('workbench.action.files.revert', uri);
+        }
+
+        vscode.window.showInformationMessage(`CTRL code formatted successfully: ${path.basename(filePath)}`);
     } catch (error) {
         vscode.window.showErrorMessage(`Failed to format CTRL code: ${error}`);
     }
@@ -257,6 +436,7 @@ export async function formatAllCtrlFiles(): Promise<void> {
     try {
         // Try to get astyle path
         let astylePath = vscode.workspace.getConfiguration('winccOAProjects').get<string>('astylePath');
+        let astyleConfigPath = vscode.workspace.getConfiguration('winccOAProjects').get<string>('astyleConfigPath');
 
         if (!astylePath) {
             const projectPath = workspaceFolders[0].uri.fsPath;
@@ -264,6 +444,7 @@ export async function formatAllCtrlFiles(): Promise<void> {
 
             if (astyleConfig) {
                 astylePath = astyleConfig.executable;
+                astyleConfigPath = astyleConfig.configFile || undefined;
             } else {
                 astylePath = await promptForAStylePath('unknown');
             }
@@ -310,7 +491,7 @@ export async function formatAllCtrlFiles(): Promise<void> {
                     });
 
                     try {
-                        await formatCtrlFile(file.fsPath, astylePath!);
+                        await formatCtrlFile(file.fsPath, astylePath!, astyleConfigPath);
                         successCount++;
                     } catch (error) {
                         console.error(`Failed to format ${file.fsPath}:`, error);
@@ -325,5 +506,119 @@ export async function formatAllCtrlFiles(): Promise<void> {
         );
     } catch (error) {
         vscode.window.showErrorMessage(`Failed to format CTRL files: ${error}`);
+    }
+}
+
+/**
+ * Format all .ctl files in a specific folder (recursively)
+ */
+export async function formatAllCtrlFilesInFolder(folderUri?: vscode.Uri): Promise<void> {
+    try {
+        // If no folder URI provided, use the first workspace folder
+        let folderPath: string;
+
+        if (folderUri) {
+            folderPath = folderUri.fsPath;
+        } else {
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (!workspaceFolders || workspaceFolders.length === 0) {
+                vscode.window.showErrorMessage('No workspace folder open');
+                return;
+            }
+            folderPath = workspaceFolders[0].uri.fsPath;
+        }
+
+        // Verify it's a directory
+        if (!fs.existsSync(folderPath) || !fs.statSync(folderPath).isDirectory()) {
+            vscode.window.showErrorMessage('Selected item is not a folder');
+            return;
+        }
+
+        // Try to get astyle path
+        let astylePath = vscode.workspace.getConfiguration('winccOAProjects').get<string>('astylePath');
+        let astyleConfigPath = vscode.workspace.getConfiguration('winccOAProjects').get<string>('astyleConfigPath');
+
+        if (!astylePath) {
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (workspaceFolders && workspaceFolders.length > 0) {
+                const projectPath = workspaceFolders[0].uri.fsPath;
+                const astyleConfig = await findAStyleExecutable(projectPath);
+
+                if (astyleConfig) {
+                    astylePath = astyleConfig.executable;
+                    astyleConfigPath = astyleConfig.configFile || undefined;
+                } else {
+                    astylePath = await promptForAStylePath('unknown');
+                }
+            }
+        }
+
+        if (!astylePath || !fs.existsSync(astylePath)) {
+            vscode.window.showErrorMessage('astyle.exe not found');
+            return;
+        }
+
+        // Find all .ctl files in the folder (recursively)
+        const pattern = new vscode.RelativePattern(folderPath, '**/*.ctl');
+        const ctlFiles = await vscode.workspace.findFiles(pattern, '**/node_modules/**');
+
+        if (ctlFiles.length === 0) {
+            vscode.window.showInformationMessage(`No .ctl files found in ${path.basename(folderPath)}`);
+            return;
+        }
+
+        const selection = await vscode.window.showWarningMessage(
+            `Found ${ctlFiles.length} .ctl file(s) in ${path.basename(folderPath)}. Format all?`,
+            'Yes',
+            'No'
+        );
+
+        if (selection !== 'Yes') {
+            return;
+        }
+
+        let successCount = 0;
+        let failureCount = 0;
+
+        await vscode.window.withProgress(
+            {
+                location: vscode.ProgressLocation.Notification,
+                title: `Formatting CTRL files in ${path.basename(folderPath)}...`,
+                cancellable: false
+            },
+            async progress => {
+                for (let i = 0; i < ctlFiles.length; i++) {
+                    const file = ctlFiles[i];
+                    progress.report({
+                        message: `${i + 1}/${ctlFiles.length}: ${path.basename(file.fsPath)}`,
+                        increment: 100 / ctlFiles.length
+                    });
+
+                    try {
+                        await formatCtrlFile(file.fsPath, astylePath!, astyleConfigPath);
+                        successCount++;
+                    } catch (error) {
+                        console.error(`Failed to format ${file.fsPath}:`, error);
+                        failureCount++;
+                    }
+                }
+            }
+        );
+
+        vscode.window.showInformationMessage(
+            `Formatted ${successCount} file(s) in ${path.basename(folderPath)}. ${failureCount > 0 ? `Failed: ${failureCount}` : ''}`
+        );
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to format CTRL files: ${error}`);
+    }
+}
+
+/**
+ * Dispose output channel
+ */
+export function dispose(): void {
+    if (outputChannel) {
+        outputChannel.dispose();
+        outputChannel = undefined;
     }
 }

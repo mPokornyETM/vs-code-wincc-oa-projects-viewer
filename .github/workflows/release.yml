@@ -64,8 +64,8 @@ jobs:
         needs: test
         # Only run on merged release PRs or manual workflow dispatch
         if: |
-            github.event_name == 'workflow_dispatch' || 
-            (github.event.pull_request.merged == true && 
+            github.event_name == 'workflow_dispatch' ||
+            (github.event.pull_request.merged == true &&
              (startsWith(github.head_ref, 'release/') || contains(github.event.pull_request.labels.*.name, 'release')))
         outputs:
             version: ${{ steps.release.outputs.version }}

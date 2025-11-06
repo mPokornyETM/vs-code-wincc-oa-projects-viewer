@@ -1499,14 +1499,30 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Code Formatting Commands
-    const formatCtrlFileCommand = vscode.commands.registerCommand('winccOAProjects.formatCtrlFile', async () => {
-        await formatting.formatActiveCtrlFile();
-    });
+    const formatCtrlFileCommand = vscode.commands.registerCommand(
+        'winccOAProjects.formatCtrlFile',
+        async (uri?: vscode.Uri) => {
+            if (uri) {
+                // Called from explorer context menu
+                await formatting.formatCtrlFileFromUri(uri);
+            } else {
+                // Called from command palette or editor
+                await formatting.formatActiveCtrlFile();
+            }
+        }
+    );
 
     const formatAllCtrlFilesCommand = vscode.commands.registerCommand(
         'winccOAProjects.formatAllCtrlFiles',
         async () => {
             await formatting.formatAllCtrlFiles();
+        }
+    );
+
+    const formatAllCtrlFilesInFolderCommand = vscode.commands.registerCommand(
+        'winccOAProjects.formatAllCtrlFilesInFolder',
+        async (uri?: vscode.Uri) => {
+            await formatting.formatAllCtrlFilesInFolder(uri);
         }
     );
 
@@ -1543,7 +1559,8 @@ export function activate(context: vscode.ExtensionContext) {
         killManagerCommand,
         removeManagerCommand,
         formatCtrlFileCommand,
-        formatAllCtrlFilesCommand
+        formatAllCtrlFilesCommand,
+        formatAllCtrlFilesInFolderCommand
     );
 
     // Auto-refresh when extension starts
@@ -6642,6 +6659,9 @@ export function deactivate() {
     if (outputChannel) {
         outputChannel.dispose();
     }
+
+    // Dispose formatting output channel
+    formatting.dispose();
 }
 
 // Export types and interfaces for other extensions to use

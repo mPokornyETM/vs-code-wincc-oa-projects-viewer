@@ -205,7 +205,7 @@ jobs:
                   # For pre-releases, we DON'T push version changes back to develop
                   # This avoids branch protection conflicts since we don't need to commit to develop
                   # The version bump is only in package.json for building the release artifact
-                  
+
                   echo "ℹ️  Pre-release version $VERSION is tag-only (not committed to develop)"
                   echo "📌 This prevents branch protection conflicts"
                   echo "✅ The develop branch package.json remains unchanged"
