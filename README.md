@@ -92,6 +92,16 @@ _Useful commands to interact with WinCC OA projects_
 - **Smart Filters**: Filter by project type, status, or version
 - **Quick Navigation**: Jump to specific projects effortlessly
 
+### Code Formatting
+
+- **CTRL Code Formatting**: Format WinCC OA .ctl files using astyle.exe
+- **Auto-Detection**: Automatically finds astyle.exe from WinCC OA installation
+- **Custom Configuration**: Use WinCC OA's astyle.config or provide your own
+- **Flexible Formatting**: Format single files or entire folders recursively
+- **Extension-less Files**: Supports formatting files without .ctl extension
+- **Output Panel**: View detailed formatting logs in VS Code OUTPUT
+- **No Backup Clutter**: Optionally disable .orig backup files (recommended with source control)
+
 ---
 
 ## Installation & Quick Start
@@ -139,6 +149,7 @@ Every contribution helps maintain and improve this extension for the entire WinC
 ### User Guides
 
 - [User Guide](docs/USER_GUIDE.md) - Complete feature walkthrough
+- [CTRL Code Formatting](docs/CTL_CODE_FORMATTING.md) - Code formatting documentation
 - [Development Guide](docs/development/DEVELOPMENT.md) - Contributing and development setup
 - [Project Management](docs/PMON_MANAGEMENT.md) - Advanced project control features
 

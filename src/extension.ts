@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as childProcess from 'child_process';
+import * as formatting from './formatting';
 // import { JSDOM } from 'jsdom';
 // import * as DOMPurify from 'dompurify';
 
@@ -1497,6 +1498,34 @@ export function activate(context: vscode.ExtensionContext) {
         showCommandHistory();
     });
 
+    // Code Formatting Commands
+    const formatCtrlFileCommand = vscode.commands.registerCommand(
+        'winccOAProjects.formatCtrlFile',
+        async (uri?: vscode.Uri) => {
+            if (uri) {
+                // Called from explorer context menu
+                await formatting.formatCtrlFileFromUri(uri);
+            } else {
+                // Called from command palette or editor
+                await formatting.formatActiveCtrlFile();
+            }
+        }
+    );
+
+    const formatAllCtrlFilesCommand = vscode.commands.registerCommand(
+        'winccOAProjects.formatAllCtrlFiles',
+        async () => {
+            await formatting.formatAllCtrlFiles();
+        }
+    );
+
+    const formatAllCtrlFilesInFolderCommand = vscode.commands.registerCommand(
+        'winccOAProjects.formatAllCtrlFilesInFolder',
+        async (uri?: vscode.Uri) => {
+            await formatting.formatAllCtrlFilesInFolder(uri);
+        }
+    );
+
     context.subscriptions.push(
         treeView,
         watcher,
@@ -1528,7 +1557,10 @@ export function activate(context: vscode.ExtensionContext) {
         startManagerCommand,
         stopManagerCommand,
         killManagerCommand,
-        removeManagerCommand
+        removeManagerCommand,
+        formatCtrlFileCommand,
+        formatAllCtrlFilesCommand,
+        formatAllCtrlFilesInFolderCommand
     );
 
     // Auto-refresh when extension starts
@@ -6627,6 +6659,9 @@ export function deactivate() {
     if (outputChannel) {
         outputChannel.dispose();
     }
+
+    // Dispose formatting output channel
+    formatting.dispose();
 }
 
 // Export types and interfaces for other extensions to use

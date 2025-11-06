@@ -201,6 +201,21 @@
                 "command": "winccOAProjects.removeManager",
                 "title": "WinCC OA: Remove Manager",
                 "icon": "$(trash)"
+            },
+            {
+                "command": "winccOAProjects.formatCtrlFile",
+                "title": "WinCC OA: Format CTRL File",
+                "icon": "$(code)"
+            },
+            {
+                "command": "winccOAProjects.formatAllCtrlFiles",
+                "title": "WinCC OA: Format All CTRL Files",
+                "icon": "$(file-code)"
+            },
+            {
+                "command": "winccOAProjects.formatAllCtrlFilesInFolder",
+                "title": "WinCC OA: Format All CTRL Files in Folder",
+                "icon": "$(file-code)"
             }
         ],
         "menus": {
@@ -353,6 +368,16 @@
                     "command": "winccOAProjects.registerRunnableProject",
                     "when": "explorerResourceIsFolder",
                     "group": "2_workspace@2"
+                },
+                {
+                    "command": "winccOAProjects.formatCtrlFile",
+                    "when": "resourceExtname == .ctl",
+                    "group": "7_modification@1"
+                },
+                {
+                    "command": "winccOAProjects.formatAllCtrlFilesInFolder",
+                    "when": "explorerResourceIsFolder",
+                    "group": "7_modification@2"
                 }
             ],
             "editor/title/context": [
@@ -415,6 +440,19 @@
                 },
                 {
                     "command": "winccOAProjects.showCommandHistory"
+                },
+                {
+                    "command": "winccOAProjects.formatCtrlFile"
+                },
+                {
+                    "command": "winccOAProjects.formatAllCtrlFiles"
+                }
+            ],
+            "editor/context": [
+                {
+                    "command": "winccOAProjects.formatCtrlFile",
+                    "when": "resourceExtname == .ctl",
+                    "group": "1_modification@1"
                 }
             ]
         },
@@ -449,6 +487,21 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Enable automatic refresh of Manager Overview"
+                },
+                "winccOAProjects.astylePath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Path to astyle.exe for formatting CTRL files. If not set, the extension will try to find it automatically from WinCC OA installation."
+                },
+                "winccOAProjects.astyleConfigPath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Path to astyle.config file for CTRL code formatting. If not set, the extension will use the default config from WinCC OA installation (e.g., C:\\Siemens\\Automation\\WinCC_OA\\3.20\\config\\astyle.config)."
+                },
+                "winccOAProjects.astyleCreateBackup": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Create .orig backup files when formatting CTRL code. Not recommended when using source control."
                 }
             }
         }
