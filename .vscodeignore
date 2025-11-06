@@ -16,7 +16,6 @@ out/**
 node_modules/**
 *.map
 **/*.ts
-!out/**/*.js
 tsconfig.json
 .eslintrc.json
 .eslintignore
