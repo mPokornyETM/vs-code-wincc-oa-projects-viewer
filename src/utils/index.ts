@@ -2,6 +2,7 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 import { WinCCOAProject, WinCCOAManager, WinCCOAProjectState } from '../types';
+import { PmonComponent } from '../types/components/implementations';
 
 /**
  * Gets the platform-specific path to the pvssInst.conf file
@@ -114,34 +115,11 @@ export function canUnregisterProject(project: WinCCOAProject): { canUnregister: 
  * Gets the WCCILpmon executable path for a specific version
  * @param version - Optional version string
  * @returns Path to WCCILpmon executable or null if not found
+ * @deprecated Use PmonComponent instance instead
  */
 export function getWCCILpmonPath(version?: string): string | null {
-    if (os.platform() !== 'win32') {
-        // On non-Windows platforms, assume pmon is in PATH
-        return 'pmon';
-    }
-
-    // Windows-specific logic
-    const basePath = 'C:\\Program Files\\Siemens\\WinCC_OA';
-
-    if (version) {
-        // Try specific version first
-        const versionPath = path.join(basePath, version, 'bin', 'WCCILpmon.exe');
-        if (fs.existsSync(versionPath)) {
-            return versionPath;
-        }
-    }
-
-    // Find the highest available version
-    const availableVersions = getAvailableWinCCOAVersions();
-    for (const availableVersion of availableVersions) {
-        const pmonPath = buildWCCILpmonPathFromInstallation(path.join(basePath, availableVersion));
-        if (fs.existsSync(pmonPath)) {
-            return pmonPath;
-        }
-    }
-
-    return null;
+    const pmon = new PmonComponent();
+    return pmon.getPath();
 }
 
 /**
@@ -364,3 +342,6 @@ export function parseManagerStatus(output: string): { managers: WinCCOAManager[]
 
     return { managers };
 }
+
+// Re-export WinCC OA path utilities
+export { getWinCCOAInstallationPathByVersion } from './winccoa-paths';
