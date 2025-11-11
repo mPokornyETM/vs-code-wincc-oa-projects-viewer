@@ -2,7 +2,7 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 import { WinCCOAProject, WinCCOAManager, WinCCOAProjectState } from '../types';
-import { getAvailableWinCCOAVersions, getWinCCOAInstallationPathByVersion } from './winccoa-paths';
+import * as winccOAPaths from './winccoa-paths';
 
 /**
  * Gets the platform-specific path to the pvssInst.conf file
@@ -62,9 +62,9 @@ export function extractVersionFromProject(project: WinCCOAProject): string | nul
         }
 
         // Try to match installation directory with known WinCC OA versions
-        const oaVersions = getAvailableWinCCOAVersions();
+        const oaVersions = winccOAPaths.getAvailableWinCCOAVersions();
         for (const version of oaVersions) {
-            const oaInstallPath = getWinCCOAInstallationPathByVersion(version);
+            const oaInstallPath = winccOAPaths.getWinCCOAInstallationPathByVersion(version);
             if (oaInstallPath && project.config.installationDir.startsWith(oaInstallPath)) {
                 return version;
             }
@@ -106,9 +106,9 @@ export function isWinCCOADeliveredSubProject(project: WinCCOAProject): boolean {
     // Normalize the project path for comparison (handle both Windows and Unix paths)
     const normalizedProjectPath = project.config.installationDir.replace(/\\/g, '/').toLowerCase();
 
-    const oaVersions = getAvailableWinCCOAVersions();
+    const oaVersions = winccOAPaths.getAvailableWinCCOAVersions();
     for (const version of oaVersions) {
-        const oaInstallPath = getWinCCOAInstallationPathByVersion(version);
+        const oaInstallPath = winccOAPaths.getWinCCOAInstallationPathByVersion(version);
         if (oaInstallPath) {
             // Normalize the OA install path for comparison
             const normalizedOAPath = oaInstallPath.replace(/\\/g, '/').toLowerCase();
