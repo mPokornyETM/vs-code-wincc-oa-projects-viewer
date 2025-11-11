@@ -133,12 +133,12 @@ suite('WinCC OA Core Functionality Tests', () => {
         test('isWinCCOADeliveredSubProject should handle Unix paths', () => {
             // Use actual detected WinCC OA installations
             const detectedVersions = getAvailableWinCCOAVersions();
-            
+
             if (detectedVersions.length > 0) {
                 // Test with first detected version
                 const version = detectedVersions[0];
                 const oaPath = getWinCCOAInstallationPathByVersion(version);
-                
+
                 if (oaPath) {
                     // Create a Unix-style path for testing path normalization
                     const unixStylePath = oaPath.replace(/\\/g, '/') + '/projects/BACnet_3.20';

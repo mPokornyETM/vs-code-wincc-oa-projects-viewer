@@ -99,7 +99,7 @@ suite('WinCC OA Projects Extension Test Suite', () => {
         test('should identify WinCC OA delivered sub-projects', () => {
             // Get actual detected WinCC OA versions for realistic testing
             const detectedVersions = getAvailableWinCCOAVersions();
-            
+
             if (detectedVersions.length > 0) {
                 // Test with actual detected installation paths
                 detectedVersions.forEach(version => {

@@ -255,10 +255,7 @@ suite('WinCC OA Pmon Management Tests', () => {
                 assert.ok(error instanceof Error);
                 // The actual error might be from process execution, missing executable, or failed to start
                 // Just check that an error was thrown - the specific message varies by system
-                assert.ok(
-                    error.message.length > 0,
-                    `Expected error to have a message, got: ${error.message}`
-                );
+                assert.ok(error.message.length > 0, `Expected error to have a message, got: ${error.message}`);
             }
         });
 

@@ -99,17 +99,21 @@ suite('Direct Function Tests', () => {
     test('isWinCCOADeliveredSubProject should identify delivered projects', () => {
         // Use actual detected WinCC OA installations for realistic testing
         const detectedVersions = getAvailableWinCCOAVersions();
-        
+
         if (detectedVersions.length > 0) {
             const version = detectedVersions[0];
             const oaPath = getWinCCOAInstallationPathByVersion(version);
             if (oaPath) {
                 const deliveredPath = path.join(oaPath, 'projects', 'OPC_UA');
-                const mockProject = createMockWinCCOAProject({
-                    name: 'OPC_UA',
-                    installationDir: deliveredPath,
-                    notRunnable: true
-                }, undefined, false); // Set isRunnable to false
+                const mockProject = createMockWinCCOAProject(
+                    {
+                        name: 'OPC_UA',
+                        installationDir: deliveredPath,
+                        notRunnable: true
+                    },
+                    undefined,
+                    false
+                ); // Set isRunnable to false
 
                 const result = isWinCCOADeliveredSubProject(mockProject);
                 assert.strictEqual(result, true);
@@ -241,17 +245,21 @@ suite('Direct Function Tests', () => {
     test('isWinCCOADeliveredSubProject should handle various path patterns', () => {
         // Use actual detected WinCC OA installations
         const detectedVersions = getAvailableWinCCOAVersions();
-        
+
         if (detectedVersions.length > 0) {
             const version = detectedVersions[0];
             const oaPath = getWinCCOAInstallationPathByVersion(version);
             if (oaPath) {
                 // Test delivered project under WinCC OA installation
-                const project1 = createMockWinCCOAProject({
-                    name: 'OPC_UA',
-                    installationDir: path.join(oaPath, 'projects', 'OPC_UA'),
-                    notRunnable: true
-                }, undefined, false); // Set isRunnable to false
+                const project1 = createMockWinCCOAProject(
+                    {
+                        name: 'OPC_UA',
+                        installationDir: path.join(oaPath, 'projects', 'OPC_UA'),
+                        notRunnable: true
+                    },
+                    undefined,
+                    false
+                ); // Set isRunnable to false
                 assert.strictEqual(isWinCCOADeliveredSubProject(project1), true);
             }
         }
