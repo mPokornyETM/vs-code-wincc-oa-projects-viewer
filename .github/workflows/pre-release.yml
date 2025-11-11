@@ -205,7 +205,7 @@ jobs:
                   # For pre-releases, we DON'T push version changes back to develop
                   # This avoids branch protection conflicts since we don't need to commit to develop
                   # The version bump is only in package.json for building the release artifact
-                  
+
                   echo "ℹ️  Pre-release version $VERSION is tag-only (not committed to develop)"
                   echo "📌 This prevents branch protection conflicts"
                   echo "✅ The develop branch package.json remains unchanged"
@@ -273,6 +273,29 @@ jobs:
                   generate_release_notes: true
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Delete Old Pre-Releases
+              run: |
+                  echo "🧹 Cleaning up old pre-releases..."
+                  
+                  # Get all pre-releases sorted by creation date (newest first)
+                  PRERELEASES=$(gh release list --limit 100 --json tagName,isPrerelease,createdAt --jq '.[] | select(.isPrerelease == true) | .tagName' | sort -r)
+                  
+                  # Skip the first (latest) pre-release
+                  OLD_PRERELEASES=$(echo "$PRERELEASES" | tail -n +2)
+                  
+                  if [ -z "$OLD_PRERELEASES" ]; then
+                    echo "✅ No old pre-releases to delete"
+                  else
+                    echo "🗑️  Deleting old pre-releases:"
+                    for TAG in $OLD_PRERELEASES; do
+                      echo "  - Deleting $TAG"
+                      gh release delete "$TAG" --yes --cleanup-tag || echo "⚠️  Failed to delete $TAG"
+                    done
+                    echo "✅ Old pre-releases cleaned up, kept only: v${{ steps.release.outputs.version }}"
+                  fi
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     notify-success:
         runs-on: ubuntu-latest
