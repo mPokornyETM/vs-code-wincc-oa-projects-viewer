@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import * as os from 'os';
 import * as path from 'path';
+import * as sinon from 'sinon';
 
 // Import functions and classes from extension
 import {
@@ -19,7 +20,7 @@ import {
     deactivate
 } from '../extension';
 import { extractVersionFromProject, isWinCCOADeliveredSubProject } from '../utils';
-import { getAvailableWinCCOAVersions, getWinCCOAInstallationPathByVersion } from '../utils/winccoa-paths';
+import * as winccOAPaths from '../utils/winccoa-paths';
 
 // Helper function to create mock WinCCOA project
 function createMockProject(config: any): any {
@@ -131,28 +132,27 @@ suite('WinCC OA Core Functionality Tests', () => {
         });
 
         test('isWinCCOADeliveredSubProject should handle Unix paths', () => {
-            // Use actual detected WinCC OA installations
-            const detectedVersions = getAvailableWinCCOAVersions();
+            // Mock WinCC OA detection functions for CI environments
+            const getAvailableVersionsStub = sinon.stub(winccOAPaths, 'getAvailableWinCCOAVersions');
+            const getInstallPathStub = sinon.stub(winccOAPaths, 'getWinCCOAInstallationPathByVersion');
 
-            if (detectedVersions.length > 0) {
-                // Test with first detected version
-                const version = detectedVersions[0];
-                const oaPath = getWinCCOAInstallationPathByVersion(version);
+            try {
+                // Setup mock: Simulate WinCC OA 3.20 installed at /opt/WinCC_OA/3.20
+                getAvailableVersionsStub.returns(['3.20']);
+                getInstallPathStub.withArgs('3.20').returns('/opt/WinCC_OA/3.20');
 
-                if (oaPath) {
-                    // Create a Unix-style path for testing path normalization
-                    const unixStylePath = oaPath.replace(/\\/g, '/') + '/projects/BACnet_3.20';
-                    const project = createMockProject({
-                        installationDir: unixStylePath,
-                        notRunnable: true
-                    });
-                    const isDelivered = isWinCCOADeliveredSubProject(project);
-                    assert.strictEqual(isDelivered, true);
-                }
-            } else {
-                // If no WinCC OA detected, skip test
-                console.log('⚠️  No WinCC OA installations detected, skipping Unix path test');
-                assert.ok(true);
+                // Create a Unix-style path for testing path normalization
+                const unixStylePath = '/opt/WinCC_OA/3.20/projects/BACnet_3.20';
+                const project = createMockProject({
+                    installationDir: unixStylePath,
+                    notRunnable: true
+                });
+                const isDelivered = isWinCCOADeliveredSubProject(project);
+                assert.strictEqual(isDelivered, true);
+            } finally {
+                // Restore original functions
+                getAvailableVersionsStub.restore();
+                getInstallPathStub.restore();
             }
         });
     });

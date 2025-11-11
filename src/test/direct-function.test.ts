@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import * as path from 'path';
+import * as sinon from 'sinon';
 
 // Import functions directly from extension for direct testing
 import * as vscode from 'vscode';
@@ -19,7 +20,7 @@ import {
     WinCCOAProjectState
 } from '../extension';
 import { extractVersionFromProject, isWinCCOADeliveredSubProject } from '../utils';
-import { getAvailableWinCCOAVersions, getWinCCOAInstallationPathByVersion } from '../utils/winccoa-paths';
+import * as winccOAPaths from '../utils/winccoa-paths';
 
 // Helper function to create mock WinCCOAProject
 function createMockWinCCOAProject(
@@ -97,31 +98,32 @@ suite('Direct Function Tests', () => {
     });
 
     test('isWinCCOADeliveredSubProject should identify delivered projects', () => {
-        // Use actual detected WinCC OA installations for realistic testing
-        const detectedVersions = getAvailableWinCCOAVersions();
+        // Mock WinCC OA detection functions for CI environments
+        const getAvailableVersionsStub = sinon.stub(winccOAPaths, 'getAvailableWinCCOAVersions');
+        const getInstallPathStub = sinon.stub(winccOAPaths, 'getWinCCOAInstallationPathByVersion');
 
-        if (detectedVersions.length > 0) {
-            const version = detectedVersions[0];
-            const oaPath = getWinCCOAInstallationPathByVersion(version);
-            if (oaPath) {
-                const deliveredPath = path.join(oaPath, 'projects', 'OPC_UA');
-                const mockProject = createMockWinCCOAProject(
-                    {
-                        name: 'OPC_UA',
-                        installationDir: deliveredPath,
-                        notRunnable: true
-                    },
-                    undefined,
-                    false
-                ); // Set isRunnable to false
+        try {
+            // Setup mock: Simulate WinCC OA 3.20 installed at /opt/WinCC_OA/3.20
+            getAvailableVersionsStub.returns(['3.20', '3.19']);
+            getInstallPathStub.withArgs('3.20').returns('/opt/WinCC_OA/3.20');
+            getInstallPathStub.withArgs('3.19').returns('/opt/WinCC_OA/3.19');
 
-                const result = isWinCCOADeliveredSubProject(mockProject);
-                assert.strictEqual(result, true);
-            }
-        } else {
-            // If no WinCC OA detected, test should pass (skip)
-            console.log('⚠️  No WinCC OA installations detected, skipping test');
-            assert.ok(true);
+            const mockProject = createMockWinCCOAProject(
+                {
+                    name: 'OPC_UA',
+                    installationDir: '/opt/WinCC_OA/3.20/projects/OPC_UA',
+                    notRunnable: true
+                },
+                undefined,
+                false
+            ); // Set isRunnable to false
+
+            const result = isWinCCOADeliveredSubProject(mockProject);
+            assert.strictEqual(result, true);
+        } finally {
+            // Restore original functions
+            getAvailableVersionsStub.restore();
+            getInstallPathStub.restore();
         }
     });
 
@@ -243,40 +245,45 @@ suite('Direct Function Tests', () => {
     });
 
     test('isWinCCOADeliveredSubProject should handle various path patterns', () => {
-        // Use actual detected WinCC OA installations
-        const detectedVersions = getAvailableWinCCOAVersions();
+        // Mock WinCC OA detection functions for CI environments
+        const getAvailableVersionsStub = sinon.stub(winccOAPaths, 'getAvailableWinCCOAVersions');
+        const getInstallPathStub = sinon.stub(winccOAPaths, 'getWinCCOAInstallationPathByVersion');
 
-        if (detectedVersions.length > 0) {
-            const version = detectedVersions[0];
-            const oaPath = getWinCCOAInstallationPathByVersion(version);
-            if (oaPath) {
-                // Test delivered project under WinCC OA installation
-                const project1 = createMockWinCCOAProject(
-                    {
-                        name: 'OPC_UA',
-                        installationDir: path.join(oaPath, 'projects', 'OPC_UA'),
-                        notRunnable: true
-                    },
-                    undefined,
-                    false
-                ); // Set isRunnable to false
-                assert.strictEqual(isWinCCOADeliveredSubProject(project1), true);
-            }
+        try {
+            // Setup mock: Simulate WinCC OA 3.20 installed at C:\Siemens\Automation\WinCC_OA\3.20
+            getAvailableVersionsStub.returns(['3.20']);
+            getInstallPathStub.withArgs('3.20').returns('C:\\Siemens\\Automation\\WinCC_OA\\3.20');
+
+            // Test delivered project under WinCC OA installation
+            const project1 = createMockWinCCOAProject(
+                {
+                    name: 'OPC_UA',
+                    installationDir: 'C:\\Siemens\\Automation\\WinCC_OA\\3.20\\projects\\OPC_UA',
+                    notRunnable: true
+                },
+                undefined,
+                false
+            ); // Set isRunnable to false
+            assert.strictEqual(isWinCCOADeliveredSubProject(project1), true);
+
+            // User project path (outside WinCC OA installation)
+            const project2 = createMockWinCCOAProject({
+                name: 'UserProject',
+                installationDir: 'C:\\MyProjects\\UserProject'
+            });
+            assert.strictEqual(isWinCCOADeliveredSubProject(project2), false);
+
+            // Project with missing installationDir should handle gracefully
+            const project3 = createMockWinCCOAProject({
+                name: 'TestProject',
+                installationDir: '' // Empty installation dir
+            });
+            assert.strictEqual(isWinCCOADeliveredSubProject(project3), false);
+        } finally {
+            // Restore original functions
+            getAvailableVersionsStub.restore();
+            getInstallPathStub.restore();
         }
-
-        // User project path (outside WinCC OA installation)
-        const project2 = createMockWinCCOAProject({
-            name: 'UserProject',
-            installationDir: 'C:\\MyProjects\\UserProject'
-        });
-        assert.strictEqual(isWinCCOADeliveredSubProject(project2), false);
-
-        // Project with missing installationDir should handle gracefully
-        const project3 = createMockWinCCOAProject({
-            name: 'TestProject',
-            installationDir: '' // Empty installation dir
-        });
-        assert.strictEqual(isWinCCOADeliveredSubProject(project3), false);
     });
 
     test('parseManagerList should parse MGRLIST:LIST output correctly', () => {
