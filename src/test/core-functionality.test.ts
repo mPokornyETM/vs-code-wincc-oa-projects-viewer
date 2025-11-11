@@ -102,33 +102,75 @@ suite('WinCC OA Core Functionality Tests', () => {
 
     suite('Project Classification', () => {
         test('isWinCCOADeliveredSubProject should identify delivered projects', () => {
-            const project = createMockProject({
-                name: 'OPC_UA',
-                installationDir: 'C:\\Siemens\\Automation\\WinCC_OA\\3.20\\projects\\OPC_UA_3.20',
-                notRunnable: true
-            });
-            const isDelivered = isWinCCOADeliveredSubProject(project);
-            assert.strictEqual(isDelivered, true);
+            // Mock WinCC OA detection functions for CI environments
+            const getAvailableVersionsStub = sinon.stub(winccOAPaths, 'getAvailableWinCCOAVersions');
+            const getInstallPathStub = sinon.stub(winccOAPaths, 'getWinCCOAInstallationPathByVersion');
+
+            try {
+                // Setup mock: Simulate WinCC OA 3.20 installed at C:\Siemens\Automation\WinCC_OA\3.20
+                getAvailableVersionsStub.returns(['3.20', '3.19']);
+                getInstallPathStub.withArgs('3.20').returns('C:\\Siemens\\Automation\\WinCC_OA\\3.20');
+                getInstallPathStub.withArgs('3.19').returns('C:\\Siemens\\Automation\\WinCC_OA\\3.19');
+
+                const project = createMockProject({
+                    name: 'OPC_UA',
+                    installationDir: 'C:\\Siemens\\Automation\\WinCC_OA\\3.20\\projects\\OPC_UA_3.20',
+                    notRunnable: true
+                });
+                const isDelivered = isWinCCOADeliveredSubProject(project);
+                assert.strictEqual(isDelivered, true);
+            } finally {
+                getAvailableVersionsStub.restore();
+                getInstallPathStub.restore();
+            }
         });
 
         test('isWinCCOADeliveredSubProject should identify user projects', () => {
-            const project = createMockProject({
-                name: 'MyCustomProject',
-                installationDir: 'C:\\MyProjects\\CustomProject',
-                notRunnable: true
-            });
-            const isDelivered = isWinCCOADeliveredSubProject(project);
-            assert.strictEqual(isDelivered, false);
+            // Mock WinCC OA detection functions for CI environments
+            const getAvailableVersionsStub = sinon.stub(winccOAPaths, 'getAvailableWinCCOAVersions');
+            const getInstallPathStub = sinon.stub(winccOAPaths, 'getWinCCOAInstallationPathByVersion');
+
+            try {
+                // Setup mock: Simulate WinCC OA 3.20 installed at C:\Siemens\Automation\WinCC_OA\3.20
+                getAvailableVersionsStub.returns(['3.20', '3.19']);
+                getInstallPathStub.withArgs('3.20').returns('C:\\Siemens\\Automation\\WinCC_OA\\3.20');
+                getInstallPathStub.withArgs('3.19').returns('C:\\Siemens\\Automation\\WinCC_OA\\3.19');
+
+                const project = createMockProject({
+                    name: 'MyCustomProject',
+                    installationDir: 'C:\\MyProjects\\CustomProject',
+                    notRunnable: true
+                });
+                const isDelivered = isWinCCOADeliveredSubProject(project);
+                assert.strictEqual(isDelivered, false);
+            } finally {
+                getAvailableVersionsStub.restore();
+                getInstallPathStub.restore();
+            }
         });
 
         test('isWinCCOADeliveredSubProject should be not runnable projects', () => {
-            const project = createMockProject({
-                name: 'MyCustomProject',
-                installationDir: 'C:\\MyProjects\\CustomProject',
-                notRunnable: false // means it's runnable
-            });
-            const isDelivered = isWinCCOADeliveredSubProject(project);
-            assert.strictEqual(isDelivered, false);
+            // Mock WinCC OA detection functions for CI environments
+            const getAvailableVersionsStub = sinon.stub(winccOAPaths, 'getAvailableWinCCOAVersions');
+            const getInstallPathStub = sinon.stub(winccOAPaths, 'getWinCCOAInstallationPathByVersion');
+
+            try {
+                // Setup mock: Simulate WinCC OA 3.20 installed at C:\Siemens\Automation\WinCC_OA\3.20
+                getAvailableVersionsStub.returns(['3.20', '3.19']);
+                getInstallPathStub.withArgs('3.20').returns('C:\\Siemens\\Automation\\WinCC_OA\\3.20');
+                getInstallPathStub.withArgs('3.19').returns('C:\\Siemens\\Automation\\WinCC_OA\\3.19');
+
+                const project = createMockProject({
+                    name: 'MyCustomProject',
+                    installationDir: 'C:\\MyProjects\\CustomProject',
+                    notRunnable: false // means it's runnable
+                });
+                const isDelivered = isWinCCOADeliveredSubProject(project);
+                assert.strictEqual(isDelivered, false);
+            } finally {
+                getAvailableVersionsStub.restore();
+                getInstallPathStub.restore();
+            }
         });
 
         test('isWinCCOADeliveredSubProject should handle Unix paths', () => {

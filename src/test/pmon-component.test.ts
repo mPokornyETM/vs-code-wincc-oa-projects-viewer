@@ -9,6 +9,7 @@
  */
 
 import * as assert from 'assert';
+import * as sinon from 'sinon';
 import { PmonComponent } from '../types/components/implementations/PmonComponent';
 
 suite('PmonComponent Tests', () => {
@@ -297,6 +298,12 @@ suite('PmonComponent Tests', () => {
 
     suite('Callback Tests', () => {
         test('registerSubProject should call output callback', async () => {
+            // Stub getPath to return a fake path so the test can proceed
+            // The actual execution will fail, but we're testing the callback mechanism
+            const getPathStub = sinon
+                .stub(pmon, 'getPath')
+                .returns('C:\\Siemens\\Automation\\WinCC_OA\\3.20\\bin\\WCCILpmon.exe');
+
             const messages: string[] = [];
             const callback = (msg: string) => messages.push(msg);
 
@@ -304,13 +311,20 @@ suite('PmonComponent Tests', () => {
                 await pmon.registerSubProject('C:\\NonExistent\\Project', callback);
             } catch (error) {
                 // Expected to fail, but callback should have been called
+            } finally {
+                getPathStub.restore();
             }
 
-            // Should have at least some output messages
+            // Should have at least some output messages (even if just the initial messages before spawn fails)
             assert.ok(messages.length > 0, 'Callback should be called with messages');
         });
 
         test('unregisterProject should call output callback', async () => {
+            // Stub getPath to return a fake path
+            const getPathStub = sinon
+                .stub(pmon, 'getPath')
+                .returns('C:\\Siemens\\Automation\\WinCC_OA\\3.20\\bin\\WCCILpmon.exe');
+
             const messages: string[] = [];
             const callback = (msg: string) => messages.push(msg);
 
@@ -318,6 +332,8 @@ suite('PmonComponent Tests', () => {
                 await pmon.unregisterProject('NonExistentProject', callback);
             } catch (error) {
                 // Expected to fail, but callback should have been called
+            } finally {
+                getPathStub.restore();
             }
 
             // Should have at least some output messages
@@ -325,6 +341,11 @@ suite('PmonComponent Tests', () => {
         });
 
         test('registerProject should call output callback', async () => {
+            // Stub getPath to return a fake path
+            const getPathStub = sinon
+                .stub(pmon, 'getPath')
+                .returns('C:\\Siemens\\Automation\\WinCC_OA\\3.20\\bin\\WCCILpmon.exe');
+
             const messages: string[] = [];
             const callback = (msg: string) => messages.push(msg);
 
@@ -332,6 +353,8 @@ suite('PmonComponent Tests', () => {
                 await pmon.registerProject('C:\\NonExistent\\config', callback);
             } catch (error) {
                 // Expected to fail, but callback should have been called
+            } finally {
+                getPathStub.restore();
             }
 
             // Should have at least some output messages
