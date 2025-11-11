@@ -4,3 +4,6 @@ node_modules
 .vscode-test/
 *.vsix
 coverage/
+
+# Pilot phase documentation - not ready for commit
+docs/REFACTORING_SUMMARY.md

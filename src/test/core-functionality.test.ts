@@ -6,8 +6,6 @@ import * as path from 'path';
 // Import functions and classes from extension
 import {
     getPvssInstConfPath,
-    extractVersionFromProject,
-    isWinCCOADeliveredSubProject,
     WinCCOAProjectProvider,
     ProjectCategory,
     getProjects,
@@ -20,6 +18,7 @@ import {
     getCurrentProjectsInfo,
     deactivate
 } from '../extension';
+import { extractVersionFromProject, isWinCCOADeliveredSubProject } from '../utils';
 
 // Helper function to create mock WinCCOA project
 function createMockProject(config: any): any {

@@ -1,7 +1,8 @@
 import * as assert from 'assert';
 
-// Import functions from extension
-import { parseVersionOutput, DetailedVersionInfo } from '../extension';
+// Import functions from version module
+import { parseVersionOutput } from '../version';
+import { DetailedVersionInfo } from '../types';
 
 suite('WinCC OA Version Information - Unit Tests', () => {
     suite('parseVersionOutput Function', () => {

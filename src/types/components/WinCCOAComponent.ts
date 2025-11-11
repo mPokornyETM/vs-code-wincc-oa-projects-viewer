@@ -6,7 +6,7 @@ import { spawn, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import { getWinCCOAInstallationPathByVersion } from '../../utils/winccoa-paths';
-import { getAvailableWinCCOAVersions } from '../../utils';
+import { getAvailableWinCCOAVersions } from '../../utils/winccoa-paths';
 import path from 'path';
 
 /**
@@ -39,6 +39,14 @@ export abstract class WinCCOAComponent {
      * @returns Short description of the component
      */
     public abstract getDescription(): string;
+
+    public setOaVersion(version: string): void {
+        this.OaVersion = version;
+    }
+
+    public getOaVersion(): string | undefined {
+        return this.OaVersion;
+    }
 
     /**
      * Checks if the component executable exists on the file system
@@ -107,6 +115,7 @@ export abstract class WinCCOAComponent {
         }
     }
 
+    /** Returns the component version */
     public async getVersion(): Promise<string | null> {
         try {
             const output = execSync(`"${this.getPath()}" -version`, {
@@ -117,6 +126,118 @@ export abstract class WinCCOAComponent {
         } catch (error: any) {
             this.stdErr = error.message || '';
             return null;
+        }
+    }
+
+    /**
+     * Parses version output from WinCC OA component -version command
+     * @param output - Raw output from component -version
+     * @param executablePath - Path to the component executable
+     * @returns Parsed version information object
+     */
+    public static parseVersionOutput(
+        output: string,
+        executablePath: string
+    ): {
+        version: string;
+        platform: string;
+        architecture: string;
+        buildDate: string;
+        commitHash: string;
+        executablePath: string;
+        rawOutput: string;
+    } {
+        const defaultInfo = {
+            version: 'Unknown',
+            platform: 'Unknown',
+            architecture: 'Unknown',
+            buildDate: 'Unknown',
+            commitHash: 'Unknown',
+            executablePath,
+            rawOutput: output
+        };
+
+        if (!output || output.trim() === '') {
+            return defaultInfo;
+        }
+
+        try {
+            // Handle different timestamp formats and improved regex pattern
+            const versionRegex =
+                /WCCILpmon.*?(\d{4})\.(\d{2})\.(\d{2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3}):\s*(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)\s+platform\s+(\w+(?:\s+\w+)*)\s+linked\s+at\s+(.+?)\s+\(([a-f0-9]+)\)/i;
+            const match = output.match(versionRegex);
+
+            if (match) {
+                // Full parsing successful
+                const [
+                    ,
+                    year,
+                    month,
+                    day,
+                    hour,
+                    minute,
+                    second,
+                    millisecond,
+                    version,
+                    platformAndArch,
+                    buildDate,
+                    commitHash
+                ] = match;
+
+                // Split platform and architecture
+                const platformParts = platformAndArch.trim().split(/\s+/);
+                const platform = platformParts[0] || 'Unknown';
+                const architecture = platformParts.length > 1 ? platformParts.slice(1).join(' ') : 'Unknown';
+
+                return {
+                    version,
+                    platform,
+                    architecture,
+                    buildDate: buildDate.trim(),
+                    commitHash: commitHash.substring(0, 8), // Show first 8 characters
+                    executablePath,
+                    rawOutput: output
+                };
+            }
+
+            // Try partial parsing for cases where build info might be missing
+            const partialRegex = /(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)\s+platform\s+(\w+(?:\s+\w+)*)/i;
+            const partialMatch = output.match(partialRegex);
+
+            if (partialMatch) {
+                const [, version, platformAndArch] = partialMatch;
+                const platformParts = platformAndArch.trim().split(/\s+/);
+                const platform = platformParts[0] || 'Unknown';
+                const architecture = platformParts.length > 1 ? platformParts.slice(1).join(' ') : 'Unknown';
+
+                return {
+                    version,
+                    platform,
+                    architecture,
+                    buildDate: 'Not available',
+                    commitHash: 'Not available',
+                    executablePath,
+                    rawOutput: output
+                };
+            }
+
+            // Try to extract just the version as a fallback
+            const versionOnlyRegex = /(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)/;
+            const versionMatch = output.match(versionOnlyRegex);
+
+            if (versionMatch) {
+                return {
+                    ...defaultInfo,
+                    version: versionMatch[1],
+                    rawOutput: output
+                };
+            }
+
+            // If no patterns match, return default with raw output
+            return defaultInfo;
+        } catch (error) {
+            // If parsing fails, return default info with raw output for debugging
+            return defaultInfo;
         }
     }
 
@@ -215,14 +336,14 @@ export abstract class WinCCOAComponent {
     /**
      * Gets the config path
      */
-    public getConfig(): string | undefined {
+    public getConfigPath(): string | undefined {
         return this.configPath;
     }
 
     /**
      * Sets the config path
      */
-    public setConfig(configPath: string): void {
+    public setConfigPath(configPath: string): void {
         this.configPath = configPath;
         this.projectName = undefined;
     }

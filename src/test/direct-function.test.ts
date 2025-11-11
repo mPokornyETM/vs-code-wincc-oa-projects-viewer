@@ -5,8 +5,6 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import {
     getPvssInstConfPath,
-    extractVersionFromProject,
-    isWinCCOADeliveredSubProject,
     WinCCOAProjectProvider,
     ProjectCategory,
     getProjects,
@@ -20,6 +18,7 @@ import {
     WinCCOAManager,
     WinCCOAProjectState
 } from '../extension';
+import { extractVersionFromProject, isWinCCOADeliveredSubProject } from '../utils';
 
 // Helper function to create mock WinCCOAProject
 function createMockWinCCOAProject(

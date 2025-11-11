@@ -2,13 +2,8 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 
 // Import functions from extension
-import {
-    getPvssInstConfPath,
-    extractVersionFromProject,
-    isWinCCOADeliveredSubProject,
-    WinCCOAProjectProvider,
-    ProjectCategory
-} from '../extension';
+import { getPvssInstConfPath, WinCCOAProjectProvider, ProjectCategory } from '../extension';
+import { extractVersionFromProject, isWinCCOADeliveredSubProject } from '../utils';
 
 // Helper function to create mock WinCCOA project
 function createMockProject(config: any): any {

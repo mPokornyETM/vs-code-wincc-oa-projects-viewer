@@ -1,130 +1,340 @@
-# WinCC OA Component Class API Updates
+# WinCC OA Component Class API Documentation
 
-## New Methods in `WinCCOAComponent` Base Class
+## Overview
 
-### `getName(): string`
+The `WinCCOAComponent` base class provides a unified interface for working with WinCC OA components (executables). Each component type (PMON, EVENT, CTRL, etc.) extends this base class and implements component-specific functionality.
+
+## Base Class: `WinCCOAComponent`
+
+### Abstract Methods (must be implemented by subclasses)
+
+#### `getName(): string`
 
 Returns the executable name without the `.exe` extension.
 
 ```typescript
-const component = createComponent(WinCCOAComponentType.EVENT, executablePath);
-console.log(component.getName()); // "WCCILevent"
+const pmon = new PmonComponent();
+console.log(pmon.getName()); // "WCCILpmon"
 ```
 
-### `getDescription(): string`
+#### `getDescription(): string`
 
-Returns a short description of the component.
+Returns a human-readable description of the component.
 
 ```typescript
-const component = createComponent(WinCCOAComponentType.EVENT, executablePath);
-console.log(component.getDescription()); // "Event Manager"
+const pmon = new PmonComponent();
+console.log(pmon.getDescription()); // "Process Monitor"
 ```
 
-### `static getPath(componentType, version?): string | null`
+### Instance Methods
 
-Static method to find the full path to a component executable. This replaces the standalone `getComponentPath()` function.
+#### `getPath(): string | null`
+
+Gets the full path to the component executable. Searches for the component in the following order:
+
+1. If `setOaVersion()` was called: searches only in that specific WinCC OA installation
+2. Otherwise: searches all installed WinCC OA versions (highest version first)
 
 ```typescript
-// Find PMON component for a specific version
-const pmonPath = WinCCOAComponent.getPath(WinCCOAComponentType.PMON, '3.20');
+const pmon = new PmonComponent();
 
-// Find CTRL component (searches all versions, highest first)
-const ctrlPath = WinCCOAComponent.getPath(WinCCOAComponentType.CTRL);
+// Search all versions
+const path1 = pmon.getPath();
 
-if (ctrlPath) {
-    const ctrl = createComponent(WinCCOAComponentType.CTRL, ctrlPath);
-    console.log(ctrl.getName());        // "WCCOActrl"
-    console.log(ctrl.getDescription()); // "Control Manager"
+// Search specific version
+pmon.setOaVersion('3.20');
+const path2 = pmon.getPath();
+```
+
+#### `exists(): boolean`
+
+Checks if the component executable exists on the file system.
+
+```typescript
+const event = new EventComponent();
+event.setOaVersion('3.20');
+
+if (event.exists()) {
+    console.log('Event manager found');
 }
 ```
 
-## Complete Example
+#### `getVersion(): Promise<string | null>`
+
+Executes the component with `-version` flag and returns the version output.
 
 ```typescript
-import { WinCCOAComponent, WinCCOAComponentType, createComponent } from './types';
+const ctrl = new CtrlComponent();
+ctrl.setOaVersion('3.21');
 
-// Find component path
-const eventPath = WinCCOAComponent.getPath(WinCCOAComponentType.EVENT, '3.20');
+const version = await ctrl.getVersion();
+console.log(version); // e.g., " 3.20.5 platform Windows AMD64 linked at Oct 10 2025 23:15:17 (<sha1>)"
+```
 
-if (eventPath) {
-    // Create component instance
-    const event = createComponent(WinCCOAComponentType.EVENT, eventPath);
-    
-    // Get component info
-    console.log('Name:', event.getName());              // "WCCILevent"
-    console.log('Description:', event.getDescription()); // "Event Manager"
-    console.log('Path:', event.getExecutablePath());     // Full path to executable
-    console.log('Type:', event.getComponentType());      // WinCCOAComponentType.EVENT
-    
-    // Configure component
-    event.setProject('MyProject');
-    
-    // Get version
-    const version = await event.getVersion();
-    console.log('Version:', version);
-    
-    // Start component
-    const exitCode = await event.start(['-num', '1']);
-    console.log('Exit code:', exitCode);
-    console.log('Output:', event.getStdOut());
+#### `getHelp(): Promise<string | null>`
+
+Executes the component with `-help` flag and returns the help text.
+
+```typescript
+const data = new DataComponent();
+const help = await data.getHelp();
+console.log(help);
+```
+
+#### `setOaVersion(version: string): void`
+
+Sets the WinCC OA version to use when searching for the component.
+
+```typescript
+const component = new EventComponent();
+component.setOaVersion('3.20');
+```
+
+#### `setProject(projectName: string): void`
+
+Sets the project name for the component. Used when building command line arguments.
+
+```typescript
+const ctrl = new CtrlComponent();
+ctrl.setProject('MyProject');
+```
+
+#### `setConfigPath(configPath: string): void`
+
+Sets the config file path for the component. Used when building command line arguments.
+
+```typescript
+const pmon = new PmonComponent();
+pmon.setConfigPath('C:\\Projects\\MyProject\\config\\config');
+```
+
+#### `start(args: string[]): Promise<number>`
+
+Starts the component with additional arguments. Returns exit code.
+
+```typescript
+const ctrl = new CtrlComponent();
+ctrl.setProject('MyProject');
+
+const exitCode = await ctrl.start(['-n', 'myscript.ctl']);
+console.log('Exit code:', exitCode);
+console.log('Output:', ctrl.getStdOut());
+```
+
+#### `startDetached(args: string[]): Promise<number>`
+
+Starts the component as a detached background process. Returns process ID.
+
+```typescript
+const pmon = new PmonComponent();
+pmon.setProject('MyProject');
+
+const pid = await pmon.startDetached(['-noAutostart']);
+console.log('Started with PID:', pid);
+```
+
+#### `getStdOut(): string`
+
+Gets the standard output from the last execution.
+
+```typescript
+const component = new EventComponent();
+await component.start(['-help']);
+console.log(component.getStdOut());
+```
+
+#### `getStdErr(): string`
+
+Gets the standard error output from the last execution.
+
+```typescript
+const component = new DataComponent();
+await component.start(['-invalid']);
+console.log(component.getStdErr());
+```
+
+### Static Methods
+
+#### `parseVersionOutput(output: string, executablePath: string)`
+
+Parses version output from WinCC OA component `-version` command.
+
+```typescript
+const versionInfo = WinCCOAComponent.parseVersionOutput(rawOutput, execPath);
+console.log(versionInfo.version);        // "3.20.5"
+console.log(versionInfo.platform);       // "NT"
+console.log(versionInfo.architecture);   // "x86 64"
+console.log(versionInfo.buildDate);      // "Dec 15 2024 10:30:00"
+console.log(versionInfo.commitHash);     // "a1b2c3d4"
+```
+
+## Available Component Classes
+
+All component classes extend `WinCCOAComponent` and implement `getName()` and `getDescription()`:
+
+| Class | Executable Name | Description |
+|-------|-----------------|-------------|
+| `PmonComponent` | WCCILpmon | Process Monitor |
+| `EventComponent` | WCCILevent | Event Manager |
+| `DataComponent` | WCCILdata | Database Manager |
+| `UIComponent` | WCCOAui | User Interface |
+| `CtrlComponent` | WCCOActrl | Control Manager |
+| `DistComponent` | WCCILdist | Distribution Manager |
+| `ReduComponent` | WCCILredu | Redundancy Manager |
+| `AsciiManagerComponent` | WCCOAascii | ASCII Manager |
+| `SplitComponent` | WCCILsplit | Split Mode Manager |
+| `RdbComponent` | WCCOArdb | RDB Archive Manager |
+| `ValueArchManagerComponent` | WCCOAvalarch | Archive Manager |
+| `ReportManagerComponent` | WCCOAreporting | Reporting Manager |
+| `VideoDriverComponent` | WCCOAvideoOA | Video Manager |
+| `HttpComponent` | WCCOAhttp | Web Server |
+| `JavaScriptComponent` | node | JavaScript Manager |
+| `SimComponent` | WCCILsim | Simulation Driver |
+| `OpcUaComponent` | WCCOAopcua | OPC UA Client |
+| `OpcDaComponent` | WCCOAopc | OPC DA Client |
+| `S7Component` | WCCOAs7 | S7 Driver |
+| `ModbusComponent` | WCCOAmod | Modbus Driver |
+| `IEC60870Component` | WCCOAiec | IEC 60870 101/104 Driver |
+| `IEC61850Component` | WCCOAiec61850 | IEC 61850/61400 Client |
+| `DNP3Component` | WCCOAdnp3 | DNP3 Driver |
+
+## Complete Usage Example
+
+```typescript
+import { PmonComponent, CtrlComponent } from './types/components/implementations';
+
+// Create and configure PMON component
+const pmon = new PmonComponent();
+pmon.setOaVersion('3.21');
+pmon.setProject('MyProject');
+
+// Check if component exists
+if (pmon.exists()) {
+    console.log('PMON found at:', pmon.getPath());
+
+    // Get version information
+    const version = await pmon.getVersion();
+    console.log('PMON version:', version);
+
+    // Start PMON with specific options
+    const exitCode = await pmon.start(['-noAutostart']);
+    console.log('PMON started with exit code:', exitCode);
 }
+
+// Create and use CTRL component
+const ctrl = new CtrlComponent();
+ctrl.setOaVersion('3.21');
+ctrl.setProject('MyProject');
+
+// Start a control script
+const ctrlExitCode = await ctrl.startWithScript('myScript.ctl', ['-num', '1']);
+console.log('Script exit code:', ctrlExitCode);
+console.log('Script output:', ctrl.getStdOut());
 ```
 
-## Migration Guide
+## PmonComponent Specific Methods
 
-### Old API (deprecated)
+The `PmonComponent` class extends the base class with pmon-specific operations:
+
+### `registerSubProject(projectPath: string, outputCallback?: (message: string) => void): Promise<void>`
+
+Registers a sub-project using pmon's `-regsubf` option.
 
 ```typescript
-import { getComponentPath, WinCCOAComponentType } from './utils/winccoa-paths';
+const pmon = new PmonComponent();
+pmon.setOaVersion('3.21');
 
-const pmonPath = getComponentPath(WinCCOAComponentType.PMON, '3.20');
+await pmon.registerSubProject(
+    'C:\\Projects\\SubProject',
+    (msg) => console.log(msg)
+);
 ```
 
-### New API (recommended)
+### `unregisterProject(projectName: string, outputCallback?: (message: string) => void): Promise<void>`
+
+Unregisters a project using pmon's `-unreg` option.
 
 ```typescript
-import { WinCCOAComponent, WinCCOAComponentType } from './types';
+const pmon = new PmonComponent();
+pmon.setOaVersion('3.21');
 
-const pmonPath = WinCCOAComponent.getPath(WinCCOAComponentType.PMON, '3.20');
+await pmon.unregisterProject('MyProject', (msg) => console.log(msg));
 ```
 
-## Component Descriptions Map
+### `registerProject(configPath: string, outputCallback?: (message: string) => void): Promise<number>`
 
-All component types now have descriptions:
+Registers a runnable project using pmon's `-config -autofreg -status` options.
 
-| Component Type | Executable Name | Description |
-|----------------|-----------------|-------------|
-| PMON | WCCILpmon | Process Monitor |
-| EVENT | WCCILevent | Event Manager |
-| DATA | WCCILdata | Database Manager |
-| UI | WCCOAui | User Interface |
-| CTRL | WCCOActrl | Control Manager |
-| DIST | WCCILdist | Distribution Manager |
-| REDU | WCCILredu | Redundancy Manager |
-| ASCIIMANAGER | WCCOAascii | ASCII Manager |
-| SPLIT | WCCILsplit | Split Mode Manager |
-| RDB | WCCOArdb | RDB Archive Manager |
-| VALUEARCMANAGER | WCCOAvalarch | Archive Manager |
-| REPORTMANAGER | WCCOAreporting | Reporting Manager |
-| VIDEODRIVER | WCCOAvideoOA | Video Manager |
-| HTTP | webclient_http.ctl | Web Server |
-| JAVASCRIPT | node | JavaScript Manager |
-| SIM | WCCILsim | Simulation Driver |
-| OPCUA | WCCOAopcua | OPC UA Client |
-| OPC / OPCDA | WCCOAopc | OPC DA Client |
-| S7 | WCCOAs7 | S7 Driver |
-| MODBUS | WCCOAmod | Modbus Driver |
-| IEC60870 | WCCOAiec | IEC 60870 101/104 Driver |
-| IEC61850 | WCCOAiec61850 | IEC 61850/61400 Client |
-| DNP3 | WCCOAdnp3 | DNP3 Driver |
-| ... | ... | ... |
+```typescript
+const pmon = new PmonComponent();
+pmon.setOaVersion('3.21');
 
-(See `COMPONENT_DESCRIPTION_MAP` for complete list)
+const exitCode = await pmon.registerProject(
+    'C:\\Projects\\MyProject\\config\\config',
+    (msg) => console.log(msg)
+);
+```
 
-## Benefits
+### Project Control Methods
 
-1. **Cleaner API** - Static method on the class is more intuitive than standalone function
-2. **Better Encapsulation** - Component information methods are part of the component object
-3. **Type Safety** - All methods are properly typed and documented
-4. **Discoverability** - IntelliSense shows all available methods on the component instance
-5. **Consistency** - All component-related functionality is in the `WinCCOAComponent` class
+```typescript
+// Check if project is running
+const isRunning = await pmon.checkProjectStatus('MyProject');
+
+// Start pmon only (without managers)
+await pmon.startPmonOnly('MyProject', (msg) => console.log(msg));
+
+// Start project with all managers
+await pmon.startProject('MyProject', true, (msg) => console.log(msg));
+
+// Stop all managers
+await pmon.stopProject('MyProject', (msg) => console.log(msg));
+
+// Stop all managers and exit pmon
+await pmon.stopProjectAndPmon('MyProject', (msg) => console.log(msg));
+
+// Restart all managers
+await pmon.restartProject('MyProject', (msg) => console.log(msg));
+
+// Set wait mode
+await pmon.setWaitMode('MyProject', (msg) => console.log(msg));
+```
+
+### Manager Control Methods
+
+```typescript
+// Get list of managers
+const managers = await pmon.getManagerList('MyProject');
+console.log('Managers:', managers);
+
+// Get detailed manager status
+const status = await pmon.getDetailedManagerStatus('MyProject');
+console.log('Status:', status);
+
+// Start specific manager by index
+await pmon.startManager('MyProject', 1, (msg) => console.log(msg));
+
+// Stop specific manager
+await pmon.stopManager('MyProject', 1, (msg) => console.log(msg));
+
+// Kill specific manager
+await pmon.killManager('MyProject', 1, (msg) => console.log(msg));
+
+// Remove specific manager
+await pmon.removeManager('MyProject', 1, (msg) => console.log(msg));
+```
+
+## CtrlComponent Specific Methods
+
+### `startWithScript(scriptName: string, additionalArgs: string[] = []): Promise<number>`
+
+Starts the Control Manager with a specific CTL script.
+
+```typescript
+const ctrl = new CtrlComponent();
+ctrl.setOaVersion('3.21');
+ctrl.setProject('MyProject');
+
+const exitCode = await ctrl.startWithScript('myScript.ctl', ['-num', '1']);
+console.log('Script completed with code:', exitCode);
+```

@@ -6,17 +6,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import { spawn } from 'child_process';
-import {
-    getAvailableWinCCOAVersions,
-    findAvailableWinCCOAVersions,
-    getWCCILpmonPath,
-    parseVersionString,
-    getWinCCOAInstallationPath,
-    searchForPmonExecutable,
-    readProjectVersionFromConfig,
-    markProjectAsNotRunnable
-} from '../utils';
-import { WinCCOAProject as ModularWinCCOAProject } from '../types';
+import { readProjectVersionFromConfig } from '../utils';
+import { getAvailableWinCCOAVersions } from '../utils/winccoa-paths';
+import { PmonComponent } from '../types';
 
 // Interface for WinCC OA Project
 export interface WinCCOAProject {
@@ -89,7 +81,20 @@ export function unregisterProjectFromDirectoryCommand(): vscode.Disposable {
 
             if (confirm === 'Yes, Unregister') {
                 try {
-                    await unregisterProjectWithPmon(projectName);
+                    // Find the highest available WinCC OA version
+                    const versions = getAvailableWinCCOAVersions();
+                    if (versions.length === 0) {
+                        throw new Error('No WinCC OA installation found');
+                    }
+
+                    // Create PmonComponent instance
+                    const pmon = new PmonComponent();
+                    pmon.setOaVersion(versions[0]);
+
+                    // Unregister project with output logging
+                    await pmon.unregisterProject(projectName, (message: string) => {
+                        adminOutputChannel.appendLine(message);
+                    });
 
                     // Trigger refresh of project tree
                     await vscode.commands.executeCommand('winccoa.refreshProjects');
@@ -143,7 +148,20 @@ export function unregisterProjectFromTreeViewCommand(): vscode.Disposable {
 
         if (confirm === 'Yes, Unregister') {
             try {
-                await unregisterProjectWithPmon(projectName);
+                // Find the highest available WinCC OA version
+                const versions = getAvailableWinCCOAVersions();
+                if (versions.length === 0) {
+                    throw new Error('No WinCC OA installation found');
+                }
+
+                // Create PmonComponent instance
+                const pmon = new PmonComponent();
+                pmon.setOaVersion(versions[0]);
+
+                // Unregister project with output logging
+                await pmon.unregisterProject(projectName, (message: string) => {
+                    adminOutputChannel.appendLine(message);
+                });
 
                 // Trigger refresh of project tree
                 await vscode.commands.executeCommand('winccoa.refreshProjects');
@@ -201,23 +219,9 @@ async function registerWinCCOAProject(configPath: string): Promise<void> {
             return;
         }
 
-        // Get pmon path based on project version
-        const pmonPath = await searchForPmonExecutable(version);
-
-        // Check if pmon executable exists
-        if (!pmonPath) {
-            const errorMsg = `Cannot register project: No WinCC OA pmon executable found for version ${version}. Please ensure WinCC OA ${version} is properly installed and registered.`;
-            adminOutputChannel.appendLine(`ERROR: ${errorMsg}`);
-            vscode.window.showErrorMessage(errorMsg);
-            return;
-        }
-
-        if (!fs.existsSync(pmonPath)) {
-            const errorMsg = `Cannot register project: WinCC OA pmon executable not found at detected path: ${pmonPath}. The installation may be corrupted or moved.`;
-            adminOutputChannel.appendLine(`ERROR: ${errorMsg}`);
-            vscode.window.showErrorMessage(errorMsg);
-            return;
-        }
+        // Create PmonComponent instance with the project version
+        const pmon = new PmonComponent();
+        pmon.setOaVersion(version);
 
         // Show progress while registering
         await vscode.window.withProgress(
@@ -229,74 +233,33 @@ async function registerWinCCOAProject(configPath: string): Promise<void> {
             async progress => {
                 progress.report({ increment: 0, message: 'Starting pmon registration...' });
 
-                return new Promise<void>((resolve, reject) => {
-                    const command = `"${pmonPath}"`;
-                    const args = ['-config', `"${configPath}"`, '-log', '+stderr', '-autofreg', '-status'];
-
-                    const fullCommand = `${command} ${args.join(' ')}`;
-                    adminOutputChannel.appendLine(`Executing command: ${fullCommand}`);
+                try {
                     adminOutputChannel.show(true);
 
-                    const child = spawn(command, args, {
-                        shell: true,
-                        stdio: ['pipe', 'pipe', 'pipe']
-                    });
-
-                    let stdout = '';
-                    let stderr = '';
-
-                    child.stdout?.on('data', data => {
-                        const output = data.toString();
-                        stdout += output;
-                        adminOutputChannel.append(output);
-                        progress.report({ increment: 25, message: 'Processing...' });
-                    });
-
-                    child.stderr?.on('data', data => {
-                        const output = data.toString();
-                        stderr += output;
-                        adminOutputChannel.append(`[STDERR] ${output}`);
-                    });
-
-                    child.on('close', code => {
-                        progress.report({ increment: 100, message: 'Completed' });
-
-                        adminOutputChannel.appendLine(`\npmon process exited with code: ${code}`);
-                        adminOutputChannel.appendLine('--- Command execution completed ---\n');
-
-                        // Only exit codes 0 and 3 indicate successful registration
-                        if (code === 0 || code === 3) {
-                            const successMsg = `WinCC OA project registered successfully! (Exit code: ${code})`;
-                            adminOutputChannel.appendLine(`SUCCESS: ${successMsg}`);
-                            vscode.window.showInformationMessage(successMsg);
-
-                            // Trigger refresh of project tree and select project
-                            vscode.commands.executeCommand('winccoa.refreshProjects').then(() => {
-                                vscode.commands.executeCommand('winccoa.selectProject', projectDir);
-                            });
-
-                            resolve();
-                        } else {
-                            const errorMessage = `Failed to register WinCC OA project. Exit code: ${code}`;
-                            adminOutputChannel.appendLine(`ERROR: ${errorMessage}`);
-                            if (stderr) {
-                                adminOutputChannel.appendLine(`STDERR: ${stderr}`);
-                            }
-                            if (stdout) {
-                                adminOutputChannel.appendLine(`STDOUT: ${stdout}`);
-                            }
-                            vscode.window.showErrorMessage(errorMessage);
-                            reject(new Error(errorMessage));
+                    // Register project with output logging
+                    const exitCode = await pmon.registerProject(configPath, (message: string) => {
+                        adminOutputChannel.appendLine(message);
+                        if (!message.startsWith('[STDERR]') && !message.startsWith('\n')) {
+                            progress.report({ increment: 25, message: 'Processing...' });
                         }
                     });
 
-                    child.on('error', error => {
-                        const errorMessage = `Failed to start pmon process: ${error.message}`;
-                        adminOutputChannel.appendLine(`ERROR: ${errorMessage}`);
-                        vscode.window.showErrorMessage(errorMessage);
-                        reject(error);
-                    });
-                });
+                    progress.report({ increment: 100, message: 'Completed' });
+
+                    const successMsg = `WinCC OA project registered successfully! (Exit code: ${exitCode})`;
+                    adminOutputChannel.appendLine(`SUCCESS: ${successMsg}`);
+                    vscode.window.showInformationMessage(successMsg);
+
+                    // Trigger refresh of project tree and select project
+                    await vscode.commands.executeCommand('winccoa.refreshProjects');
+                    await vscode.commands.executeCommand('winccoa.selectProject', projectDir);
+                } catch (error) {
+                    progress.report({ increment: 100, message: 'Failed' });
+                    const errorMessage = `Failed to register WinCC OA project: ${error}`;
+                    adminOutputChannel.appendLine(`ERROR: ${errorMessage}`);
+                    vscode.window.showErrorMessage(errorMessage);
+                    throw error;
+                }
             }
         );
     } catch (error) {
@@ -344,7 +307,14 @@ async function registerWinCCOASubProject(projectPath: string): Promise<void> {
                 progress.report({ increment: 0, message: 'Starting sub-project registration...' });
 
                 try {
-                    await registerSubProjectWithPmon(projectPath, version);
+                    // Create PmonComponent instance with the selected version
+                    const pmon = new PmonComponent();
+                    pmon.setOaVersion(version);
+
+                    // Register sub-project with output logging
+                    await pmon.registerSubProject(projectPath, (message: string) => {
+                        adminOutputChannel.appendLine(message);
+                    });
 
                     progress.report({ increment: 100, message: 'Completed' });
 
@@ -368,155 +338,6 @@ async function registerWinCCOASubProject(projectPath: string): Promise<void> {
         adminOutputChannel.appendLine(`ERROR: ${errorMsg}`);
         vscode.window.showErrorMessage(errorMsg);
     }
-}
-
-// Helper function to register sub-project using -regsubf option
-async function registerSubProjectWithPmon(projectPath: string, version: string): Promise<void> {
-    const installationPath = getWinCCOAInstallationPath(version);
-    if (!installationPath) {
-        throw new Error(`WinCC OA installation not found for version ${version}`);
-    }
-
-    const isWindows = os.platform() === 'win32';
-    const pmonExecutable = isWindows ? 'WCCILpmon.exe' : 'WCCILpmon';
-    const pmonPath = path.join(installationPath, 'bin', pmonExecutable);
-
-    if (!fs.existsSync(pmonPath)) {
-        throw new Error(`pmon executable not found at ${pmonPath}`);
-    }
-
-    adminOutputChannel.appendLine(`Registering sub-project: ${projectPath}`);
-    adminOutputChannel.appendLine(`Using WinCC OA version: ${version}`);
-    adminOutputChannel.appendLine(`pmon path: ${pmonPath}`);
-
-    // Use -regsubf option to register sub-project
-    const args = ['-regsubf', '-proj', projectPath, '-log', '+stderr'];
-
-    adminOutputChannel.appendLine(`Executing: ${pmonPath} ${args.join(' ')}`);
-
-    return new Promise((resolve, reject) => {
-        const process = spawn(pmonPath, args, {
-            cwd: path.dirname(pmonPath),
-            stdio: ['pipe', 'pipe', 'pipe']
-        });
-
-        let stdout = '';
-        let stderr = '';
-
-        process.stdout?.on('data', data => {
-            const output = data.toString();
-            stdout += output;
-            adminOutputChannel.append(output);
-        });
-
-        process.stderr?.on('data', data => {
-            const output = data.toString();
-            stderr += output;
-            adminOutputChannel.append(output);
-        });
-
-        process.on('close', code => {
-            adminOutputChannel.appendLine(`\nProcess exited with code: ${code}`);
-
-            // Success codes: 0 (success), 3 (already registered)
-            if (code === 0 || code === 3) {
-                adminOutputChannel.appendLine('Sub-project registration completed successfully!');
-                resolve();
-            } else {
-                const errorMsg = `Sub-project registration failed with exit code ${code}`;
-                adminOutputChannel.appendLine(errorMsg);
-                if (stderr) {
-                    adminOutputChannel.appendLine(`Error details: ${stderr}`);
-                }
-                reject(new Error(errorMsg));
-            }
-        });
-
-        process.on('error', error => {
-            const errorMsg = `Failed to start pmon process: ${error.message}`;
-            adminOutputChannel.appendLine(errorMsg);
-            reject(new Error(errorMsg));
-        });
-    });
-}
-
-// Helper function to unregister project using -unreg option
-async function unregisterProjectWithPmon(projectName: string, version?: string): Promise<void> {
-    // Find a suitable WinCC OA version if not provided
-    if (!version) {
-        const versions = getAvailableWinCCOAVersions();
-        if (versions.length === 0) {
-            throw new Error('No WinCC OA installation found');
-        }
-        version = versions[0]; // Use the highest version
-    }
-
-    const installationPath = getWinCCOAInstallationPath(version);
-    if (!installationPath) {
-        throw new Error(`WinCC OA installation not found for version ${version}`);
-    }
-
-    const isWindows = os.platform() === 'win32';
-    const pmonExecutable = isWindows ? 'WCCILpmon.exe' : 'WCCILpmon';
-    const pmonPath = path.join(installationPath, 'bin', pmonExecutable);
-
-    if (!fs.existsSync(pmonPath)) {
-        throw new Error(`pmon executable not found at ${pmonPath}`);
-    }
-
-    adminOutputChannel.appendLine(`Unregistering project: ${projectName}`);
-    adminOutputChannel.appendLine(`Using WinCC OA version: ${version}`);
-    adminOutputChannel.appendLine(`pmon path: ${pmonPath}`);
-
-    // Use -unreg option to unregister project
-    const args = ['-unreg', projectName, '-log', '+stderr'];
-
-    adminOutputChannel.appendLine(`Executing: ${pmonPath} ${args.join(' ')}`);
-
-    return new Promise((resolve, reject) => {
-        const process = spawn(pmonPath, args, {
-            cwd: path.dirname(pmonPath),
-            stdio: ['pipe', 'pipe', 'pipe']
-        });
-
-        let stdout = '';
-        let stderr = '';
-
-        process.stdout?.on('data', data => {
-            const output = data.toString();
-            stdout += output;
-            adminOutputChannel.append(output);
-        });
-
-        process.stderr?.on('data', data => {
-            const output = data.toString();
-            stderr += output;
-            adminOutputChannel.append(output);
-        });
-
-        process.on('close', code => {
-            adminOutputChannel.appendLine(`\nProcess exited with code: ${code}`);
-
-            // Success code: 0 (success)
-            if (code === 0) {
-                adminOutputChannel.appendLine('Project unregistration completed successfully!');
-                resolve();
-            } else {
-                const errorMsg = `Project unregistration failed with exit code ${code}`;
-                adminOutputChannel.appendLine(errorMsg);
-                if (stderr) {
-                    adminOutputChannel.appendLine(`Error details: ${stderr}`);
-                }
-                reject(new Error(errorMsg));
-            }
-        });
-
-        process.on('error', error => {
-            const errorMsg = `Failed to start pmon process: ${error.message}`;
-            adminOutputChannel.appendLine(errorMsg);
-            reject(new Error(errorMsg));
-        });
-    });
 }
 
 // Export all command registration functions for easy integration
