@@ -62,24 +62,6 @@ jobs:
               labels: ['question', 'needs-triage']
             });
 
-      - name: Auto-assign to project
-        if: github.event_name == 'issues'
-        uses: actions/github-script@v8
-        with:
-          script: |
-            // Add issue to project board
-            const projectId = 'PVT_kwDONTEJHM4AnJOZ'; // Replace with your project ID
-            
-            try {
-              await github.rest.projects.createCard({
-                column_id: 'your-column-id', // Replace with your "New Issues" column ID
-                content_id: context.issue.id,
-                content_type: 'Issue'
-              });
-            } catch (error) {
-              console.log('Could not add to project:', error.message);
-            }
-
       - name: Welcome first-time contributors
         if: github.event_name == 'issues'
         uses: actions/github-script@v8
