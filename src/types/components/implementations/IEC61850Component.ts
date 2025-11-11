@@ -10,7 +10,7 @@ export class IEC61850Component extends WinCCOAComponent {
     }
 
     public getDescription(): string {
-        return 'IEC 61850/61400 Client';
+        return 'IEC 61850 Client';
     }
 
     // Add IEC61850-specific methods here
