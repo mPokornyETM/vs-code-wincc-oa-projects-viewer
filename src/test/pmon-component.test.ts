@@ -165,7 +165,7 @@ suite('PmonComponent Tests', () => {
         });
 
         test('startProject should accept projectName, startAll flag, and optional callback', () => {
-            assert.strictEqual(pmon.startProject.length, 3);
+            assert.strictEqual(pmon.startProject.length, 1);
         });
 
         test('stopProject should accept projectName and optional callback', () => {

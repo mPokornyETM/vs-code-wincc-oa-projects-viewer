@@ -69,17 +69,18 @@ export function extractVersionFromProject(project: WinCCOAProject): string | nul
                 return version;
             }
         }
-    }
 
-    // this is not very reliable, but as a last resort:
-    // Try to extract version from project name
-    const nameMatch = project.config.name.match(/(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)/);
-    if (nameMatch) {
-        return nameMatch[1];
+        // this is not very reliable, but as a last resort:
+        // Try to extract version from project name
+        const nameMatch = project.config.name.match(/(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)/);
+        if (nameMatch) {
+            return nameMatch[1];
+        }
     }
 
     // Try to extract version from installation directory
-    const pathMatch = project.installationDir.match(/WinCC_OA[\\\/](\d+\.\d+(?:\.\d+)?(?:\.\d+)?)/);
+    const pathMatch =
+        project.installationDir && project.installationDir.match(/WinCC_OA[\\\/](\d+\.\d+(?:\.\d+)?(?:\.\d+)?)/);
     if (pathMatch) {
         return pathMatch[1];
     }
@@ -102,11 +103,18 @@ export function isWinCCOADeliveredSubProject(project: WinCCOAProject): boolean {
         return false;
     }
 
+    // Normalize the project path for comparison (handle both Windows and Unix paths)
+    const normalizedProjectPath = project.config.installationDir.replace(/\\/g, '/').toLowerCase();
+
     const oaVersions = getAvailableWinCCOAVersions();
     for (const version of oaVersions) {
         const oaInstallPath = getWinCCOAInstallationPathByVersion(version);
-        if (oaInstallPath && project.config.installationDir.startsWith(oaInstallPath)) {
-            return true;
+        if (oaInstallPath) {
+            // Normalize the OA install path for comparison
+            const normalizedOAPath = oaInstallPath.replace(/\\/g, '/').toLowerCase();
+            if (normalizedProjectPath.startsWith(normalizedOAPath)) {
+                return true;
+            }
         }
     }
 

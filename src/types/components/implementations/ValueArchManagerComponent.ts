@@ -10,7 +10,7 @@ export class ValueArchManagerComponent extends WinCCOAComponent {
     }
 
     public getDescription(): string {
-        return 'Archive Manager';
+        return 'Value Archive Manager';
     }
 
     // Add VALUEARCMANAGER-specific methods here

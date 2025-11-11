@@ -194,35 +194,32 @@ export abstract class WinCCOAComponent {
                     platform,
                     architecture,
                     buildDate: buildDate.trim(),
-                    commitHash: commitHash.substring(0, 8), // Show first 8 characters
+                    commitHash, // Use the full commit hash from the output
                     executablePath,
                     rawOutput: output
                 };
             }
 
             // Try partial parsing for cases where build info might be missing
-            const partialRegex = /(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)\s+platform\s+(\w+(?:\s+\w+)*)/i;
+            const partialRegex = /(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)\s+platform\s+(\w+)\s+(\w+)/i;
             const partialMatch = output.match(partialRegex);
 
             if (partialMatch) {
-                const [, version, platformAndArch] = partialMatch;
-                const platformParts = platformAndArch.trim().split(/\s+/);
-                const platform = platformParts[0] || 'Unknown';
-                const architecture = platformParts.length > 1 ? platformParts.slice(1).join(' ') : 'Unknown';
+                const [, version, platform, architecture] = partialMatch;
 
                 return {
                     version,
                     platform,
                     architecture,
-                    buildDate: 'Not available',
-                    commitHash: 'Not available',
+                    buildDate: 'Unknown',
+                    commitHash: 'Unknown',
                     executablePath,
                     rawOutput: output
                 };
             }
 
             // Try to extract just the version as a fallback
-            const versionOnlyRegex = /(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)/;
+            const versionOnlyRegex = /:\s*(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)\s/;
             const versionMatch = output.match(versionOnlyRegex);
 
             if (versionMatch) {

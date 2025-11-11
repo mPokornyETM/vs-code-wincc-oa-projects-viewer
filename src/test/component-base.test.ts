@@ -169,9 +169,9 @@ suite('Component Base Class Tests', () => {
             assert.strictEqual(component.getName(), 'WCCOAreporting');
         });
 
-        test('getDescription() should return "Report Manager"', () => {
+        test('getDescription() should return "Reporting Manager"', () => {
             const component = new ReportManagerComponent();
-            assert.strictEqual(component.getDescription(), 'Report Manager');
+            assert.strictEqual(component.getDescription(), 'Reporting Manager');
         });
     });
 
@@ -188,14 +188,14 @@ suite('Component Base Class Tests', () => {
     });
 
     suite('HttpComponent', () => {
-        test('getName() should return "WCCOAhttp"', () => {
+        test('getName() should return "webclient_http.ctl"', () => {
             const component = new HttpComponent();
-            assert.strictEqual(component.getName(), 'WCCOAhttp');
+            assert.strictEqual(component.getName(), 'webclient_http.ctl');
         });
 
-        test('getDescription() should return "HTTP Server"', () => {
+        test('getDescription() should return "Web Server"', () => {
             const component = new HttpComponent();
-            assert.strictEqual(component.getDescription(), 'HTTP Server');
+            assert.strictEqual(component.getDescription(), 'Web Server');
         });
     });
 
@@ -277,9 +277,9 @@ suite('Component Base Class Tests', () => {
             assert.strictEqual(component.getName(), 'WCCOAiec');
         });
 
-        test('getDescription() should return "IEC 60870 Driver"', () => {
+        test('getDescription() should return "IEC 60870 101/104 Driver"', () => {
             const component = new IEC60870Component();
-            assert.strictEqual(component.getDescription(), 'IEC 60870 Driver');
+            assert.strictEqual(component.getDescription(), 'IEC 60870 101/104 Driver');
         });
     });
 

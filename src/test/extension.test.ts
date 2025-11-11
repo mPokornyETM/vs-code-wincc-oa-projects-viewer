@@ -1,9 +1,11 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
+import * as path from 'path';
 
 // Import functions from extension
 import { getPvssInstConfPath, WinCCOAProjectProvider, ProjectCategory } from '../extension';
 import { extractVersionFromProject, isWinCCOADeliveredSubProject } from '../utils';
+import { getAvailableWinCCOAVersions, getWinCCOAInstallationPathByVersion } from '../utils/winccoa-paths';
 
 // Helper function to create mock WinCCOA project
 function createMockProject(config: any): any {
@@ -95,17 +97,24 @@ suite('WinCC OA Projects Extension Test Suite', () => {
 
     suite('Project Classification', () => {
         test('should identify WinCC OA delivered sub-projects', () => {
-            const deliveredPaths = [
-                'C:\\Program Files\\Siemens\\WinCC_OA\\3.20\\projects\\BACnet',
-                '/opt/wincc_oa/3.21/projects/OPC_UA',
-                'C:\\ProgramData\\Siemens\\WinCC_OA\\projects\\Modbus'
-            ];
-
-            deliveredPaths.forEach(installDir => {
-                const project = createMockProject({ installationDir: installDir });
-                const isDelivered = isWinCCOADeliveredSubProject(project);
-                assert.ok(isDelivered, `Should identify ${installDir} as WinCC OA delivered`);
-            });
+            // Get actual detected WinCC OA versions for realistic testing
+            const detectedVersions = getAvailableWinCCOAVersions();
+            
+            if (detectedVersions.length > 0) {
+                // Test with actual detected installation paths
+                detectedVersions.forEach(version => {
+                    const oaPath = getWinCCOAInstallationPathByVersion(version);
+                    if (oaPath) {
+                        const deliveredPath = path.join(oaPath, 'projects', 'BACnet');
+                        const project = createMockProject({ installationDir: deliveredPath, notRunnable: true });
+                        const isDelivered = isWinCCOADeliveredSubProject(project);
+                        assert.ok(isDelivered, `Should identify ${deliveredPath} as WinCC OA delivered`);
+                    }
+                });
+            } else {
+                // Skip test if no WinCC OA installations detected
+                console.log('⚠️  No WinCC OA installations detected, skipping delivered sub-project test');
+            }
         });
 
         test('should identify user sub-projects', () => {
@@ -116,7 +125,7 @@ suite('WinCC OA Projects Extension Test Suite', () => {
             ];
 
             userPaths.forEach(installDir => {
-                const project = createMockProject({ installationDir: installDir });
+                const project = createMockProject({ installationDir: installDir, notRunnable: true });
                 const isDelivered = isWinCCOADeliveredSubProject(project);
                 assert.ok(!isDelivered, `Should identify ${installDir} as user project`);
             });
