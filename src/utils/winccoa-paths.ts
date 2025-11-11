@@ -23,7 +23,7 @@
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import { parseVersionString } from '../utils';
 
 /**
@@ -71,11 +71,10 @@ export function getWinCCOAInstallationPathByVersion(version: string): string | n
  */
 function getWindowsInstallationPath(version: string): string | null {
     try {
-        // Try to read from registry
+        // Try to read from registry using execFileSync to prevent shell injection
         const regKey = `HKLM\\Software\\ETM\\WinCC_OA\\${version}`;
-        const command = `reg query "${regKey}" /v INSTALLDIR`;
-
-        const output = execSync(command, { encoding: 'utf-8' });
+        const args = ['query', regKey, '/v', 'INSTALLDIR'];
+        const output = execFileSync('reg', args, { encoding: 'utf-8' });
 
         // Parse the output to extract the INSTALLDIR value
         const match = output.match(/INSTALLDIR\s+REG_SZ\s+(.+)/);
