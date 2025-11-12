@@ -827,32 +827,7 @@ export function activate(context: vscode.ExtensionContext) {
             let targetProject: WinCCOAProject | undefined = project;
 
             if (!targetProject) {
-                // Show selection dialog for WinCC OA system projects
-                const systemProjects = provider.getProjects().filter(p => p.isWinCCOASystem);
-
-                if (systemProjects.length === 0) {
-                    vscode.window.showErrorMessage('No WinCC OA system installations found.');
-                    return;
-                }
-
-                const projectItems = systemProjects.map((p: WinCCOAProject) => ({
-                    label: p.config.name,
-                    description: p.config.installationDir,
-                    detail: `WinCC OA v${p.version} System Installation`,
-                    project: p
-                }));
-
-                const selected = await vscode.window.showQuickPick(projectItems, {
-                    placeHolder: 'Select WinCC OA version to get detailed information...',
-                    matchOnDescription: true,
-                    matchOnDetail: true
-                });
-
-                if (!selected) {
-                    return; // User cancelled
-                }
-
-                targetProject = selected.project;
+                targetProject = await selectWinCCOAVersion();
             }
 
             if (targetProject) {
@@ -1520,6 +1495,12 @@ export function activate(context: vscode.ExtensionContext) {
         }
     );
 
+    // Register document formatting provider for .ctl files
+    const ctrlFormattingProvider = vscode.languages.registerDocumentFormattingEditProvider(
+        { scheme: 'file', pattern: '**/*.ctl' },
+        new formatting.CtrlDocumentFormattingProvider()
+    );
+
     context.subscriptions.push(
         treeView,
         watcher,
@@ -1554,7 +1535,8 @@ export function activate(context: vscode.ExtensionContext) {
         removeManagerCommand,
         formatCtrlFileCommand,
         formatAllCtrlFilesCommand,
-        formatAllCtrlFilesInFolderCommand
+        formatAllCtrlFilesInFolderCommand,
+        ctrlFormattingProvider
     );
 
     // Auto-refresh when extension starts
@@ -6141,8 +6123,11 @@ export function getProjects(): WinCCOAProject[] {
 }
 
 export function getProjectByPath(path: string): WinCCOAProject | undefined {
+    if (!path) {
+        return undefined;
+    }
     const projects = projectProvider?.getProjects() || [];
-    return projects.find(p => p.installationDir === path || p.config.installationDir === path);
+    return projects.find(p => path.startsWith(p.installationDir) || path.startsWith(p.config.installationDir));
 }
 
 export function getProjectVersion(installationDir: string): string | undefined {
@@ -6266,6 +6251,35 @@ export async function showVersionInfoDialog(versionInfo: DetailedVersionInfo): P
         outputChannel.appendLine(versionInfo.rawOutput);
         outputChannel.show(true);
     }
+}
+
+export async function selectWinCCOAVersion(): Promise<WinCCOAProject | undefined> {
+    // Show selection dialog for WinCC OA system projects
+    const systemProjects = getProjects().filter(p => p.isWinCCOASystem);
+
+    if (systemProjects.length === 0) {
+        vscode.window.showErrorMessage('No WinCC OA system installations found.');
+        return undefined;
+    }
+
+    const projectItems = systemProjects.map((p: WinCCOAProject) => ({
+        label: p.config.name,
+        description: p.config.installationDir,
+        detail: `WinCC OA v${p.version} System Installation`,
+        project: p
+    }));
+
+    const selected = await vscode.window.showQuickPick(projectItems, {
+        placeHolder: 'Select WinCC OA version',
+        matchOnDescription: true,
+        matchOnDetail: true
+    });
+
+    if (!selected) {
+        return undefined; // User cancelled
+    }
+
+    return selected.project;
 }
 
 // Export the path utility functions and new types

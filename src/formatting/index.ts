@@ -1,6 +1,9 @@
 /**
  * WinCC OA Code Formatting Module
  * Provides functionality to format .ctl files using astyle.exe from WinCC OA installation
+ *
+ * Note: astyle.exe is only available in WinCC OA version 3.19 and later.
+ * Formatting features will not work with older versions.
  */
 
 import * as vscode from 'vscode';
@@ -8,6 +11,13 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import {
+    getProjectByPath,
+    getProjects,
+    getWinCCOASystemVersions,
+    selectWinCCOAVersion,
+    WinCCOAProject
+} from '../extension';
 
 const execFileAsync = promisify(execFile);
 
@@ -28,7 +38,32 @@ interface AStyleConfig {
 }
 
 /**
+ * Find the WinCC OA project path for a given file or folder path
+ * Checks all registered projects and returns the project path that contains the given path
+ * @param selectedPath - The path to check (file or folder)
+ * @returns The project installation directory, or null if not found
+ */
+export function findProjectPathForFile(selectedPath: string): string | null {
+    const allProjects = getProjects();
+
+    // Normalize the selected path for comparison
+    const normalizedPath = path.normalize(selectedPath).toLowerCase();
+
+    // Find the project whose installation directory is a parent of the selected path
+    // Sort by path length descending to find the most specific (deepest) match first
+    const matchingProject = allProjects
+        .filter(project => {
+            const projectPath = path.normalize(project.installationDir).toLowerCase();
+            return normalizedPath.startsWith(projectPath);
+        })
+        .sort((a, b) => b.installationDir.length - a.installationDir.length)[0];
+
+    return matchingProject ? matchingProject.installationDir : null;
+}
+
+/**
  * Find astyle.exe in WinCC OA installation
+ * Note: astyle.exe is only available in WinCC OA version 3.19 and later
  */
 export async function findAStyleExecutable(projectPath: string): Promise<AStyleConfig | null> {
     try {
@@ -98,42 +133,67 @@ export async function findAStyleExecutable(projectPath: string): Promise<AStyleC
 }
 
 /**
- * Prompt user to select astyle.exe if not found automatically
+ * Get or configure astyle paths (executable and config file)
+ * Tries auto-detection, throws error if not found
+ * Note: Requires WinCC OA version 3.19 or later
+ * @param filePath - Optional file path to determine the correct project (for multi-project workspaces)
  */
-export async function promptForAStylePath(version: string): Promise<string | undefined> {
-    const message = `astyle.exe not found for WinCC OA version ${version}. Please select astyle.exe from your WinCC OA installation.`;
+async function getAStylePaths(filePath: string): Promise<{ astylePath: string; astyleConfigPath?: string }> {
+    let astyleConfigPath: string | undefined;
+    let oaVersion: string;
 
-    const selection = await vscode.window.showWarningMessage(message, 'Select astyle.exe', 'Cancel');
+    const output = getOutputChannel();
 
-    if (selection === 'Select astyle.exe') {
-        const result = await vscode.window.showOpenDialog({
-            canSelectFiles: true,
-            canSelectFolders: false,
-            canSelectMany: false,
-            filters: {
-                Executables: ['exe']
-            },
-            title: 'Select astyle.exe from WinCC OA bin directory'
-        });
+    if (!filePath) {
+        throw new Error('File path is required to determine the WinCC OA project');
+    }
+    let project = getProjectByPath(filePath);
+    let oaVersionSystem: WinCCOAProject | undefined;
 
-        if (result && result.length > 0) {
-            const selectedPath = result[0].fsPath;
-
-            // Verify it's astyle.exe
-            if (path.basename(selectedPath).toLowerCase() === 'astyle.exe') {
-                // Store the path in workspace settings for future use
-                await vscode.workspace
-                    .getConfiguration('winccOAProjects')
-                    .update('astylePath', selectedPath, vscode.ConfigurationTarget.Workspace);
-
-                return selectedPath;
-            } else {
-                vscode.window.showErrorMessage('Selected file is not astyle.exe');
-            }
+    if (project) {
+        //try to find the astyle confi file in the project directory first
+        let projectPath = project.installationDir;
+        output.appendLine('I have project path: ' + projectPath);
+        astyleConfigPath = path.join(projectPath, 'config', 'astyle.config');
+        if (!fs.existsSync(astyleConfigPath)) {
+            astyleConfigPath = undefined;
         }
+
+        oaVersion = project.version || '';
+        oaVersionSystem = getWinCCOASystemVersions().find(version => version.id === oaVersion);
     }
 
-    return undefined;
+    if (!oaVersionSystem) {
+        output.appendLine('Ask user for oa path');
+        oaVersionSystem = await selectWinCCOAVersion();
+    }
+
+    if (!oaVersionSystem) {
+        throw new Error(`Cannot determine WinCC OA system installation from file path: ` + filePath);
+    }
+
+    let astyleExecutablePath = path.join(oaVersionSystem.installationDir, 'bin', 'astyle.exe');
+    if (!astyleConfigPath) {
+        astyleConfigPath = path.join(oaVersionSystem.installationDir, 'config', 'astyle.config');
+    }
+
+    if (
+        !astyleExecutablePath ||
+        !fs.existsSync(astyleExecutablePath) ||
+        !astyleConfigPath ||
+        !fs.existsSync(astyleConfigPath)
+    ) {
+        throw new Error(
+            'astyle.exe not found in WinCC OA installation. ' +
+                'Please ensure WinCC OA version 3.19 or later is properly installed. ' +
+                'Code formatting is not available for older versions.'
+        );
+    }
+
+    return {
+        astylePath: astyleExecutablePath,
+        astyleConfigPath: astyleConfigPath
+    };
 }
 
 /**
@@ -166,22 +226,7 @@ export async function formatCtrlFile(filePath: string, astylePath: string, confi
             astyleOptions.push(`--options=${configFilePath}`);
             output.appendLine(`Config file: ${configFilePath}`);
         } else {
-            output.appendLine('Config file: None (using default options)');
-            // Fallback to default options if no config file
-            astyleOptions.push(
-                '--style=allman', // Allman bracket style (commonly used in WinCC OA)
-                '--indent=spaces=2', // 2-space indentation
-                '--indent-switches', // Indent switch cases
-                '--indent-cases', // Indent case statements
-                '--pad-oper', // Pad operators with spaces
-                '--pad-header', // Pad headers (if, for, while, etc.)
-                '--unpad-paren', // Remove padding around parentheses
-                '--align-pointer=name', // Align pointer/reference to variable name
-                '--break-blocks', // Add blank lines around blocks
-                '--convert-tabs', // Convert tabs to spaces
-                '--max-code-length=120', // Max line length
-                '--mode=c' // C/C++ mode (CTRL is C-like)
-            );
+            throw new Error('astyle.config file not found. Please ensure it exists in the WinCC OA config directory.');
         }
 
         astyleOptions.push(filePath); // File to format (in-place)
@@ -248,56 +293,7 @@ export async function formatActiveCtrlFile(): Promise<void> {
     }
 
     try {
-        // Try to get astyle path from workspace settings
-        let astylePath = vscode.workspace.getConfiguration('winccOAProjects').get<string>('astylePath');
-        let astyleConfigPath = vscode.workspace.getConfiguration('winccOAProjects').get<string>('astyleConfigPath');
-
-        // If not in settings, try to find it automatically
-        if (!astylePath) {
-            const workspaceFolders = vscode.workspace.workspaceFolders;
-            if (!workspaceFolders || workspaceFolders.length === 0) {
-                vscode.window.showErrorMessage('No workspace folder open');
-                return;
-            }
-
-            const projectPath = workspaceFolders[0].uri.fsPath;
-            const astyleConfig = await findAStyleExecutable(projectPath);
-
-            if (astyleConfig) {
-                astylePath = astyleConfig.executable;
-                astyleConfigPath = astyleConfig.configFile || undefined;
-
-                // Store for future use
-                await vscode.workspace
-                    .getConfiguration('winccOAProjects')
-                    .update('astylePath', astylePath, vscode.ConfigurationTarget.Workspace);
-
-                if (astyleConfigPath) {
-                    await vscode.workspace
-                        .getConfiguration('winccOAProjects')
-                        .update('astyleConfigPath', astyleConfigPath, vscode.ConfigurationTarget.Workspace);
-                }
-            } else {
-                // Prompt user to select
-                astylePath = await promptForAStylePath('unknown');
-            }
-        }
-
-        if (!astylePath) {
-            return; // User cancelled
-        }
-
-        // Verify astyle.exe exists
-        if (!fs.existsSync(astylePath)) {
-            vscode.window.showErrorMessage(`astyle.exe not found at: ${astylePath}`);
-
-            // Clear invalid path
-            await vscode.workspace
-                .getConfiguration('winccOAProjects')
-                .update('astylePath', undefined, vscode.ConfigurationTarget.Workspace);
-
-            return;
-        }
+        const paths = await getAStylePaths(document.fileName);
 
         // Format the file
         await vscode.window.withProgress(
@@ -307,7 +303,7 @@ export async function formatActiveCtrlFile(): Promise<void> {
                 cancellable: false
             },
             async () => {
-                await formatCtrlFile(document.fileName, astylePath!, astyleConfigPath);
+                await formatCtrlFile(document.fileName, paths.astylePath, paths.astyleConfigPath);
             }
         );
 
@@ -348,56 +344,7 @@ export async function formatCtrlFileFromUri(uri: vscode.Uri): Promise<void> {
     }
 
     try {
-        // Try to get astyle path from workspace settings
-        let astylePath = vscode.workspace.getConfiguration('winccOAProjects').get<string>('astylePath');
-        let astyleConfigPath = vscode.workspace.getConfiguration('winccOAProjects').get<string>('astyleConfigPath');
-
-        // If not in settings, try to find it automatically
-        if (!astylePath) {
-            const workspaceFolders = vscode.workspace.workspaceFolders;
-            if (!workspaceFolders || workspaceFolders.length === 0) {
-                vscode.window.showErrorMessage('No workspace folder open');
-                return;
-            }
-
-            const projectPath = workspaceFolders[0].uri.fsPath;
-            const astyleConfig = await findAStyleExecutable(projectPath);
-
-            if (astyleConfig) {
-                astylePath = astyleConfig.executable;
-                astyleConfigPath = astyleConfig.configFile || undefined;
-
-                // Store for future use
-                await vscode.workspace
-                    .getConfiguration('winccOAProjects')
-                    .update('astylePath', astylePath, vscode.ConfigurationTarget.Workspace);
-
-                if (astyleConfigPath) {
-                    await vscode.workspace
-                        .getConfiguration('winccOAProjects')
-                        .update('astyleConfigPath', astyleConfigPath, vscode.ConfigurationTarget.Workspace);
-                }
-            } else {
-                // Prompt user to select
-                astylePath = await promptForAStylePath('unknown');
-            }
-        }
-
-        if (!astylePath) {
-            return; // User cancelled
-        }
-
-        // Verify astyle.exe exists
-        if (!fs.existsSync(astylePath)) {
-            vscode.window.showErrorMessage(`astyle.exe not found at: ${astylePath}`);
-
-            // Clear invalid path
-            await vscode.workspace
-                .getConfiguration('winccOAProjects')
-                .update('astylePath', undefined, vscode.ConfigurationTarget.Workspace);
-
-            return;
-        }
+        const paths = await getAStylePaths(filePath);
 
         // Format the file
         await vscode.window.withProgress(
@@ -407,7 +354,7 @@ export async function formatCtrlFileFromUri(uri: vscode.Uri): Promise<void> {
                 cancellable: false
             },
             async () => {
-                await formatCtrlFile(filePath, astylePath!, astyleConfigPath);
+                await formatCtrlFile(filePath, paths.astylePath, paths.astyleConfigPath);
             }
         );
 
@@ -434,26 +381,15 @@ export async function formatAllCtrlFiles(): Promise<void> {
     }
 
     try {
-        // Try to get astyle path
-        let astylePath = vscode.workspace.getConfiguration('winccOAProjects').get<string>('astylePath');
-        let astyleConfigPath = vscode.workspace.getConfiguration('winccOAProjects').get<string>('astyleConfigPath');
-
-        if (!astylePath) {
-            const projectPath = workspaceFolders[0].uri.fsPath;
-            const astyleConfig = await findAStyleExecutable(projectPath);
-
-            if (astyleConfig) {
-                astylePath = astyleConfig.executable;
-                astyleConfigPath = astyleConfig.configFile || undefined;
-            } else {
-                astylePath = await promptForAStylePath('unknown');
-            }
-        }
-
-        if (!astylePath || !fs.existsSync(astylePath)) {
-            vscode.window.showErrorMessage('astyle.exe not found');
+        // Use first workspace folder to determine project
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            vscode.window.showErrorMessage('No workspace folder open');
             return;
         }
+        const searchPath = workspaceFolders[0].uri.fsPath;
+
+        const paths = await getAStylePaths(searchPath);
 
         // Find all .ctl files
         const ctlFiles = await vscode.workspace.findFiles('**/*.ctl', '**/node_modules/**');
@@ -491,7 +427,7 @@ export async function formatAllCtrlFiles(): Promise<void> {
                     });
 
                     try {
-                        await formatCtrlFile(file.fsPath, astylePath!, astyleConfigPath);
+                        await formatCtrlFile(file.fsPath, paths.astylePath, paths.astyleConfigPath);
                         successCount++;
                     } catch (error) {
                         console.error(`Failed to format ${file.fsPath}:`, error);
@@ -534,29 +470,7 @@ export async function formatAllCtrlFilesInFolder(folderUri?: vscode.Uri): Promis
             return;
         }
 
-        // Try to get astyle path
-        let astylePath = vscode.workspace.getConfiguration('winccOAProjects').get<string>('astylePath');
-        let astyleConfigPath = vscode.workspace.getConfiguration('winccOAProjects').get<string>('astyleConfigPath');
-
-        if (!astylePath) {
-            const workspaceFolders = vscode.workspace.workspaceFolders;
-            if (workspaceFolders && workspaceFolders.length > 0) {
-                const projectPath = workspaceFolders[0].uri.fsPath;
-                const astyleConfig = await findAStyleExecutable(projectPath);
-
-                if (astyleConfig) {
-                    astylePath = astyleConfig.executable;
-                    astyleConfigPath = astyleConfig.configFile || undefined;
-                } else {
-                    astylePath = await promptForAStylePath('unknown');
-                }
-            }
-        }
-
-        if (!astylePath || !fs.existsSync(astylePath)) {
-            vscode.window.showErrorMessage('astyle.exe not found');
-            return;
-        }
+        const paths = await getAStylePaths(folderPath);
 
         // Find all .ctl files in the folder (recursively)
         const pattern = new vscode.RelativePattern(folderPath, '**/*.ctl');
@@ -595,7 +509,7 @@ export async function formatAllCtrlFilesInFolder(folderUri?: vscode.Uri): Promis
                     });
 
                     try {
-                        await formatCtrlFile(file.fsPath, astylePath!, astyleConfigPath);
+                        await formatCtrlFile(file.fsPath, paths.astylePath, paths.astyleConfigPath);
                         successCount++;
                     } catch (error) {
                         console.error(`Failed to format ${file.fsPath}:`, error);
@@ -620,5 +534,37 @@ export function dispose(): void {
     if (outputChannel) {
         outputChannel.dispose();
         outputChannel = undefined;
+    }
+}
+
+/**
+ * Document formatting provider for CTRL (.ctl) files
+ * Integrates with VS Code's built-in formatting commands
+ */
+export class CtrlDocumentFormattingProvider implements vscode.DocumentFormattingEditProvider {
+    async provideDocumentFormattingEdits(
+        document: vscode.TextDocument,
+        options: vscode.FormattingOptions,
+        token: vscode.CancellationToken
+    ): Promise<vscode.TextEdit[]> {
+        try {
+            // Save the document before formatting
+            if (document.isDirty) {
+                await document.save();
+            }
+
+            const filePath = document.uri.fsPath;
+            const paths = await getAStylePaths(filePath);
+
+            // Format the file
+            await formatCtrlFile(filePath, paths.astylePath, paths.astyleConfigPath);
+
+            // Return empty array since formatting is done in-place
+            // VS Code will reload the file automatically
+            return [];
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to format CTRL code: ${error}`);
+            return [];
+        }
     }
 }

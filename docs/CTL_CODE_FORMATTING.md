@@ -2,13 +2,16 @@
 
 This extension provides comprehensive code formatting for WinCC OA CTRL (.ctl) files using the `astyle.exe` tool included with WinCC OA installations.
 
+> **Important**: CTRL code formatting requires **WinCC OA version 3.19 or later**. The `astyle.exe` tool is not available in WinCC OA 3.18 and older versions.
+
 ## Features
 
 ### Automatic Detection
 
 - **astyle.exe**: Automatically detected from WinCC OA installation directory
 - **astyle.config**: Auto-detected from `{WinCC_OA_Install}\config\astyle.config`
-- **Version-aware**: Works with multiple WinCC OA versions (3.17-3.21+)
+- **Version-aware**: Works with multiple WinCC OA versions (3.19-3.21+)
+- **Multi-Project Support**: Automatically detects the correct project in multi-project workspaces
 
 ### Flexible Formatting Options
 
@@ -19,6 +22,8 @@ This extension provides comprehensive code formatting for WinCC OA CTRL (.ctl) f
 
 ### Smart Features
 
+- **Built-in Formatting Provider**: Integrates with VS Code's standard "Format Document" command
+- **Format on Save**: Works with VS Code's "Format On Save" setting
 - **Extension-less Files**: Prompts to format files without .ctl extension
 - **Dirty File Handling**: Automatically saves unsaved changes before formatting
 - **Output Logging**: Detailed formatting logs in "WinCC OA Formatting" OUTPUT channel
@@ -28,11 +33,17 @@ This extension provides comprehensive code formatting for WinCC OA CTRL (.ctl) f
 
 ### Format Active File
 
+**Method 1: Using Format Document Command (Recommended)**
+1. Open a .ctl file in the editor
+2. Press `Shift+Alt+F` (Windows/Linux) or `Shift+Option+F` (Mac)
+3. Or right-click in editor and select "Format Document"
+
+**Method 2: Using WinCC OA Command**
 1. Open a .ctl file in the editor
 2. Open Command Palette (Ctrl+Shift+P)
 3. Run: `WinCC OA: Format CTRL File`
 
-**Or use the keyboard shortcut** (if configured)
+**Or use a keyboard shortcut** (if configured)
 
 ### Format from Explorer
 
@@ -51,6 +62,12 @@ This extension provides comprehensive code formatting for WinCC OA CTRL (.ctl) f
 2. Run: `WinCC OA: Format All CTRL Files`
 3. Confirm the number of files to format
 
+## Requirements
+
+- **WinCC OA Version**: 3.19 or later (astyle.exe not available in 3.18 and older)
+- **Registered Project**: File must be part of a registered WinCC OA project
+- **Proper Installation**: WinCC OA must be properly installed with astyle.exe in bin directory
+
 ## Configuration
 
 ### Settings
@@ -59,40 +76,41 @@ Configure the extension in VS Code Settings (File > Preferences > Settings):
 
 ```json
 {
-  // Path to astyle.exe (auto-detected if not specified)
-  "winccOAProjects.astylePath": "",
-
-  // Path to astyle.config (auto-detected if not specified)
-  "winccOAProjects.astyleConfigPath": "",
-
   // Create .orig backup files when formatting (default: false)
   "winccOAProjects.astyleCreateBackup": false
 }
 ```
 
-### Auto-Detection Paths
+> **Note**: Manual path configuration (`astylePath` and `astyleConfigPath`) has been removed. The extension now automatically detects these paths from your registered WinCC OA projects.
 
-The extension searches for `astyle.exe` in the following locations:
+### Auto-Detection Process
 
-1. **PVSS_II Environment Variable**: `%PVSS_II%\bin\astyle.exe`
-2. **Project Config**: Path from project's `config/config` file
-3. **Common Paths**:
-   - `C:\Siemens\Automation\WinCC_OA\{version}\bin\astyle.exe`
-   - `C:\WinCC_OA\{version}\bin\astyle.exe`
-   - `D:\Siemens\Automation\WinCC_OA\{version}\bin\astyle.exe`
+The extension automatically detects astyle.exe using the following process:
 
-The extension searches for `astyle.config` in:
+1. **Identifies the Project**: Determines which registered WinCC OA project contains the file being formatted
+2. **Finds the Installation**: Locates the WinCC OA system installation for that project's version
+3. **Locates astyle.exe**: Looks in `{WinCC_OA_Install}\bin\astyle.exe`
+4. **Finds astyle.config**: Looks in `{WinCC_OA_Install}\config\astyle.config`
 
-- `{WinCC_OA_Install}\config\astyle.config`
+#### Multi-Project Workspace Support
 
-### Manual Configuration
+In workspaces with multiple WinCC OA projects or sub-projects:
 
-If auto-detection fails, you'll be prompted to manually select:
+- The extension finds the **most specific project** that contains the file
+- Uses that project's WinCC OA installation to locate astyle.exe
+- Supports nested project structures automatically
 
-1. **astyle.exe location**: Browse to your WinCC OA installation's bin folder
-2. **astyle.config location** (optional): Browse to your custom config file
-
-The extension saves your selections in workspace settings for future use.
+Example:
+```
+workspace/
+├── ProjectA/           (WinCC OA 3.19)
+│   └── scripts/
+│       └── libs/
+│           └── myLib.ctl   → Uses 3.19 astyle.exe
+└── ProjectB/           (WinCC OA 3.20)
+    └── scripts/
+        └── main.ctl        → Uses 3.20 astyle.exe
+```
 
 ## astyle.config
 
@@ -140,11 +158,18 @@ View detailed formatting information in the OUTPUT panel:
 
 **Problem**: Extension can't find astyle.exe automatically
 
+**Common Causes**:
+
+1. **Old WinCC OA Version**: You're using WinCC OA 3.18 or older (astyle.exe not included)
+2. **Project Not Registered**: The file is not part of a registered WinCC OA project
+3. **Invalid Installation**: WinCC OA installation is incomplete or corrupted
+
 **Solutions**:
 
-1. Set `PVSS_II` environment variable to your WinCC OA installation path
-2. Manually specify path in settings: `winccOAProjects.astylePath`
-3. Select astyle.exe when prompted
+1. **Upgrade to WinCC OA 3.19+**: Code formatting requires version 3.19 or later
+2. **Register Your Project**: Use the extension to register your project in WinCC OA
+3. **Verify Installation**: Check that `{WinCC_OA_Install}\bin\astyle.exe` exists
+4. **Check Project Version**: Ensure the project's `config/config` file has correct version info
 
 ### Config File Not Found
 
@@ -153,8 +178,19 @@ View detailed formatting information in the OUTPUT panel:
 **Solutions**:
 
 1. Verify astyle.config exists in `{WinCC_OA_Install}\config\`
-2. Manually specify path in settings: `winccOAProjects.astyleConfigPath`
-3. Extension will use default formatting rules if no config found
+2. Extension will automatically use default formatting rules if no config found
+3. Check WinCC OA installation is complete
+
+### Project Not Found
+
+**Problem**: "No WinCC OA project found" error
+
+**Solutions**:
+
+1. Ensure the file is inside a registered WinCC OA project directory
+2. Register your project using the WinCC OA Projects view
+3. Refresh the projects view to update the project list
+4. Verify the project appears in the WinCC OA Projects tree
 
 ### Files Without Extension
 
@@ -193,14 +229,39 @@ For consistent formatting across your team:
 1. **Share astyle.config**: Commit your astyle.config to source control
 2. **Document Path**: Add config location to team documentation
 3. **Workspace Settings**: Share `.vscode/settings.json` with team
+4. **Enable Format on Save**: Add to workspace settings:
+   ```json
+   {
+     "editor.formatOnSave": true,
+     "[ctl]": {
+       "editor.defaultFormatter": "mPokornyETM.wincc-oa-projects"
+     }
+   }
+   ```
 
 ### Format on Save
 
-To automatically format on save:
+To automatically format .ctl files when you save them:
 
-1. Use VS Code's format on save feature
-2. Or integrate with pre-commit hooks
-3. Or use workspace tasks
+**For All Files:**
+```json
+{
+  "editor.formatOnSave": true
+}
+```
+
+**For .ctl Files Only:**
+```json
+{
+  "editor.formatOnSave": true,
+  "[ctl]": {
+    "editor.defaultFormatter": "mPokornyETM.wincc-oa-projects",
+    "editor.formatOnSave": true
+  }
+}
+```
+
+Add these settings to your User Settings or Workspace Settings (File > Preferences > Settings).
 
 ## Examples
 
@@ -245,10 +306,16 @@ A: Yes, use Ctrl+Z to undo, or revert using source control.
 A: Yes, but you may need to reload the file in other editors after formatting.
 
 **Q: What if I have multiple WinCC OA versions installed?**
-A: The extension detects the version from your project's config file and uses the corresponding astyle.exe.
+A: The extension detects the version from your project's config file and uses the corresponding astyle.exe automatically.
 
 **Q: Can I format files not in a WinCC OA project?**
-A: Yes, but you must manually specify the astyle.exe and config paths in settings.
+A: Yes, but you need to select which WinCC OA version shall be used.
+
+**Q: What about WinCC OA 3.18 and older versions?**
+A: Code formatting is not available for WinCC OA 3.18 and older. The astyle.exe tool was introduced in version 3.19.
+
+**Q: How does it work with multiple projects in one workspace?**
+A: The extension automatically identifies which project contains the file and uses that project's WinCC OA installation.
 
 ## Related Features
 
