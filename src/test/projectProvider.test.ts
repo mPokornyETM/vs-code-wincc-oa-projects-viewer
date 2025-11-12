@@ -169,7 +169,7 @@ RandomLine without equals
                     expected: '3.20'
                 },
                 {
-                    path: '/opt/wincc_oa/3.21/OPC_UA',
+                    path: '/opt/WinCC_OA/3.21/OPC_UA',
                     expected: '3.21'
                 },
                 {

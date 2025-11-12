@@ -69,7 +69,7 @@ suite('Registration Commands Test Suite', () => {
 
         test('should validate Unix paths correctly', () => {
             const unixPaths = [
-                '/opt/wincc_oa/3.21/projects/TestProject',
+                '/opt/WinCC_OA/3.21/projects/TestProject',
                 '/home/user/projects/TestProject',
                 '/etc/opt/pvss/TestProject'
             ];
@@ -83,7 +83,7 @@ suite('Registration Commands Test Suite', () => {
         test('should handle path normalization across platforms', () => {
             const testPaths = [
                 'C:\\Test\\..\\TestProject',
-                '/opt/wincc_oa/../projects/TestProject',
+                '/opt/WinCC_OA/../projects/TestProject',
                 'C:\\Test\\Project\\..\\..\\Final'
             ];
 

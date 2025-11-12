@@ -2,6 +2,7 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 import { WinCCOAProject, WinCCOAManager, WinCCOAProjectState } from '../types';
+import * as winccOAPaths from './winccoa-paths';
 
 /**
  * Gets the platform-specific path to the pvssInst.conf file
@@ -44,19 +45,42 @@ export function analyzePmonResponse(response: string): { success: boolean; error
  * @returns The version string or null if not found
  */
 export function extractVersionFromProject(project: WinCCOAProject): string | null {
+    // Check for null or undefined project
+    if (!project) {
+        return null;
+    }
+
     // First try to get version from project version field
     if (project.version) {
         return project.version;
     }
 
-    // Try to extract version from project name
-    const nameMatch = project.config.name.match(/(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)/);
-    if (nameMatch) {
-        return nameMatch[1];
+    if (project.config) {
+        const versionFromConfig = readProjectVersionFromConfig(project.installationDir);
+        if (versionFromConfig) {
+            return versionFromConfig;
+        }
+
+        // Try to match installation directory with known WinCC OA versions
+        const oaVersions = winccOAPaths.getAvailableWinCCOAVersions();
+        for (const version of oaVersions) {
+            const oaInstallPath = winccOAPaths.getWinCCOAInstallationPathByVersion(version);
+            if (oaInstallPath && project.config.installationDir.startsWith(oaInstallPath)) {
+                return version;
+            }
+        }
+
+        // this is not very reliable, but as a last resort:
+        // Try to extract version from project name
+        const nameMatch = project.config.name.match(/(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)/);
+        if (nameMatch) {
+            return nameMatch[1];
+        }
     }
 
     // Try to extract version from installation directory
-    const pathMatch = project.installationDir.match(/WinCC_OA[\\\/](\d+\.\d+(?:\.\d+)?(?:\.\d+)?)/);
+    const pathMatch =
+        project.installationDir && project.installationDir.match(/WinCC_OA[\\\/](\d+\.\d+(?:\.\d+)?(?:\.\d+)?)/);
     if (pathMatch) {
         return pathMatch[1];
     }
@@ -79,9 +103,22 @@ export function isWinCCOADeliveredSubProject(project: WinCCOAProject): boolean {
         return false;
     }
 
-    // Check if installation directory contains WinCC_OA (indicating delivered sub-project)
-    const normalizedPath = project.installationDir.replace(/\\/g, '/');
-    return normalizedPath.includes('/WinCC_OA/') || normalizedPath.includes('\\WinCC_OA\\');
+    // Normalize the project path for comparison (handle both Windows and Unix paths)
+    const normalizedProjectPath = project.config.installationDir.replace(/\\/g, '/').toLowerCase();
+
+    const oaVersions = winccOAPaths.getAvailableWinCCOAVersions();
+    for (const version of oaVersions) {
+        const oaInstallPath = winccOAPaths.getWinCCOAInstallationPathByVersion(version);
+        if (oaInstallPath) {
+            // Normalize the OA install path for comparison
+            const normalizedOAPath = oaInstallPath.replace(/\\/g, '/').toLowerCase();
+            if (normalizedProjectPath.startsWith(normalizedOAPath)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -111,53 +148,6 @@ export function canUnregisterProject(project: WinCCOAProject): { canUnregister: 
 }
 
 /**
- * Gets the WCCILpmon executable path for a specific version
- * @param version - Optional version string
- * @returns Path to WCCILpmon executable or null if not found
- */
-export function getWCCILpmonPath(version?: string): string | null {
-    if (os.platform() !== 'win32') {
-        // On non-Windows platforms, assume pmon is in PATH
-        return 'pmon';
-    }
-
-    // Windows-specific logic
-    const basePath = 'C:\\Program Files\\Siemens\\WinCC_OA';
-
-    if (version) {
-        // Try specific version first
-        const versionPath = path.join(basePath, version, 'bin', 'WCCILpmon.exe');
-        if (fs.existsSync(versionPath)) {
-            return versionPath;
-        }
-    }
-
-    // Find the highest available version
-    const availableVersions = getAvailableWinCCOAVersions();
-    for (const availableVersion of availableVersions) {
-        const pmonPath = buildWCCILpmonPathFromInstallation(path.join(basePath, availableVersion));
-        if (fs.existsSync(pmonPath)) {
-            return pmonPath;
-        }
-    }
-
-    return null;
-}
-
-/**
- * Builds the WCCILpmon path from an installation directory
- * @param installationDir - The WinCC OA installation directory
- * @returns Full path to WCCILpmon executable
- */
-export function buildWCCILpmonPathFromInstallation(installationDir: string): string {
-    if (os.platform() === 'win32') {
-        return path.join(installationDir, 'bin', 'WCCILpmon.exe');
-    } else {
-        return path.join(installationDir, 'bin', 'pmon');
-    }
-}
-
-/**
  * Parses a version string to a comparable number
  * @param version - Version string like "3.21" or "3.20.5"
  * @returns Numeric representation for comparison
@@ -165,68 +155,6 @@ export function buildWCCILpmonPathFromInstallation(installationDir: string): str
 export function parseVersionString(version: string): number {
     const parts = version.split('.').map(part => parseInt(part, 10));
     return parts[0] * 10000 + (parts[1] || 0) * 100 + (parts[2] || 0);
-}
-
-/**
- * Gets available WinCC OA versions installed on the system
- * @returns Array of version strings sorted from highest to lowest
- */
-export function getAvailableWinCCOAVersions(): string[] {
-    if (os.platform() !== 'win32') {
-        return [];
-    }
-
-    const basePath = 'C:\\Program Files\\Siemens\\WinCC_OA';
-
-    try {
-        if (!fs.existsSync(basePath)) {
-            return [];
-        }
-
-        const versions = fs
-            .readdirSync(basePath)
-            .filter(item => {
-                const fullPath = path.join(basePath, item);
-                return fs.statSync(fullPath).isDirectory() && /^\d+\.\d+/.test(item);
-            })
-            .sort((a, b) => parseVersionString(b) - parseVersionString(a)); // Sort descending
-
-        return versions;
-    } catch (error) {
-        return [];
-    }
-}
-
-//--------------------------------------------------------------------------
-
-/**
- * Gets WinCC OA installation path for a specific version
- * @param version - Version string like "3.21" or "3.20.5"
- * @returns Installation path or null if not found
- */
-export function getWinCCOAInstallationPath(version: string): string | null {
-    if (os.platform() !== 'win32') {
-        return null;
-    }
-
-    const installPath = path.join('C:\\Program Files\\Siemens\\WinCC_OA', version);
-
-    if (fs.existsSync(installPath)) {
-        return installPath;
-    }
-
-    return null;
-}
-
-//--------------------------------------------------------------------------
-
-/**
- * Searches for pmon executable for a specific version
- * @param version - WinCC OA version
- * @returns Path to pmon executable or null if not found
- */
-export function searchForPmonExecutable(version: string): string | null {
-    return getWCCILpmonPath(version);
 }
 
 //--------------------------------------------------------------------------
@@ -250,43 +178,11 @@ export function readProjectVersionFromConfig(projectDir: string): string | null 
             }
         }
 
-        // Try to read from progs/config.dat file (alternative location)
-        const altConfigPath = path.join(projectDir, 'progs', 'config.dat');
-        if (fs.existsSync(altConfigPath)) {
-            const content = fs.readFileSync(altConfigPath, 'utf-8');
-
-            // Look for proj_version line
-            const versionMatch = content.match(/^proj_version\s*=\s*"?([^"\r\n]+)"?/m);
-            if (versionMatch) {
-                return versionMatch[1].trim();
-            }
-        }
-
         return null;
     } catch (error) {
         return null;
     }
 }
-
-//--------------------------------------------------------------------------
-
-/**
- * Marks a project as not runnable (placeholder function)
- * @param project - Project to mark
- */
-export function markProjectAsNotRunnable(project: any): void {
-    if (project && typeof project === 'object') {
-        project.isRunnable = false;
-    }
-}
-
-//--------------------------------------------------------------------------
-
-/**
- * Alias for getAvailableWinCCOAVersions for backward compatibility
- * @returns Array of version strings sorted from highest to lowest
- */
-export const findAvailableWinCCOAVersions = getAvailableWinCCOAVersions;
 
 /**
  * Parses manager list output from WCCILpmon

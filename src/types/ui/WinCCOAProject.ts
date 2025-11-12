@@ -23,6 +23,9 @@ export class WinCCOAProject extends vscode.TreeItem {
     /** Current PMON status of the project */
     private _pmonStatus: PmonProjectRunningStatus = PmonProjectRunningStatus.Unknown;
 
+    /** Function to check if project can be unregistered (for protected status) */
+    private _canUnregisterCheck?: (project: WinCCOAProject) => { canUnregister: boolean; reason?: string };
+
     /**
      * Creates a new WinCC OA project tree item.
      *
@@ -44,6 +47,25 @@ export class WinCCOAProject extends vscode.TreeItem {
         this.tooltip = this.createTooltip();
         this.description = this.createDescription();
         this.contextValue = this.getContextValue();
+        this.iconPath = this.getIcon();
+    }
+
+    //--------------------------------------------------------------------------
+
+    /**
+     * Sets the function used to check if project can be unregistered.
+     * This is used to determine protected project status.
+     *
+     * @param checkFn Function that checks unregister eligibility
+     */
+    public setCanUnregisterCheck(
+        checkFn: (project: WinCCOAProject) => { canUnregister: boolean; reason?: string }
+    ): void {
+        this._canUnregisterCheck = checkFn;
+        // Update UI elements that depend on protected status
+        this.contextValue = this.getContextValue();
+        this.tooltip = this.createTooltip();
+        this.description = this.createDescription();
         this.iconPath = this.getIcon();
     }
 
@@ -102,6 +124,14 @@ export class WinCCOAProject extends vscode.TreeItem {
             return 'winccOAProjectUnregistered';
         }
 
+        // Check if project can be unregistered (protected projects)
+        if (this._canUnregisterCheck) {
+            const canUnregisterResult = this._canUnregisterCheck(this);
+            if (!canUnregisterResult.canUnregister) {
+                return 'winccOAProjectProtected';
+            }
+        }
+
         // Runnable projects have different contexts based on running state
         if (this.isRunnable) {
             switch (this._pmonStatus) {
@@ -156,6 +186,13 @@ export class WinCCOAProject extends vscode.TreeItem {
         if (this.contextValue === 'winccOAProjectUnregistered') {
             lines.unshift('⚠️ NOT REGISTERED IN PVSS CONFIGURATION');
             lines.push('Right-click to register this project.');
+        } else if (this.contextValue === 'winccOAProjectProtected') {
+            lines.unshift('🚫 PROTECTED FROM UNREGISTRATION');
+            if (this.isWinCCOASystem) {
+                lines.push('This is a WinCC OA system installation and cannot be unregistered.');
+            } else {
+                lines.push('This is a WinCC OA delivered sub-project and cannot be unregistered.');
+            }
         } else if (this.isCurrent) {
             lines.unshift('*** CURRENT PROJECT ***');
         }
@@ -176,6 +213,8 @@ export class WinCCOAProject extends vscode.TreeItem {
         // Add status indicators
         if (this.contextValue === 'winccOAProjectUnregistered') {
             labels.push('❗ Unregistered');
+        } else if (this.contextValue === 'winccOAProjectProtected') {
+            labels.push('🚫 Protected');
         } else if (this.isCurrent) {
             labels.push('⭐ Current');
         }

@@ -21,11 +21,5 @@ export enum PmonProjectRunningStatus {
     Running = 'running',
 
     /** Project is configured but not currently running */
-    NotRunning = 'not-running',
-
-    /** Project exists but cannot be run (configuration issues) */
-    NotRunnable = 'not-runnable',
-
-    /** System project (part of WinCC OA installation) */
-    SystemProject = 'system-project'
+    NotRunning = 'not-running'
 }
