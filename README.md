@@ -146,6 +146,11 @@ Every contribution helps maintain and improve this extension for the entire WinC
 
 ## Documentation & Resources
 
+### Strategic Vision
+
+- [📘 **Vision Document**](VISION.md) - Long-term roadmap and ecosystem strategy
+- [🗺️ **Roadmap**](https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/wiki/Roadmap) - Development phases and milestones
+
 ### User Guides
 
 - [User Guide](docs/USER_GUIDE.md) - Complete feature walkthrough
