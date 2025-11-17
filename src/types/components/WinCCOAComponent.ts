@@ -103,28 +103,56 @@ export abstract class WinCCOAComponent {
     }
 
     public async getHelp(): Promise<string | null> {
+        const exePath = this.getPath();
+        if (!exePath) {
+            this.stdErr = 'Executable path not found';
+            return null;
+        }
         try {
-            const output = execSync(`"${this.getPath()}" -help`, {
+            const output = execSync(`"${exePath}" -help`, {
                 encoding: 'utf-8',
-                timeout: 5000
+                timeout: 5000,
+                stdio: ['ignore', 'pipe', 'pipe']
             });
             return output;
         } catch (error: any) {
-            this.stdErr = error.message || '';
+            // execSync throws; attempt to salvage stdout if command produced help text despite non-zero exit
+            if (error?.status !== undefined && error.stdout) {
+                const recovered = error.stdout.toString();
+                if (recovered.trim()) {
+                    this.stdOut = recovered;
+                    return recovered;
+                }
+            }
+            this.stdErr = error.message || 'Unknown error running -help';
             return null;
         }
     }
 
     /** Returns the component version */
     public async getVersion(): Promise<string | null> {
+        const exePath = this.getPath();
+        if (!exePath) {
+            this.stdErr = 'Executable path not found';
+            return null;
+        }
         try {
-            const output = execSync(`"${this.getPath()}" -version`, {
+            const output = execSync(`"${exePath}" -version`, {
                 encoding: 'utf-8',
-                timeout: 5000
+                timeout: 5000,
+                stdio: ['ignore', 'pipe', 'pipe']
             });
             return output.trim();
         } catch (error: any) {
-            this.stdErr = error.message || '';
+            // If component returns non-zero but still prints version, capture it
+            if (error?.status !== undefined && error.message) {
+                const recovered = error.message.toString().trim();
+                if (recovered) {
+                    error.message = recovered;
+                    return recovered;
+                }
+            }
+            this.stdErr = error.message || 'Unknown error running -version';
             return null;
         }
     }
