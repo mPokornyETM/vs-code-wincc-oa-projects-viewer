@@ -31,3 +31,7 @@ export * from './history/PmonCommandHistory';
 
 // Version information types
 export * from './version/DetailedVersionInfo';
+
+// Component types
+export * from './components/WinCCOAComponent';
+export * from './components/ComponentImplementations';

@@ -1,7 +1,8 @@
 import * as assert from 'assert';
 
-// Import functions from extension
-import { parseVersionOutput, DetailedVersionInfo } from '../extension';
+// Import functions from version module
+import { parseVersionOutput } from '../version';
+import { DetailedVersionInfo } from '../types';
 
 suite('WinCC OA Version Information - Unit Tests', () => {
     suite('parseVersionOutput Function', () => {
@@ -24,7 +25,7 @@ suite('WinCC OA Version Information - Unit Tests', () => {
         test('should parse Linux output format correctly', () => {
             const output =
                 'WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.21.0 platform Linux x86_64 linked at Jan 15 2025 14:30:22 (abc123def4)\nWCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!';
-            const executablePath = '/opt/wincc_oa/3.21/bin/WCCILpmon';
+            const executablePath = '/opt/WinCC_OA/3.21/bin/WCCILpmon';
 
             const result = parseVersionOutput(output, executablePath);
 

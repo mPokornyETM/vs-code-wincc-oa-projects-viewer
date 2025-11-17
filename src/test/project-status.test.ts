@@ -22,9 +22,9 @@ class MockWinCCOAProject extends vscode.TreeItem {
 
 suite('WinCC OA Project Status Check Tests', () => {
     test('PmonProjectRunningStatus enum should have correct values', () => {
-        assert.strictEqual(PmonProjectRunningStatus.RUNNING, 'running');
-        assert.strictEqual(PmonProjectRunningStatus.STOPPED, 'stopped');
-        assert.strictEqual(PmonProjectRunningStatus.UNKNOWN, 'unknown');
+        assert.strictEqual(PmonProjectRunningStatus.Running, 'running');
+        assert.strictEqual(PmonProjectRunningStatus.NotRunning, 'not-running');
+        assert.strictEqual(PmonProjectRunningStatus.Unknown, 'unknown');
     });
 
     test('checkProjectRunningStatus should reject non-runnable projects', async () => {

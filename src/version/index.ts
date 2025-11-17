@@ -1,7 +1,5 @@
 import * as vscode from 'vscode';
-import * as childProcess from 'child_process';
-import { DetailedVersionInfo, WinCCOAProject } from '../types';
-import { getWCCILpmonPath } from '../utils';
+import { DetailedVersionInfo, WinCCOAProject, PmonComponent, WinCCOAComponent } from '../types';
 
 /**
  * Gets detailed version information from a WinCC OA project
@@ -9,58 +7,32 @@ import { getWCCILpmonPath } from '../utils';
  * @returns Promise with detailed version information
  */
 export async function getDetailedVersionInfo(project: WinCCOAProject): Promise<DetailedVersionInfo> {
-    return new Promise((resolve, reject) => {
-        // Only get version info for WinCC OA system projects
-        if (!project.isWinCCOASystem) {
-            reject(new Error('Version information is only available for WinCC OA system installations'));
-            return;
-        }
+    // Only get version info for WinCC OA system projects
+    if (!project.isWinCCOASystem) {
+        throw new Error('Version information is only available for WinCC OA system installations');
+    }
 
-        // Get the pmon path for this project's version
-        const projectVersion = project.version;
-        const pmonPath = getWCCILpmonPath(projectVersion);
+    // Create PmonComponent instance for this project's version
+    const pmonComponent = new PmonComponent();
+    if (project.version) {
+        pmonComponent.setOaVersion(project.version);
+    }
 
-        if (!pmonPath) {
-            reject(new Error(`WCCILpmon executable not found for version ${projectVersion || 'default'}`));
-            return;
-        }
+    const pmonPath = pmonComponent.getPath();
+    if (!pmonPath) {
+        throw new Error(`WCCILpmon executable not found for version ${project.version || 'default'}`);
+    }
 
-        // Execute WCCILpmon -version
-        const pmonProcess = childProcess.spawn(pmonPath, ['-version'], {
-            stdio: ['pipe', 'pipe', 'pipe']
-        });
+    // Get version output using PmonComponent
+    const versionOutput = await pmonComponent.getVersion();
+    if (!versionOutput) {
+        throw new Error(`Failed to get version information: ${pmonComponent.getStdErr()}`);
+    }
 
-        let stdout = '';
-        let stderr = '';
+    // Parse version output using WinCCOAComponent static method
+    const versionInfo = WinCCOAComponent.parseVersionOutput(versionOutput, pmonPath);
 
-        pmonProcess.stdout?.on('data', data => {
-            stdout += data.toString();
-        });
-
-        pmonProcess.stderr?.on('data', data => {
-            stderr += data.toString();
-        });
-
-        pmonProcess.on('close', code => {
-            if (code === 0 || stdout.trim() !== '') {
-                try {
-                    const versionInfo = parseVersionOutput(stdout + stderr, pmonPath);
-                    resolve(versionInfo);
-                } catch (parseError) {
-                    reject(new Error(`Failed to parse version output: ${parseError}`));
-                }
-            } else {
-                reject(new Error(`WCCILpmon exited with code ${code}: ${stderr || 'No error details available'}`));
-            }
-        });
-
-        pmonProcess.on('error', error => {
-            reject(new Error(`Failed to execute WCCILpmon: ${error.message}`));
-        });
-
-        // Close stdin to prevent hanging
-        pmonProcess.stdin?.end();
-    });
+    return versionInfo;
 }
 
 /**
@@ -68,100 +40,10 @@ export async function getDetailedVersionInfo(project: WinCCOAProject): Promise<D
  * @param output - Raw output from WCCILpmon -version
  * @param executablePath - Path to the WCCILpmon executable
  * @returns Parsed version information
+ * @deprecated Use WinCCOAComponent.parseVersionOutput() instead
  */
 export function parseVersionOutput(output: string, executablePath: string): DetailedVersionInfo {
-    const defaultInfo: DetailedVersionInfo = {
-        version: 'Unknown',
-        platform: 'Unknown',
-        architecture: 'Unknown',
-        buildDate: 'Unknown',
-        commitHash: 'Unknown',
-        executablePath,
-        rawOutput: output
-    };
-
-    if (!output || output.trim() === '') {
-        return defaultInfo;
-    }
-
-    try {
-        // Handle different timestamp formats and improved regex pattern
-        const versionRegex =
-            /WCCILpmon.*?(\d{4})\.(\d{2})\.(\d{2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3}):\s*(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)\s+platform\s+(\w+(?:\s+\w+)*)\s+linked\s+at\s+(.+?)\s+\(([a-f0-9]+)\)/i;
-        const match = output.match(versionRegex);
-
-        if (match) {
-            // Full parsing successful
-            const [
-                ,
-                year,
-                month,
-                day,
-                hour,
-                minute,
-                second,
-                millisecond,
-                version,
-                platformAndArch,
-                buildDate,
-                commitHash
-            ] = match;
-
-            // Split platform and architecture
-            const platformParts = platformAndArch.trim().split(/\s+/);
-            const platform = platformParts[0] || 'Unknown';
-            const architecture = platformParts.length > 1 ? platformParts.slice(1).join(' ') : 'Unknown';
-
-            return {
-                version,
-                platform,
-                architecture,
-                buildDate: buildDate.trim(),
-                commitHash: commitHash.substring(0, 8), // Show first 8 characters
-                executablePath,
-                rawOutput: output
-            };
-        }
-
-        // Try partial parsing for cases where build info might be missing
-        const partialRegex = /(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)\s+platform\s+(\w+(?:\s+\w+)*)/i;
-        const partialMatch = output.match(partialRegex);
-
-        if (partialMatch) {
-            const [, version, platformAndArch] = partialMatch;
-            const platformParts = platformAndArch.trim().split(/\s+/);
-            const platform = platformParts[0] || 'Unknown';
-            const architecture = platformParts.length > 1 ? platformParts.slice(1).join(' ') : 'Unknown';
-
-            return {
-                version,
-                platform,
-                architecture,
-                buildDate: 'Not available',
-                commitHash: 'Not available',
-                executablePath,
-                rawOutput: output
-            };
-        }
-
-        // Try to extract just the version as a fallback
-        const versionOnlyRegex = /(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)/;
-        const versionMatch = output.match(versionOnlyRegex);
-
-        if (versionMatch) {
-            return {
-                ...defaultInfo,
-                version: versionMatch[1],
-                rawOutput: output
-            };
-        }
-
-        // If no patterns match, return default with raw output
-        return defaultInfo;
-    } catch (error) {
-        // If parsing fails, return default info with raw output for debugging
-        return defaultInfo;
-    }
+    return WinCCOAComponent.parseVersionOutput(output, executablePath);
 }
 
 /**

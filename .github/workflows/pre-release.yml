@@ -277,13 +277,14 @@ jobs:
             - name: Delete Old Pre-Releases
               run: |
                   echo "🧹 Cleaning up old pre-releases..."
-                  
+
                   # Get all pre-releases sorted by creation date (newest first)
-                  PRERELEASES=$(gh release list --limit 100 --json tagName,isPrerelease,createdAt --jq '.[] | select(.isPrerelease == true) | .tagName' | sort -r)
-                  
+                  # Use jq to sort by createdAt timestamp, not alphabetically
+                  PRERELEASES=$(gh release list --limit 100 --json tagName,isPrerelease,createdAt --jq '[.[] | select(.isPrerelease == true)] | sort_by(.createdAt) | reverse | .[].tagName')
+
                   # Skip the first (latest) pre-release
                   OLD_PRERELEASES=$(echo "$PRERELEASES" | tail -n +2)
-                  
+
                   if [ -z "$OLD_PRERELEASES" ]; then
                     echo "✅ No old pre-releases to delete"
                   else

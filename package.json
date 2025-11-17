@@ -35,7 +35,7 @@
     "activationEvents": [
         "onStartupFinished"
     ],
-    "main": "./out/extension.js",
+    "main": "./dist/extension.js",
     "contributes": {
         "views": {
             "winccOAExplorer": [
@@ -201,6 +201,21 @@
                 "command": "winccOAProjects.removeManager",
                 "title": "WinCC OA: Remove Manager",
                 "icon": "$(trash)"
+            },
+            {
+                "command": "winccOAProjects.formatCtrlFile",
+                "title": "WinCC OA: Format CTRL File",
+                "icon": "$(code)"
+            },
+            {
+                "command": "winccOAProjects.formatAllCtrlFiles",
+                "title": "WinCC OA: Format All CTRL Files",
+                "icon": "$(file-code)"
+            },
+            {
+                "command": "winccOAProjects.formatAllCtrlFilesInFolder",
+                "title": "WinCC OA: Format All CTRL Files in Folder",
+                "icon": "$(file-code)"
             }
         ],
         "menus": {
@@ -353,6 +368,16 @@
                     "command": "winccOAProjects.registerRunnableProject",
                     "when": "explorerResourceIsFolder",
                     "group": "2_workspace@2"
+                },
+                {
+                    "command": "winccOAProjects.formatCtrlFile",
+                    "when": "resourceExtname == .ctl",
+                    "group": "7_modification@1"
+                },
+                {
+                    "command": "winccOAProjects.formatAllCtrlFilesInFolder",
+                    "when": "explorerResourceIsFolder",
+                    "group": "7_modification@2"
                 }
             ],
             "editor/title/context": [
@@ -415,6 +440,19 @@
                 },
                 {
                     "command": "winccOAProjects.showCommandHistory"
+                },
+                {
+                    "command": "winccOAProjects.formatCtrlFile"
+                },
+                {
+                    "command": "winccOAProjects.formatAllCtrlFiles"
+                }
+            ],
+            "editor/context": [
+                {
+                    "command": "winccOAProjects.formatCtrlFile",
+                    "when": "resourceExtname == .ctl",
+                    "group": "1_modification@1"
                 }
             ]
         },
@@ -449,15 +487,36 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Enable automatic refresh of Manager Overview"
+                },
+                "winccOAProjects.astylePath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Path to astyle.exe for formatting CTRL files. If not set, the extension will try to find it automatically from WinCC OA installation."
+                },
+                "winccOAProjects.astyleConfigPath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Path to astyle.config file for CTRL code formatting. If not set, the extension will use the default config from WinCC OA installation (e.g., C:\\Siemens\\Automation\\WinCC_OA\\3.20\\config\\astyle.config)."
+                },
+                "winccOAProjects.astyleCreateBackup": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Create .orig backup files when formatting CTRL code. Not recommended when using source control."
                 }
             }
         }
     },
     "scripts": {
-        "vscode:prepublish": "npm run compile",
-        "compile": "tsc -p ./",
-        "watch": "tsc -watch -p ./",
-        "pretest": "npm run compile && npm run lint",
+        "vscode:prepublish": "npm run package",
+        "compile": "npm run check-types && node esbuild.js",
+        "check-types": "tsc --noEmit",
+        "watch": "npm-run-all -p watch:*",
+        "watch:esbuild": "node esbuild.js --watch",
+        "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+        "package": "npm run check-types && node esbuild.js --production",
+        "compile-tests": "tsc -p . --outDir out",
+        "watch-tests": "tsc -p . -w --outDir out",
+        "pretest": "npm run compile-tests && npm run compile && npm run lint",
         "lint": "eslint src/**/*.ts",
         "lint:fix": "eslint src/**/*.ts --fix",
         "lint:md": "markdownlint \"**/*.md\" --ignore node_modules",
@@ -476,8 +535,8 @@
         "test": "vscode-test",
         "test:coverage": "c8 --reporter=lcov --reporter=text --reporter=json --reporter=json-summary --all --src src --exclude 'src/test/**' npm test",
         "coverage": "npm run test:coverage",
-        "build:vsix": "npm run compile && vsce package",
-        "package": "vsce package",
+        "build:vsix": "npm run package && vsce package",
+        "package:vsix": "vsce package",
         "release": "standard-version",
         "release:minor": "standard-version --release-as minor",
         "release:major": "standard-version --release-as major",
@@ -488,15 +547,17 @@
         "@types/node": "24.x",
         "@types/sinon": "^17.0.4",
         "@types/vscode": "^1.105.0",
-        "@typescript-eslint/eslint-plugin": "^8.46.2",
+        "@typescript-eslint/eslint-plugin": "^8.46.4",
         "@typescript-eslint/parser": "^8.45.0",
         "@vscode/test-cli": "^0.0.12",
         "@vscode/test-electron": "^2.5.2",
         "c8": "^10.1.3",
         "canvas": "^3.2.0",
-        "eslint": "^9.39.0",
-        "eslint-plugin-jsdoc": "^50.8.0",
+        "esbuild": "^0.27.0",
+        "eslint": "^9.39.1",
+        "eslint-plugin-jsdoc": "^61.1.12",
         "markdownlint-cli": "^0.45.0",
+        "npm-run-all": "^4.1.5",
         "prettier": "^3.6.2",
         "sinon": "^21.0.0",
         "typescript": "^5.9.3"
@@ -507,6 +568,6 @@
         "@types/marked": "^6.0.0",
         "dompurify": "^3.3.0",
         "jsdom": "^27.1.0",
-        "marked": "^16.4.1"
+        "marked": "^17.0.0"
     }
 }

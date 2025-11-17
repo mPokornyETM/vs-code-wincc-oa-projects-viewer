@@ -3,6 +3,19 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as childProcess from 'child_process';
+import * as formatting from './formatting';
+import * as pmon from './pmon';
+import { PmonProjectRunningStatus } from './types/project/PmonProjectRunningStatus';
+import { PmonComponent, DetailedVersionInfo } from './types';
+import { getDetailedVersionInfo } from './version';
+import {
+    analyzePmonResponse,
+    canUnregisterProject,
+    isWinCCOADeliveredSubProject,
+    extractVersionFromProject
+} from './utils';
+import { WinCCOAProject } from './types/ui/WinCCOAProject';
+
 // import { JSDOM } from 'jsdom';
 // import * as DOMPurify from 'dompurify';
 
@@ -34,27 +47,6 @@ function getPvssInstConfPath(): string {
         // Unix/Linux path
         return '/etc/opt/pvss/pvssInst.conf';
     }
-}
-
-/**
- * Analyzes pmon command response to determine success/failure
- * @param response - The raw response from pmon command
- * @returns Object with success status and error reason if failed
- */
-function analyzePmonResponse(response: string): { success: boolean; errorReason?: string } {
-    const trimmedResponse = response.trim();
-
-    if (trimmedResponse === 'OK') {
-        return { success: true };
-    }
-
-    if (trimmedResponse.startsWith('ERROR')) {
-        const errorReason = trimmedResponse.substring(5).trim(); // Remove 'ERROR' prefix
-        return { success: false, errorReason };
-    }
-
-    // Consider empty or other responses as successful if they don't start with ERROR
-    return { success: true };
 }
 
 /**
@@ -324,6 +316,9 @@ export function activate(context: vscode.ExtensionContext) {
     // Create output channel for WCCILpmon command outputs
     outputChannel = vscode.window.createOutputChannel('WinCC OA Projects');
     context.subscriptions.push(outputChannel);
+
+    // Initialize the pmon module with the output channel
+    pmon.initializePmonModule(outputChannel);
 
     const provider = new WinCCOAProjectProvider();
     projectProvider = provider;
@@ -832,32 +827,7 @@ export function activate(context: vscode.ExtensionContext) {
             let targetProject: WinCCOAProject | undefined = project;
 
             if (!targetProject) {
-                // Show selection dialog for WinCC OA system projects
-                const systemProjects = provider.getProjects().filter(p => p.isWinCCOASystem);
-
-                if (systemProjects.length === 0) {
-                    vscode.window.showErrorMessage('No WinCC OA system installations found.');
-                    return;
-                }
-
-                const projectItems = systemProjects.map((p: WinCCOAProject) => ({
-                    label: p.config.name,
-                    description: p.config.installationDir,
-                    detail: `WinCC OA v${p.version} System Installation`,
-                    project: p
-                }));
-
-                const selected = await vscode.window.showQuickPick(projectItems, {
-                    placeHolder: 'Select WinCC OA version to get detailed information...',
-                    matchOnDescription: true,
-                    matchOnDetail: true
-                });
-
-                if (!selected) {
-                    return; // User cancelled
-                }
-
-                targetProject = selected.project;
+                targetProject = await selectWinCCOAVersion();
             }
 
             if (targetProject) {
@@ -929,15 +899,15 @@ export function activate(context: vscode.ExtensionContext) {
                 let icon: string;
 
                 switch (status) {
-                    case PmonProjectRunningStatus.RUNNING:
+                    case PmonProjectRunningStatus.Running:
                         icon = '✅';
                         message = `Project '${project.config.name}' is currently RUNNING.`;
                         break;
-                    case PmonProjectRunningStatus.STOPPED:
+                    case PmonProjectRunningStatus.NotRunning:
                         icon = '⏹️';
                         message = `Project '${project.config.name}' is currently STOPPED.`;
                         break;
-                    case PmonProjectRunningStatus.UNKNOWN:
+                    case PmonProjectRunningStatus.Unknown:
                         icon = '❓';
                         message = `Project '${project.config.name}' status is UNKNOWN.`;
                         break;
@@ -985,7 +955,7 @@ export function activate(context: vscode.ExtensionContext) {
                         const status = await checkProjectRunningStatus(project);
                         return { project: project.config.name, status };
                     } catch (error) {
-                        return { project: project.config.name, status: PmonProjectRunningStatus.UNKNOWN, error };
+                        return { project: project.config.name, status: PmonProjectRunningStatus.Unknown, error };
                     }
                 })
             );
@@ -996,16 +966,16 @@ export function activate(context: vscode.ExtensionContext) {
                 } else {
                     return {
                         project: runnableProjects[index].config.name,
-                        status: PmonProjectRunningStatus.UNKNOWN,
+                        status: PmonProjectRunningStatus.Unknown,
                         error: result.reason
                     };
                 }
             });
 
             // Display results
-            const runningProjects = results.filter((r: any) => r.status === PmonProjectRunningStatus.RUNNING);
-            const stoppedProjects = results.filter((r: any) => r.status === PmonProjectRunningStatus.STOPPED);
-            const unknownProjects = results.filter((r: any) => r.status === PmonProjectRunningStatus.UNKNOWN);
+            const runningProjects = results.filter((r: any) => r.status === PmonProjectRunningStatus.Running);
+            const stoppedProjects = results.filter((r: any) => r.status === PmonProjectRunningStatus.NotRunning);
+            const unknownProjects = results.filter((r: any) => r.status === PmonProjectRunningStatus.Unknown);
 
             let message = `Status refresh complete:\n`;
             message += `✅ Running: ${runningProjects.length}\n`;
@@ -1051,7 +1021,7 @@ export function activate(context: vscode.ExtensionContext) {
                             projectName: project.config.name,
                             isRunning: false,
                             managers: [],
-                            pmonStatus: PmonProjectRunningStatus.UNKNOWN,
+                            pmonStatus: PmonProjectRunningStatus.Unknown,
                             lastUpdate: new Date(),
                             error: error instanceof Error ? error.message : String(error)
                         } as WinCCOAProjectStatus & { error: string };
@@ -1067,7 +1037,7 @@ export function activate(context: vscode.ExtensionContext) {
                             projectName: runnableProjects[index].config.name,
                             isRunning: false,
                             managers: [],
-                            pmonStatus: PmonProjectRunningStatus.UNKNOWN,
+                            pmonStatus: PmonProjectRunningStatus.Unknown,
                             lastUpdate: new Date(),
                             error: result.reason instanceof Error ? result.reason.message : String(result.reason)
                         } as WinCCOAProjectStatus & { error: string };
@@ -1497,6 +1467,40 @@ export function activate(context: vscode.ExtensionContext) {
         showCommandHistory();
     });
 
+    // Code Formatting Commands
+    const formatCtrlFileCommand = vscode.commands.registerCommand(
+        'winccOAProjects.formatCtrlFile',
+        async (uri?: vscode.Uri) => {
+            if (uri) {
+                // Called from explorer context menu
+                await formatting.formatCtrlFileFromUri(uri);
+            } else {
+                // Called from command palette or editor
+                await formatting.formatActiveCtrlFile();
+            }
+        }
+    );
+
+    const formatAllCtrlFilesCommand = vscode.commands.registerCommand(
+        'winccOAProjects.formatAllCtrlFiles',
+        async () => {
+            await formatting.formatAllCtrlFiles();
+        }
+    );
+
+    const formatAllCtrlFilesInFolderCommand = vscode.commands.registerCommand(
+        'winccOAProjects.formatAllCtrlFilesInFolder',
+        async (uri?: vscode.Uri) => {
+            await formatting.formatAllCtrlFilesInFolder(uri);
+        }
+    );
+
+    // Register document formatting provider for .ctl files
+    const ctrlFormattingProvider = vscode.languages.registerDocumentFormattingEditProvider(
+        { scheme: 'file', pattern: '**/*.ctl' },
+        new formatting.CtrlDocumentFormattingProvider()
+    );
+
     context.subscriptions.push(
         treeView,
         watcher,
@@ -1528,7 +1532,11 @@ export function activate(context: vscode.ExtensionContext) {
         startManagerCommand,
         stopManagerCommand,
         killManagerCommand,
-        removeManagerCommand
+        removeManagerCommand,
+        formatCtrlFileCommand,
+        formatAllCtrlFilesCommand,
+        formatAllCtrlFilesInFolderCommand,
+        ctrlFormattingProvider
     );
 
     // Auto-refresh when extension starts
@@ -1557,123 +1565,32 @@ interface CurrentProjectInfo {
     lastUsedProjectDir?: string;
 }
 
-// Standalone utility functions for testing
-export function extractVersionFromProject(project: WinCCOAProject): string | null {
-    // Check for null or undefined project
-    if (!project || !project.config) {
-        return null;
-    }
-
-    // Try to extract version from project version field first
-    if (project.version) {
-        return project.version;
-    }
-
-    // Try to find version from system projects (performance-oriented approach)
-    const systemProjects = projectProvider?.getProjects().filter(p => p.isWinCCOASystem) || [];
-    const systemProject = systemProjects.find(p => project.config.installationDir.startsWith(p.config.installationDir));
-    if (systemProject) {
-        return systemProject.version || null;
-    }
-
-    // Fallback: Try to extract version from project name (look for patterns like 3.20, 3_20, 3.21.1, etc.)
-    if (project.config.name) {
-        const versionMatch = project.config.name.match(/(\d{1,2}[._]\d{1,2}(?:[._]\d{1,2})?)/);
-        if (versionMatch) {
-            // Convert underscores to dots for consistency
-            return versionMatch[1].replace(/_/g, '.');
-        }
-    }
-
-    // Fallback: Try to extract from installation directory path
-    if (project.config.installationDir) {
-        const pathVersionMatch = project.config.installationDir.match(/(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)/);
-        if (pathVersionMatch) {
-            return pathVersionMatch[1];
-        }
-    }
-
-    return null;
-}
-
-export function isWinCCOADeliveredSubProject(project: WinCCOAProject): boolean {
-    // Check for null or undefined project
-    if (!project || !project.config || !project.config.installationDir) {
-        return false;
-    }
-
-    // Try to find if project is under a system project (performance-oriented approach)
-    const systemProjects = projectProvider?.getProjects().filter(p => p.isWinCCOASystem) || [];
-    const systemProject = systemProjects.find(p => project.config.installationDir.startsWith(p.config.installationDir));
-    if (systemProject) {
-        return true;
-    }
-
-    // Fallback: Check if the project is installed in common WinCC OA installation directories
-    const installDir = project.config.installationDir.toLowerCase().replace(/\\/g, '/');
-    const commonWinCCOAPaths = [
-        'c:/siemens/automation/wincc_oa/',
-        'c:/program files/siemens/wincc_oa/',
-        'c:/program files (x86)/siemens/wincc_oa/',
-        'c:/programdata/siemens/wincc_oa/',
-        '/opt/wincc_oa/'
-    ];
-
-    return commonWinCCOAPaths.some(path => installDir.startsWith(path));
-}
-
-/**
- * Checks if a project can be safely unregistered
- * @param project The project to check
- * @returns Object with canUnregister flag and reason if not allowed
- */
-export function canUnregisterProject(project: WinCCOAProject): { canUnregister: boolean; reason?: string } {
-    // WinCC OA System versions cannot be unregistered
-    if (project.isWinCCOASystem) {
-        return {
-            canUnregister: false,
-            reason: 'WinCC OA system versions cannot be unregistered as they are part of the core installation.'
-        };
-    }
-
-    // WinCC OA delivered sub-projects cannot be unregistered
-    if (isWinCCOADeliveredSubProject(project)) {
-        return {
-            canUnregister: false,
-            reason: 'WinCC OA delivered sub-projects cannot be unregistered as they are part of the standard installation.'
-        };
-    }
-
-    // Project can be unregistered
-    return { canUnregister: true };
-}
-
 /**
  * Generate HTML for project status overview
  */
 function generateStatusOverviewHTML(statusList: (WinCCOAProjectStatus & { error?: string })[]): string {
-    const runningProjects = statusList.filter(s => s.pmonStatus === PmonProjectRunningStatus.RUNNING);
-    const stoppedProjects = statusList.filter(s => s.pmonStatus === PmonProjectRunningStatus.STOPPED);
-    const unknownProjects = statusList.filter(s => s.pmonStatus === PmonProjectRunningStatus.UNKNOWN);
+    const runningProjects = statusList.filter(s => s.pmonStatus === PmonProjectRunningStatus.Running);
+    const stoppedProjects = statusList.filter(s => s.pmonStatus === PmonProjectRunningStatus.NotRunning);
+    const unknownProjects = statusList.filter(s => s.pmonStatus === PmonProjectRunningStatus.Unknown);
 
     const projectRows = statusList
         .map(status => {
             const statusIcon =
-                status.pmonStatus === PmonProjectRunningStatus.RUNNING
+                status.pmonStatus === PmonProjectRunningStatus.Running
                     ? '✅'
-                    : status.pmonStatus === PmonProjectRunningStatus.STOPPED
+                    : status.pmonStatus === PmonProjectRunningStatus.NotRunning
                       ? '⏹️'
                       : '❓';
             const statusText =
-                status.pmonStatus === PmonProjectRunningStatus.RUNNING
+                status.pmonStatus === PmonProjectRunningStatus.Running
                     ? 'Running'
-                    : status.pmonStatus === PmonProjectRunningStatus.STOPPED
+                    : status.pmonStatus === PmonProjectRunningStatus.NotRunning
                       ? 'Stopped'
                       : 'Unknown';
             const statusColor =
-                status.pmonStatus === PmonProjectRunningStatus.RUNNING
+                status.pmonStatus === PmonProjectRunningStatus.Running
                     ? '#28a745'
-                    : status.pmonStatus === PmonProjectRunningStatus.STOPPED
+                    : status.pmonStatus === PmonProjectRunningStatus.NotRunning
                       ? '#ffc107'
                       : '#dc3545';
 
@@ -2839,170 +2756,6 @@ class ProjectCategory extends vscode.TreeItem {
     }
 }
 
-class WinCCOAProject extends vscode.TreeItem {
-    private _pmonStatus: PmonProjectRunningStatus = PmonProjectRunningStatus.UNKNOWN;
-
-    constructor(
-        public readonly config: ProjectConfig,
-        public readonly installationDir: string,
-        public readonly isRunnable: boolean = true,
-        public readonly isCurrent: boolean = false,
-        public readonly version?: string
-    ) {
-        super(config.name, vscode.TreeItemCollapsibleState.None);
-
-        this.tooltip = this.createTooltip();
-        this.description = this.createDescription();
-        this.contextValue = this.getContextValue();
-        this.iconPath = this.getIcon();
-    }
-
-    public get pmonStatus(): PmonProjectRunningStatus {
-        return this._pmonStatus;
-    }
-
-    public set pmonStatus(status: PmonProjectRunningStatus) {
-        this._pmonStatus = status;
-        this.contextValue = this.getContextValue();
-        this.iconPath = this.getIcon();
-    }
-
-    public get isWinCCOASystem(): boolean {
-        // Check if this is a WinCC OA system installation (name matches version)
-        return this.version !== undefined && this.config.name === this.version;
-    }
-
-    private getContextValue(): string {
-        // Check if project can be unregistered to determine context value
-        const canUnregisterResult = canUnregisterProject(this);
-
-        // Special context for WinCC OA system installations (to show version info)
-        if (this.isWinCCOASystem) {
-            return 'winccOASystemProject';
-        }
-
-        if (!canUnregisterResult.canUnregister) {
-            // Protected projects (delivered sub-projects) get a special context
-            return 'winccOAProjectProtected';
-        }
-
-        // Differentiate between runnable and non-runnable projects with pmon status
-        if (this.isRunnable) {
-            // Add pmon status to context for runnable projects to enable/disable commands
-            switch (this._pmonStatus) {
-                case PmonProjectRunningStatus.RUNNING:
-                    return 'winccOAProjectRunnableRunning';
-                case PmonProjectRunningStatus.STOPPED:
-                    return 'winccOAProjectRunnableStopped';
-                case PmonProjectRunningStatus.UNKNOWN:
-                default:
-                    return 'winccOAProjectRunnable';
-            }
-        }
-
-        // Regular projects that can be unregistered but are not runnable (sub-projects)
-        return 'winccOAProject';
-    }
-
-    private createTooltip(): string {
-        let projectType: string;
-        if (this.contextValue === 'winccOAProjectUnregistered') {
-            projectType = 'Unregistered WinCC OA Project';
-        } else if (this.isWinCCOASystem) {
-            projectType = 'WinCC OA System Installation';
-        } else if (this.isRunnable) {
-            projectType = 'WinCC OA Project';
-        } else {
-            projectType = 'WinCC OA Extension/Plugin';
-        }
-
-        const lines = [
-            `Name: ${this.config.name}`,
-            `Location: ${this.config.installationDir}`,
-            `Created: ${this.config.installationDate}`,
-            `Type: ${projectType}`
-        ];
-
-        if (this.version) {
-            lines.push(`Version: ${this.version}`);
-        }
-
-        if (this.config.company) {
-            lines.push(`Company: ${this.config.company}`);
-        }
-
-        if (this.contextValue === 'winccOAProjectUnregistered') {
-            lines.unshift('⚠️ NOT REGISTERED IN PVSS CONFIGURATION');
-            lines.push('Right-click to register this project.');
-        } else if (this.contextValue === 'winccOAProjectProtected') {
-            lines.unshift('🚫 PROTECTED FROM UNREGISTRATION');
-            if (this.isWinCCOASystem) {
-                lines.push('This is a WinCC OA system installation and cannot be unregistered.');
-            } else {
-                lines.push('This is a WinCC OA delivered sub-project and cannot be unregistered.');
-            }
-        } else if (this.isCurrent) {
-            lines.unshift('*** CURRENT PROJECT ***');
-        }
-
-        return lines.join('\n');
-    }
-
-    private createDescription(): string {
-        const labels: string[] = [];
-
-        // Add status indicators
-        if (this.contextValue === 'winccOAProjectUnregistered') {
-            labels.push('❗ Unregistered');
-        } else if (this.contextValue === 'winccOAProjectProtected') {
-            labels.push('🚫 Protected');
-        } else if (this.isCurrent) {
-            labels.push('⭐ Current');
-        }
-
-        if (this.version) {
-            labels.push(`📝 v${this.version}`);
-        }
-
-        // Add project type
-        if (this.isWinCCOASystem) {
-            labels.push('⚙️ System');
-        } else if (this.isRunnable) {
-            labels.push('🚀 Project');
-        } else {
-            labels.push('🧩 Extension');
-        }
-
-        return labels.join(' • ');
-    }
-
-    private getIcon(): vscode.ThemeIcon {
-        if (this.contextValue === 'winccOAProjectUnregistered') {
-            // Unregistered projects get a warning icon
-            return new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'));
-        } else if (this.isCurrent) {
-            return new vscode.ThemeIcon('star-full', new vscode.ThemeColor('list.highlightForeground'));
-        } else if (this.isWinCCOASystem) {
-            // WinCC OA system installations (name equals version)
-            return new vscode.ThemeIcon('gear');
-        } else if (this.isRunnable) {
-            // Runnable projects - use different icons based on pmon status
-            switch (this._pmonStatus) {
-                case PmonProjectRunningStatus.RUNNING:
-                    return new vscode.ThemeIcon('play-circle', new vscode.ThemeColor('testing.iconPassed'));
-                case PmonProjectRunningStatus.STOPPED:
-                    return new vscode.ThemeIcon('stop-circle', new vscode.ThemeColor('testing.iconFailed'));
-                case PmonProjectRunningStatus.UNKNOWN:
-                default:
-                    return new vscode.ThemeIcon('server-process');
-            }
-        } else {
-            // Non-runnable are extensions/plugins/add-ons
-            return new vscode.ThemeIcon('extensions');
-        }
-    }
-}
-
 type TreeItem = ProjectCategory | WinCCOAProject;
 
 class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
@@ -3039,7 +2792,7 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
                 project.pmonStatus = status;
             } catch (error) {
                 // If we can't determine status, set to unknown
-                project.pmonStatus = PmonProjectRunningStatus.UNKNOWN;
+                project.pmonStatus = PmonProjectRunningStatus.Unknown;
             }
         }
 
@@ -3060,7 +2813,7 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
             project.pmonStatus = status;
         } catch (error) {
             // If we can't determine status, set to unknown
-            project.pmonStatus = PmonProjectRunningStatus.UNKNOWN;
+            project.pmonStatus = PmonProjectRunningStatus.Unknown;
         }
 
         // Refresh tree view to show updated icons and context
@@ -3255,7 +3008,9 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
                 const projectKey = `${config.name}_${version || 'unknown'}`;
                 const isCurrent = config.currentProject || currentProjectMap.has(projectKey);
 
-                projects.push(new WinCCOAProject(config, config.installationDir, isRunnable, isCurrent, version));
+                const project = new WinCCOAProject(config, config.installationDir, isRunnable, isCurrent, version);
+                project.setCanUnregisterCheck(canUnregisterProject);
+                projects.push(project);
             }
 
             // Add current projects that might not be in the regular project list
@@ -3284,9 +3039,15 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
                         ? this.getProjectVersion(currentProject.installationDir)
                         : currentProject.version;
 
-                    projects.push(
-                        new WinCCOAProject(currentConfig, currentProject.installationDir, isRunnable, true, version)
+                    const project = new WinCCOAProject(
+                        currentConfig,
+                        currentProject.installationDir,
+                        isRunnable,
+                        true,
+                        version
                     );
+                    project.setCanUnregisterCheck(canUnregisterProject);
+                    projects.push(project);
                 }
             }
 
@@ -3338,8 +3099,8 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
         const allSubProjects = this.projects.filter(
             p => !p.isRunnable && !p.isWinCCOASystem && !this.isUnregistered(p)
         );
-        const winccOADeliveredSubProjects = allSubProjects.filter(p => this.isWinCCOADeliveredSubProject(p));
-        const userSubProjects = allSubProjects.filter(p => !this.isWinCCOADeliveredSubProject(p));
+        const winccOADeliveredSubProjects = allSubProjects.filter(p => isWinCCOADeliveredSubProject(p));
+        const userSubProjects = allSubProjects.filter(p => !isWinCCOADeliveredSubProject(p));
 
         // Get unregistered projects
         const unregisteredProjects = this.projects.filter(p => this.isUnregistered(p));
@@ -3439,11 +3200,6 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
         return project.contextValue === 'winccOAProjectUnregistered';
     }
 
-    private isWinCCOADeliveredSubProject(project: WinCCOAProject): boolean {
-        // Use the global utility function to check for WinCC OA delivered sub-projects
-        return isWinCCOADeliveredSubProject(project);
-    }
-
     private async findUnregisteredProjects(): Promise<WinCCOAProject[]> {
         const unregisteredProjects: WinCCOAProject[] = [];
         const registeredPaths = new Set(this.projects.map(p => path.normalize(p.config.installationDir).toLowerCase()));
@@ -3517,6 +3273,9 @@ class WinCCOAProjectProvider implements vscode.TreeDataProvider<TreeItem> {
                         false, // Not current
                         version
                     );
+
+                    // Set up the unregister check
+                    unregisteredProject.setCanUnregisterCheck(canUnregisterProject);
 
                     // Mark as unregistered with special context
                     unregisteredProject.contextValue = 'winccOAProjectUnregistered';
@@ -4891,72 +4650,35 @@ async function registerRunnableProject(project: WinCCOAProject): Promise<void> {
         throw new Error('Cannot determine WinCC OA version for runnable project');
     }
 
-    const pmonPath = getWCCILpmonPath(projectVersion);
-    if (!pmonPath) {
-        throw new Error(`WCCILpmon not found for version ${projectVersion}`);
-    }
-
     const configFilePath = path.join(project.config.installationDir, 'config', 'config');
     if (!fs.existsSync(configFilePath)) {
         throw new Error('Project config file not found');
     }
 
-    return new Promise<void>((resolve, reject) => {
-        const args = ['-config', configFilePath, '-status', '-log', '+stderr', '-autofreg'];
+    // Create PmonComponent instance for this project's version
+    const pmonComponent = new PmonComponent();
+    pmonComponent.setOaVersion(projectVersion);
 
-        outputChannel.appendLine(`[Runnable Project Registration] Executing: ${pmonPath} ${args.join(' ')}`);
-        outputChannel.show(true); // Show the output channel
+    // Use PmonComponent to register the project with output callback
+    const outputCallback = (message: string) => {
+        outputChannel.append(message);
+    };
 
-        const child = childProcess.spawn(pmonPath, args, {
-            stdio: ['pipe', 'pipe', 'pipe'],
-            shell: false
-        });
+    outputChannel.appendLine(`[Runnable Project Registration] Starting registration for: ${project.config.name}`);
+    outputChannel.show(true);
 
-        let stdout = '';
-        let stderr = '';
+    try {
+        const exitCode = await pmonComponent.registerProject(configFilePath, outputCallback);
 
-        child.stdout.on('data', (data: Buffer) => {
-            const text = data.toString();
-            stdout += text;
-            outputChannel.append(text);
-        });
-
-        child.stderr.on('data', (data: Buffer) => {
-            const text = data.toString();
-            stderr += text;
-            outputChannel.append(text);
-        });
-
-        child.on('close', (code: number) => {
-            outputChannel.appendLine(`[Runnable Project Registration] WCCILpmon exited with code: ${code}`);
-            if (stdout.trim()) {
-                outputChannel.appendLine(`[Runnable Project Registration] stdout: ${stdout.trim()}`);
-            }
-            if (stderr.trim()) {
-                outputChannel.appendLine(`[Runnable Project Registration] stderr: ${stderr.trim()}`);
-            }
-
-            if (code === 3) {
-                // Success case for runnable project registration
-                outputChannel.appendLine(
-                    `[Runnable Project Registration] ✅ Successfully registered runnable project: ${project.config.name}`
-                );
-                resolve();
-            } else {
-                outputChannel.appendLine(
-                    `[Runnable Project Registration] ❌ Registration failed with exit code ${code}`
-                );
-                reject(new Error(`Registration failed with exit code ${code}. Error: ${stderr}`));
-            }
-        });
-
-        child.on('error', (error: Error) => {
+        if (exitCode === 0 || exitCode === 3) {
             outputChannel.appendLine(
-                `[Runnable Project Registration] ❌ Failed to execute WCCILpmon: ${error.message}`
+                `[Runnable Project Registration] ✅ Successfully registered runnable project: ${project.config.name}`
             );
-            reject(new Error(`Failed to execute WCCILpmon: ${error.message}`));
-        });
-    });
+        }
+    } catch (error) {
+        outputChannel.appendLine(`[Runnable Project Registration] ❌ Registration failed: ${error}`);
+        throw error;
+    }
 }
 
 /**
@@ -4964,272 +4686,36 @@ async function registerRunnableProject(project: WinCCOAProject): Promise<void> {
  * @param project The sub-project to register
  */
 async function registerSubProject(project: WinCCOAProject): Promise<void> {
-    const pmonPath = getWCCILpmonPath(); // Use highest available version for sub-projects
-    if (!pmonPath) {
-        throw new Error('WCCILpmon not found for sub-project registration');
-    }
+    const pmonComponent = new PmonComponent();
+    // Use highest available version for sub-projects (no specific version set)
 
-    return new Promise<void>((resolve, reject) => {
-        const args = ['-regsubf', '-proj', project.config.installationDir, '-log', '+stderr'];
+    const outputCallback = (message: string) => {
+        outputChannel.append(message);
+    };
 
-        outputChannel.appendLine(`[Sub-Project Registration] Executing: ${pmonPath} ${args.join(' ')}`);
-        outputChannel.show(true); // Show the output channel
+    outputChannel.appendLine(`[Sub-Project Registration] Registering sub-project: ${project.config.name}`);
+    outputChannel.show(true);
 
-        const child = childProcess.spawn(pmonPath, args, {
-            stdio: ['pipe', 'pipe', 'pipe'],
-            shell: false,
-            cwd: project.config.installationDir // Execute in project directory
-        });
-
-        let stdout = '';
-        let stderr = '';
-
-        child.stdout.on('data', (data: Buffer) => {
-            const text = data.toString();
-            stdout += text;
-            outputChannel.append(text);
-        });
-
-        child.stderr.on('data', (data: Buffer) => {
-            const text = data.toString();
-            stderr += text;
-            outputChannel.append(text);
-        });
-
-        child.on('close', (code: number) => {
-            outputChannel.appendLine(`[Sub-Project Registration] WCCILpmon exited with code: ${code}`);
-            if (stdout.trim()) {
-                outputChannel.appendLine(`[Sub-Project Registration] stdout: ${stdout.trim()}`);
-            }
-            if (stderr.trim()) {
-                outputChannel.appendLine(`[Sub-Project Registration] stderr: ${stderr.trim()}`);
-            }
-
-            if (code === 0) {
-                // Success case for sub-project registration
-                outputChannel.appendLine(
-                    `[Sub-Project Registration] ✅ Successfully registered sub-project: ${project.config.name}`
-                );
-                resolve();
-            } else {
-                outputChannel.appendLine(`[Sub-Project Registration] ❌ Registration failed with exit code ${code}`);
-                reject(new Error(`Sub-project registration failed with exit code ${code}. Error: ${stderr}`));
-            }
-        });
-
-        child.on('error', (error: Error) => {
-            outputChannel.appendLine(`[Sub-Project Registration] ❌ Failed to execute WCCILpmon: ${error.message}`);
-            reject(new Error(`Failed to execute WCCILpmon: ${error.message}`));
-        });
-    });
-}
-
-/**
- * Gets the path to WCCILpmon executable for a specific version or the highest available version
- * @param version Optional specific version to find. If not provided, returns highest available version
- * @returns Path to WCCILpmon executable or null if not found
- */
-function getWCCILpmonPath(version?: string): string | null {
-    // Get all WinCC OA system installations from registered projects
-    const systemProjects = projectProvider?.getProjects().filter(p => p.isWinCCOASystem) || [];
-
-    if (version) {
-        // Look for specific version
-        const systemProject = systemProjects.find(p => p.version === version);
-        if (systemProject) {
-            const pmonPath = buildWCCILpmonPathFromInstallation(systemProject.config.installationDir);
-            return fs.existsSync(pmonPath) ? pmonPath : null;
-        }
-    } else {
-        // Find highest available version by sorting system projects by version
-        const sortedSystems = systemProjects
-            .filter(p => p.version) // Only systems with valid version
-            .sort((a, b) => {
-                // Sort by version number (descending - highest first)
-                const versionA = parseVersionString(a.version!);
-                const versionB = parseVersionString(b.version!);
-                return versionB - versionA;
-            });
-
-        // Try each system installation from highest to lowest version
-        for (const systemProject of sortedSystems) {
-            const pmonPath = buildWCCILpmonPathFromInstallation(systemProject.config.installationDir);
-            if (fs.existsSync(pmonPath)) {
-                console.log(`Using WCCILpmon from version ${systemProject.version}: ${pmonPath}`);
-                return pmonPath;
-            }
-        }
-    }
-
-    return null;
-}
-
-/**
- * Builds the path to WCCILpmon executable from a WinCC OA installation directory
- * @param installationDir The WinCC OA installation directory from pvssInst.conf
- * @returns Full path to WCCILpmon executable
- */
-function buildWCCILpmonPathFromInstallation(installationDir: string): string {
-    if (os.platform() === 'win32') {
-        // Windows: InstallationDir + bin\WCCILpmon.exe
-        return path.join(installationDir, 'bin', 'WCCILpmon.exe');
-    } else {
-        // Linux/Unix: InstallationDir + bin/WCCILpmon
-        return path.join(installationDir, 'bin', 'WCCILpmon');
+    try {
+        await pmonComponent.registerSubProject(project.config.installationDir, outputCallback);
+        outputChannel.appendLine(
+            `[Sub-Project Registration] ✅ Successfully registered sub-project: ${project.config.name}`
+        );
+        addToCommandHistory(project.config.name, `registerSubProject ${project.config.name}`, 'OK');
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        outputChannel.appendLine(`[Sub-Project Registration] ❌ Registration failed: ${errorMessage}`);
+        addToCommandHistory(project.config.name, `registerSubProject ${project.config.name}`, `ERROR ${errorMessage}`);
+        throw new Error(`Failed to register sub-project: ${errorMessage}`);
     }
 }
 
-/**
- * Parses a version string into a numeric value for comparison
- * @param version Version string like "3.20", "3.19.1", etc.
- * @returns Numeric representation for comparison
- */
-function parseVersionString(version: string): number {
-    const parts = version.split('.').map(part => parseInt(part, 10));
-    // Convert to format: major * 10000 + minor * 100 + patch
-    return (parts[0] || 0) * 10000 + (parts[1] || 0) * 100 + (parts[2] || 0);
-}
+// Re-export PmonProjectRunningStatus from types for backward compatibility
+export { PmonProjectRunningStatus } from './types/project/PmonProjectRunningStatus';
 
-/**
- * Gets all available WinCC OA versions installed on the system
- * @returns Array of version strings
- */
-function getAvailableWinCCOAVersions(): string[] {
-    // Get all WinCC OA system installations from registered projects
-    const systemProjects = projectProvider?.getProjects().filter(p => p.isWinCCOASystem) || [];
-    const availableVersions: string[] = [];
-
-    for (const systemProject of systemProjects) {
-        if (systemProject.version) {
-            const pmonPath = buildWCCILpmonPathFromInstallation(systemProject.config.installationDir);
-            if (fs.existsSync(pmonPath)) {
-                availableVersions.push(systemProject.version);
-            }
-        }
-    }
-
-    // Sort versions in descending order (highest first)
-    return availableVersions.sort((a, b) => {
-        const versionA = parseVersionString(a);
-        const versionB = parseVersionString(b);
-        return versionB - versionA;
-    });
-}
-
-/**
- * Pmon project running status enum based on WCCILpmon exit codes
- */
-export enum PmonProjectRunningStatus {
-    RUNNING = 'running', // Exit code 0: pmon is running
-    STOPPED = 'stopped', // Exit code 3: pmon is stopped
-    UNKNOWN = 'unknown' // Exit code 4: unknown status
-}
-
-/**
- * Checks if a WinCC OA project is currently running using WCCILpmon status command
- * @param project The WinCC OA project to check
- * @returns Promise that resolves to the project running status
- */
-export async function checkProjectRunningStatus(project: WinCCOAProject): Promise<PmonProjectRunningStatus> {
-    // Only check status for runnable projects
-    if (!project.isRunnable || project.isWinCCOASystem) {
-        throw new Error(`Cannot check status for non-runnable project: ${project.config.name}`);
-    }
-
-    // Get the appropriate WCCILpmon path for this project's version
-    const pmonPath = getWCCILpmonPath(project.version);
-    if (!pmonPath) {
-        throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
-    }
-
-    // Build command arguments: -proj <project_name> -status
-    const args = ['-proj', project.config.name, '-status'];
-
-    outputChannel.appendLine(`[Project Status Check] Checking status for project: ${project.config.name}`);
-    outputChannel.appendLine(`[Project Status Check] Executing: ${pmonPath} ${args.join(' ')}`);
-
-    return new Promise<PmonProjectRunningStatus>((resolve, reject) => {
-        const child = childProcess.spawn(pmonPath, args, {
-            stdio: ['pipe', 'pipe', 'pipe'],
-            shell: false,
-            cwd: project.config.installationDir
-        });
-
-        let stdout = '';
-        let stderr = '';
-
-        child.stdout?.on('data', data => {
-            stdout += data.toString();
-        });
-
-        child.stderr?.on('data', data => {
-            stderr += data.toString();
-        });
-
-        child.on('error', error => {
-            outputChannel.appendLine(`[Project Status Check] ❌ Failed to execute WCCILpmon: ${error.message}`);
-            reject(new Error(`Failed to execute WCCILpmon: ${error.message}`));
-        });
-
-        child.on('close', code => {
-            outputChannel.appendLine(`[Project Status Check] WCCILpmon exited with code: ${code}`);
-
-            if (stdout.trim()) {
-                outputChannel.appendLine(`[Project Status Check] stdout: ${stdout.trim()}`);
-            }
-            if (stderr.trim()) {
-                outputChannel.appendLine(`[Project Status Check] stderr: ${stderr.trim()}`);
-            }
-
-            // Interpret exit codes according to WCCILpmon specification
-            let status: PmonProjectRunningStatus;
-            switch (code) {
-                case 0:
-                    status = PmonProjectRunningStatus.RUNNING;
-                    outputChannel.appendLine(`[Project Status Check] ✅ Project '${project.config.name}' is RUNNING`);
-                    break;
-                case 3:
-                    status = PmonProjectRunningStatus.STOPPED;
-                    outputChannel.appendLine(`[Project Status Check] ⏹️ Project '${project.config.name}' is STOPPED`);
-                    break;
-                case 4:
-                    status = PmonProjectRunningStatus.UNKNOWN;
-                    outputChannel.appendLine(
-                        `[Project Status Check] ❓ Project '${project.config.name}' status is UNKNOWN`
-                    );
-                    break;
-                default:
-                    // Any other exit code is treated as an error
-                    const errorMsg = `Unexpected exit code ${code} when checking project status`;
-                    outputChannel.appendLine(`[Project Status Check] ❌ ${errorMsg}`);
-                    reject(new Error(errorMsg));
-                    return;
-            }
-
-            resolve(status);
-        });
-    });
-}
-
-/**
- * Checks if a WinCC OA project is currently running (convenience function)
- * @param project The WinCC OA project to check
- * @returns Promise that resolves to true if running, false if stopped, throws error if unknown or failed
- */
-export async function isProjectRunning(project: WinCCOAProject): Promise<boolean> {
-    const status = await checkProjectRunningStatus(project);
-
-    switch (status) {
-        case PmonProjectRunningStatus.RUNNING:
-            return true;
-        case PmonProjectRunningStatus.STOPPED:
-            return false;
-        case PmonProjectRunningStatus.UNKNOWN:
-            throw new Error(`Project '${project.config.name}' status is unknown`);
-        default:
-            throw new Error(`Unexpected project status: ${status}`);
-    }
-}
+// Re-export pmon functions for backward compatibility
+export const checkProjectRunningStatus = pmon.checkProjectRunningStatus;
+export const isProjectRunning = pmon.isProjectRunning;
 
 /**
  * Interface for manager information
@@ -5631,62 +5117,38 @@ export async function startPmonOnly(project: WinCCOAProject): Promise<void> {
         throw new Error(`Cannot start pmon for non-runnable project: ${project.config.name}`);
     }
 
-    const pmonPath = getWCCILpmonPath(project.version);
-    if (!pmonPath) {
-        throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+    // Create PmonComponent instance for this project's version
+    const pmonComponent = new PmonComponent();
+    if (project.version) {
+        pmonComponent.setOaVersion(project.version);
     }
 
-    const args = ['-proj', project.config.name, '-log', '+stderr', '-noAutoStart'];
-    const command = `${pmonPath} ${args.join(' ')}`;
+    // Use PmonComponent to start pmon with output callback
+    const outputCallback = (message: string) => {
+        outputChannel.append(message);
+    };
 
     outputChannel.appendLine(`[Pmon Start] Starting pmon for project: ${project.config.name}`);
-    outputChannel.appendLine(`[Pmon Start] Executing: ${command}`);
     outputChannel.show(true);
 
-    return new Promise<void>((resolve, reject) => {
-        let response = '';
+    try {
+        await pmonComponent.startPmonOnly(project.config.name, outputCallback);
 
-        const child = childProcess.spawn(pmonPath, args, {
-            stdio: ['pipe', 'pipe', 'pipe'],
-            shell: false,
-            cwd: project.config.installationDir,
-            detached: true
-        });
+        outputChannel.appendLine(`✅ Pmon started for project '${project.config.name}'`);
+        vscode.window.showInformationMessage(`✅ Pmon started for project '${project.config.name}'`);
 
-        child.stdout?.on('data', data => {
-            const output = data.toString().trim();
-            response += output + '\n';
-            outputChannel.appendLine(`[Pmon Start] ${output}`);
-        });
+        // Add to history
+        addToCommandHistory(project.config.name, `startPmonOnly ${project.config.name}`, 'OK');
+    } catch (error) {
+        const errorMsg = `Failed to start pmon: ${error}`;
+        outputChannel.appendLine(`❌ ${errorMsg}`);
+        vscode.window.showErrorMessage(errorMsg);
 
-        child.stderr?.on('data', data => {
-            const output = data.toString().trim();
-            response += output + '\n';
-            outputChannel.appendLine(`[Pmon Start] Error: ${output}`);
-        });
+        // Add error to history
+        addToCommandHistory(project.config.name, `startPmonOnly ${project.config.name}`, `ERROR ${errorMsg}`);
 
-        child.on('spawn', () => {
-            outputChannel.appendLine(`✅ Pmon started for project '${project.config.name}' (PID: ${child.pid})`);
-            vscode.window.showInformationMessage(`✅ Pmon started for project '${project.config.name}'`);
-
-            // Add to history - for detached process, we consider spawn success as OK
-            addToCommandHistory(project.config.name, command, response || 'OK');
-
-            child.unref(); // Allow process to continue independently
-            resolve();
-        });
-
-        child.on('error', error => {
-            const errorMsg = `Failed to start pmon: ${error.message}`;
-            outputChannel.appendLine(`❌ ${errorMsg}`);
-            vscode.window.showErrorMessage(errorMsg);
-
-            // Add error to history
-            addToCommandHistory(project.config.name, command, `ERROR ${errorMsg}`);
-
-            reject(error);
-        });
-    });
+        throw error;
+    }
 }
 
 /**
@@ -5698,35 +5160,45 @@ export async function startProject(project: WinCCOAProject): Promise<void> {
         throw new Error(`Cannot start non-runnable project: ${project.config.name}`);
     }
 
-    const pmonPath = getWCCILpmonPath(project.version);
-    if (!pmonPath) {
-        throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+    const pmonComponent = new PmonComponent();
+    if (project.version) {
+        pmonComponent.setOaVersion(project.version);
     }
 
+    const outputCallback = (message: string) => {
+        outputChannel.append(message);
+    };
+
     // Check if pmon is already running
-    let args: string[];
+    let startAll: boolean;
     try {
         const status = await checkProjectRunningStatus(project);
-        if (status === PmonProjectRunningStatus.RUNNING) {
+        if (status === PmonProjectRunningStatus.Running) {
             // Pmon is running, use START_ALL command
-            args = ['-proj', project.config.name, '-command', 'START_ALL:'];
+            startAll = true;
             outputChannel.appendLine(`[Project Start] Pmon is running, sending START_ALL command`);
         } else {
             // Pmon not running, start normally
-            args = ['-proj', project.config.name];
+            startAll = false;
             outputChannel.appendLine(`[Project Start] Pmon not running, starting project normally`);
         }
     } catch (error) {
         // If we can't determine status, try normal start
-        args = ['-proj', project.config.name];
+        startAll = false;
         outputChannel.appendLine(`[Project Start] Could not determine pmon status, trying normal start`);
     }
 
     outputChannel.appendLine(`[Project Start] Starting project: ${project.config.name}`);
-    outputChannel.appendLine(`[Project Start] Executing: ${pmonPath} ${args.join(' ')}`);
     outputChannel.show(true);
 
-    return executeWCCILpmonCommand(pmonPath, args, project, 'start project');
+    try {
+        await pmonComponent.startProject(project.config.name, startAll, outputCallback);
+        addToCommandHistory(project.config.name, `startProject ${project.config.name}`, 'OK');
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        addToCommandHistory(project.config.name, `startProject ${project.config.name}`, `ERROR ${errorMessage}`);
+        throw new Error(`Failed to start project: ${errorMessage}`);
+    }
 }
 
 /**
@@ -5738,17 +5210,26 @@ export async function stopProject(project: WinCCOAProject): Promise<void> {
         throw new Error(`Cannot stop non-runnable project: ${project.config.name}`);
     }
 
-    const pmonPath = getWCCILpmonPath(project.version);
-    if (!pmonPath) {
-        throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+    const pmonComponent = new PmonComponent();
+    if (project.version) {
+        pmonComponent.setOaVersion(project.version);
     }
 
-    const args = ['-proj', project.config.name, '-command', 'STOP_ALL:'];
+    const outputCallback = (message: string) => {
+        outputChannel.append(message);
+    };
 
     outputChannel.appendLine(`[Project Stop] Stopping project: ${project.config.name}`);
     outputChannel.show(true);
 
-    return executeWCCILpmonCommand(pmonPath, args, project, 'stop project');
+    try {
+        await pmonComponent.stopProject(project.config.name, outputCallback);
+        addToCommandHistory(project.config.name, `stopProject ${project.config.name}`, 'OK');
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        addToCommandHistory(project.config.name, `stopProject ${project.config.name}`, `ERROR ${errorMessage}`);
+        throw new Error(`Failed to stop project: ${errorMessage}`);
+    }
 }
 
 /**
@@ -5760,17 +5241,26 @@ export async function stopProjectAndPmon(project: WinCCOAProject): Promise<void>
         throw new Error(`Cannot stop non-runnable project: ${project.config.name}`);
     }
 
-    const pmonPath = getWCCILpmonPath(project.version);
-    if (!pmonPath) {
-        throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+    const pmonComponent = new PmonComponent();
+    if (project.version) {
+        pmonComponent.setOaVersion(project.version);
     }
 
-    const args = ['-proj', project.config.name, '-stopWait'];
+    const outputCallback = (message: string) => {
+        outputChannel.append(message);
+    };
 
     outputChannel.appendLine(`[Project Stop] Stopping project and pmon: ${project.config.name}`);
     outputChannel.show(true);
 
-    return executeWCCILpmonCommand(pmonPath, args, project, 'stop project and pmon');
+    try {
+        await pmonComponent.stopProjectAndPmon(project.config.name, outputCallback);
+        addToCommandHistory(project.config.name, `stopProjectAndPmon ${project.config.name}`, 'OK');
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        addToCommandHistory(project.config.name, `stopProjectAndPmon ${project.config.name}`, `ERROR ${errorMessage}`);
+        throw new Error(`Failed to stop project and pmon: ${errorMessage}`);
+    }
 }
 
 /**
@@ -5782,17 +5272,26 @@ export async function restartProject(project: WinCCOAProject): Promise<void> {
         throw new Error(`Cannot restart non-runnable project: ${project.config.name}`);
     }
 
-    const pmonPath = getWCCILpmonPath(project.version);
-    if (!pmonPath) {
-        throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+    const pmonComponent = new PmonComponent();
+    if (project.version) {
+        pmonComponent.setOaVersion(project.version);
     }
 
-    const args = ['-proj', project.config.name, '-command', 'RESTART_ALL:'];
+    const outputCallback = (message: string) => {
+        outputChannel.append(message);
+    };
 
     outputChannel.appendLine(`[Project Restart] Restarting project: ${project.config.name}`);
     outputChannel.show(true);
 
-    return executeWCCILpmonCommand(pmonPath, args, project, 'restart project');
+    try {
+        await pmonComponent.restartProject(project.config.name, outputCallback);
+        addToCommandHistory(project.config.name, `restartProject ${project.config.name}`, 'OK');
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        addToCommandHistory(project.config.name, `restartProject ${project.config.name}`, `ERROR ${errorMessage}`);
+        throw new Error(`Failed to restart project: ${errorMessage}`);
+    }
 }
 
 /**
@@ -5804,17 +5303,26 @@ export async function setPmonWaitMode(project: WinCCOAProject): Promise<void> {
         throw new Error(`Cannot set wait mode for non-runnable project: ${project.config.name}`);
     }
 
-    const pmonPath = getWCCILpmonPath(project.version);
-    if (!pmonPath) {
-        throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+    const pmonComponent = new PmonComponent();
+    if (project.version) {
+        pmonComponent.setOaVersion(project.version);
     }
 
-    const args = ['-proj', project.config.name, '-command', 'WAIT_MODE:'];
+    const outputCallback = (message: string) => {
+        outputChannel.append(message);
+    };
 
     outputChannel.appendLine(`[Pmon Wait] Setting pmon to wait mode: ${project.config.name}`);
     outputChannel.show(true);
 
-    return executeWCCILpmonCommand(pmonPath, args, project, 'set pmon wait mode');
+    try {
+        await pmonComponent.setWaitMode(project.config.name, outputCallback);
+        addToCommandHistory(project.config.name, `setPmonWaitMode ${project.config.name}`, 'OK');
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        addToCommandHistory(project.config.name, `setPmonWaitMode ${project.config.name}`, `ERROR ${errorMessage}`);
+        throw new Error(`Failed to set wait mode: ${errorMessage}`);
+    }
 }
 
 /**
@@ -5826,42 +5334,23 @@ export async function getManagerList(project: WinCCOAProject): Promise<WinCCOAMa
         throw new Error(`Cannot get managers for non-runnable project: ${project.config.name}`);
     }
 
-    const pmonPath = getWCCILpmonPath(project.version);
-    if (!pmonPath) {
-        throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+    const pmonComponent = new PmonComponent();
+    if (project.version) {
+        pmonComponent.setOaVersion(project.version);
     }
 
-    const args = ['-proj', project.config.name, '-command', 'MGRLIST:LIST', '-log', '+stdout'];
+    const outputCallback = (message: string) => {
+        outputChannel.append(message);
+    };
 
-    return new Promise<WinCCOAManager[]>((resolve, reject) => {
-        const child = childProcess.spawn(pmonPath, args, {
-            stdio: ['pipe', 'pipe', 'pipe'],
-            shell: false,
-            cwd: project.config.installationDir
-        });
-
-        let output = '';
-        child.stdout?.on('data', data => {
-            output += data.toString();
-        });
-
-        child.stderr?.on('data', data => {
-            outputChannel.appendLine(`Error: ${data.toString()}`);
-        });
-
-        child.on('close', code => {
-            if (code === 0) {
-                const managers = parseManagerList(output);
-                resolve(managers);
-            } else {
-                reject(new Error(`Failed to get manager list. Exit code: ${code}`));
-            }
-        });
-
-        child.on('error', error => {
-            reject(new Error(`Failed to execute WCCILpmon: ${error.message}`));
-        });
-    });
+    try {
+        const output = await pmonComponent.getManagerList(project.config.name, outputCallback);
+        const managers = parseManagerList(output.join('\n'));
+        return managers;
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to get manager list: ${errorMessage}`);
+    }
 }
 
 /**
@@ -5875,42 +5364,23 @@ export async function getDetailedManagerStatus(
         throw new Error(`Cannot get manager status for non-runnable project: ${project.config.name}`);
     }
 
-    const pmonPath = getWCCILpmonPath(project.version);
-    if (!pmonPath) {
-        throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+    const pmonComponent = new PmonComponent();
+    if (project.version) {
+        pmonComponent.setOaVersion(project.version);
     }
 
-    const args = ['-proj', project.config.name, '-command', 'MGRLIST:STATI', '-log', '+stdout'];
+    const outputCallback = (message: string) => {
+        outputChannel.append(message);
+    };
 
-    return new Promise<{ managers: WinCCOAManager[]; projectState?: WinCCOAProjectState }>((resolve, reject) => {
-        const child = childProcess.spawn(pmonPath, args, {
-            stdio: ['pipe', 'pipe', 'pipe'],
-            shell: false,
-            cwd: project.config.installationDir
-        });
-
-        let output = '';
-        child.stdout?.on('data', data => {
-            output += data.toString();
-        });
-
-        child.stderr?.on('data', data => {
-            outputChannel.appendLine(`Error: ${data.toString()}`);
-        });
-
-        child.on('close', code => {
-            if (code === 0) {
-                const result = parseManagerStatus(output);
-                resolve(result);
-            } else {
-                reject(new Error(`Failed to get manager status. Exit code: ${code}`));
-            }
-        });
-
-        child.on('error', error => {
-            reject(new Error(`Failed to execute WCCILpmon: ${error.message}`));
-        });
-    });
+    try {
+        const output = await pmonComponent.getDetailedManagerStatus(project.config.name, outputCallback);
+        const result = parseManagerStatus(output);
+        return result;
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to get manager status: ${errorMessage}`);
+    }
 }
 
 /**
@@ -5918,46 +5388,8 @@ export async function getDetailedManagerStatus(
  * @param project The WinCC OA project
  */
 export async function getManagerStatus(project: WinCCOAProject): Promise<WinCCOAManager[]> {
-    if (!project.isRunnable || project.isWinCCOASystem) {
-        throw new Error(`Cannot get manager status for non-runnable project: ${project.config.name}`);
-    }
-
-    const pmonPath = getWCCILpmonPath(project.version);
-    if (!pmonPath) {
-        throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
-    }
-
-    const args = ['-proj', project.config.name, '-command', 'MGRLIST:STATI', '-log', '+stdout'];
-
-    return new Promise<WinCCOAManager[]>((resolve, reject) => {
-        const child = childProcess.spawn(pmonPath, args, {
-            stdio: ['pipe', 'pipe', 'pipe'],
-            shell: false,
-            cwd: project.config.installationDir
-        });
-
-        let output = '';
-        child.stdout?.on('data', data => {
-            output += data.toString();
-        });
-
-        child.stderr?.on('data', data => {
-            outputChannel.appendLine(`Error: ${data.toString()}`);
-        });
-
-        child.on('close', code => {
-            if (code === 0) {
-                const result = parseManagerStatus(output);
-                resolve(result.managers);
-            } else {
-                reject(new Error(`Failed to get manager status. Exit code: ${code}`));
-            }
-        });
-
-        child.on('error', error => {
-            reject(new Error(`Failed to execute WCCILpmon: ${error.message}`));
-        });
-    });
+    const result = await getDetailedManagerStatus(project);
+    return result.managers;
 }
 
 /**
@@ -5966,13 +5398,13 @@ export async function getManagerStatus(project: WinCCOAProject): Promise<WinCCOA
  */
 export async function getComprehensiveProjectStatus(project: WinCCOAProject): Promise<WinCCOAProjectStatus> {
     const [pmonStatus, managers] = await Promise.all([
-        checkProjectRunningStatus(project).catch(() => PmonProjectRunningStatus.UNKNOWN),
+        checkProjectRunningStatus(project).catch(() => PmonProjectRunningStatus.Unknown),
         getManagerStatus(project).catch(() => [] as WinCCOAManager[])
     ]);
 
     return {
         projectName: project.config.name,
-        isRunning: pmonStatus === PmonProjectRunningStatus.RUNNING,
+        isRunning: pmonStatus === PmonProjectRunningStatus.Running,
         managers,
         pmonStatus,
         lastUpdate: new Date()
@@ -5983,47 +5415,111 @@ export async function getComprehensiveProjectStatus(project: WinCCOAProject): Pr
  * Manager operations
  */
 export async function startManager(project: WinCCOAProject, index: number): Promise<void> {
-    const args = ['-proj', project.config.name, '-command', `SINGLE_MGR:START ${index}`];
-    const pmonPath = getWCCILpmonPath(project.version);
-    if (!pmonPath) {
-        throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+    const pmonComponent = new PmonComponent();
+    if (project.version) {
+        pmonComponent.setOaVersion(project.version);
     }
 
+    const outputCallback = (message: string) => {
+        outputChannel.append(message);
+    };
+
     outputChannel.appendLine(`[Manager Start] Starting manager ${index} in project: ${project.config.name}`);
-    return executeWCCILpmonCommand(pmonPath, args, project, `start manager ${index}`);
+    outputChannel.show(true);
+
+    try {
+        await pmonComponent.startManager(project.config.name, index, outputCallback);
+        addToCommandHistory(project.config.name, `startManager ${project.config.name} ${index}`, 'OK');
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        addToCommandHistory(
+            project.config.name,
+            `startManager ${project.config.name} ${index}`,
+            `ERROR ${errorMessage}`
+        );
+        throw new Error(`Failed to start manager ${index}: ${errorMessage}`);
+    }
 }
 
 export async function stopManager(project: WinCCOAProject, index: number): Promise<void> {
-    const args = ['-proj', project.config.name, '-command', `SINGLE_MGR:STOP ${index}`];
-    const pmonPath = getWCCILpmonPath(project.version);
-    if (!pmonPath) {
-        throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+    const pmonComponent = new PmonComponent();
+    if (project.version) {
+        pmonComponent.setOaVersion(project.version);
     }
 
+    const outputCallback = (message: string) => {
+        outputChannel.append(message);
+    };
+
     outputChannel.appendLine(`[Manager Stop] Stopping manager ${index} in project: ${project.config.name}`);
-    return executeWCCILpmonCommand(pmonPath, args, project, `stop manager ${index}`);
+    outputChannel.show(true);
+
+    try {
+        await pmonComponent.stopManager(project.config.name, index, outputCallback);
+        addToCommandHistory(project.config.name, `stopManager ${project.config.name} ${index}`, 'OK');
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        addToCommandHistory(
+            project.config.name,
+            `stopManager ${project.config.name} ${index}`,
+            `ERROR ${errorMessage}`
+        );
+        throw new Error(`Failed to stop manager ${index}: ${errorMessage}`);
+    }
 }
 
 export async function killManager(project: WinCCOAProject, index: number): Promise<void> {
-    const args = ['-proj', project.config.name, '-command', `SINGLE_MGR:KILL ${index}`];
-    const pmonPath = getWCCILpmonPath(project.version);
-    if (!pmonPath) {
-        throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+    const pmonComponent = new PmonComponent();
+    if (project.version) {
+        pmonComponent.setOaVersion(project.version);
     }
 
+    const outputCallback = (message: string) => {
+        outputChannel.append(message);
+    };
+
     outputChannel.appendLine(`[Manager Kill] Killing manager ${index} in project: ${project.config.name}`);
-    return executeWCCILpmonCommand(pmonPath, args, project, `kill manager ${index}`);
+    outputChannel.show(true);
+
+    try {
+        await pmonComponent.killManager(project.config.name, index, outputCallback);
+        addToCommandHistory(project.config.name, `killManager ${project.config.name} ${index}`, 'OK');
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        addToCommandHistory(
+            project.config.name,
+            `killManager ${project.config.name} ${index}`,
+            `ERROR ${errorMessage}`
+        );
+        throw new Error(`Failed to kill manager ${index}: ${errorMessage}`);
+    }
 }
 
 export async function removeManager(project: WinCCOAProject, index: number): Promise<void> {
-    const args = ['-proj', project.config.name, '-command', `SINGLE_MGR:DEL ${index}`];
-    const pmonPath = getWCCILpmonPath(project.version);
-    if (!pmonPath) {
-        throw new Error(`WCCILpmon executable not found for WinCC OA version ${project.version || 'unknown'}`);
+    const pmonComponent = new PmonComponent();
+    if (project.version) {
+        pmonComponent.setOaVersion(project.version);
     }
 
+    const outputCallback = (message: string) => {
+        outputChannel.append(message);
+    };
+
     outputChannel.appendLine(`[Manager Remove] Removing manager ${index} from project: ${project.config.name}`);
-    return executeWCCILpmonCommand(pmonPath, args, project, `remove manager ${index}`);
+    outputChannel.show(true);
+
+    try {
+        await pmonComponent.removeManager(project.config.name, index, outputCallback);
+        addToCommandHistory(project.config.name, `removeManager ${project.config.name} ${index}`, 'OK');
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        addToCommandHistory(
+            project.config.name,
+            `removeManager ${project.config.name} ${index}`,
+            `ERROR ${errorMessage}`
+        );
+        throw new Error(`Failed to remove manager ${index}: ${errorMessage}`);
+    }
 }
 
 /**
@@ -6459,6 +5955,7 @@ async function registerRunnableProjectFromDirectory(
 
         // Create a WinCCOAProject instance for registration
         const runnableProject = new WinCCOAProject(tempConfig, directoryPath, true, false, version);
+        runnableProject.setCanUnregisterCheck(canUnregisterProject);
 
         // Register the runnable project using the dedicated function
         await registerRunnableProject(runnableProject);
@@ -6504,6 +6001,7 @@ async function registerSubProjectFromDirectory(
 
         // Create a WinCCOAProject instance for registration
         const subProject = new WinCCOAProject(tempConfig, directoryPath, false, false, version);
+        subProject.setCanUnregisterCheck(canUnregisterProject);
 
         // Register the sub-project using the dedicated function
         await registerSubProject(subProject);
@@ -6523,63 +6021,26 @@ async function registerSubProjectFromDirectory(
  * @returns Promise that resolves when project is unregistered
  */
 async function unregisterProject(projectName: string): Promise<void> {
-    const pmonPath = getWCCILpmonPath(); // Use highest available version
-    if (!pmonPath) {
-        throw new Error('WCCILpmon not found for project unregistration');
+    const pmonComponent = new PmonComponent();
+    // Use highest available version for unregistration (no specific version set)
+
+    const outputCallback = (message: string) => {
+        outputChannel.append(message);
+    };
+
+    outputChannel.appendLine(`[Project Unregistration] Unregistering project: ${projectName}`);
+    outputChannel.show(true);
+
+    try {
+        await pmonComponent.unregisterProject(projectName, outputCallback);
+        outputChannel.appendLine(`[Project Unregistration] ✅ Successfully unregistered project: ${projectName}`);
+        addToCommandHistory(projectName, `unregisterProject ${projectName}`, 'OK');
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        outputChannel.appendLine(`[Project Unregistration] ❌ Unregistration failed: ${errorMessage}`);
+        addToCommandHistory(projectName, `unregisterProject ${projectName}`, `ERROR ${errorMessage}`);
+        throw new Error(`Failed to unregister project: ${errorMessage}`);
     }
-
-    return new Promise<void>((resolve, reject) => {
-        const args = ['-unreg', projectName, '-log', '+stderr'];
-
-        outputChannel.appendLine(`[Project Unregistration] Executing: ${pmonPath} ${args.join(' ')}`);
-        outputChannel.show(true); // Show the output channel
-
-        const child = childProcess.spawn(pmonPath, args, {
-            stdio: ['pipe', 'pipe', 'pipe'],
-            shell: false
-        });
-
-        let stdout = '';
-        let stderr = '';
-
-        child.stdout.on('data', (data: Buffer) => {
-            const text = data.toString();
-            stdout += text;
-            outputChannel.append(text);
-        });
-
-        child.stderr.on('data', (data: Buffer) => {
-            const text = data.toString();
-            stderr += text;
-            outputChannel.append(text);
-        });
-
-        child.on('close', (code: number) => {
-            outputChannel.appendLine(`[Project Unregistration] WCCILpmon exited with code: ${code}`);
-            if (stdout.trim()) {
-                outputChannel.appendLine(`[Project Unregistration] stdout: ${stdout.trim()}`);
-            }
-            if (stderr.trim()) {
-                outputChannel.appendLine(`[Project Unregistration] stderr: ${stderr.trim()}`);
-            }
-
-            if (code === 0) {
-                // Success case for unregistration
-                outputChannel.appendLine(
-                    `[Project Unregistration] ✅ Successfully unregistered project: ${projectName}`
-                );
-                resolve();
-            } else {
-                outputChannel.appendLine(`[Project Unregistration] ❌ Unregistration failed with exit code ${code}`);
-                reject(new Error(`Project unregistration failed with exit code ${code}. Error: ${stderr}`));
-            }
-        });
-
-        child.on('error', (error: Error) => {
-            outputChannel.appendLine(`[Project Unregistration] ❌ Failed to execute WCCILpmon: ${error.message}`);
-            reject(new Error(`Failed to execute WCCILpmon: ${error.message}`));
-        });
-    });
 }
 
 /**
@@ -6627,6 +6088,9 @@ export function deactivate() {
     if (outputChannel) {
         outputChannel.dispose();
     }
+
+    // Dispose formatting output channel
+    formatting.dispose();
 }
 
 // Export types and interfaces for other extensions to use
@@ -6659,8 +6123,11 @@ export function getProjects(): WinCCOAProject[] {
 }
 
 export function getProjectByPath(path: string): WinCCOAProject | undefined {
+    if (!path) {
+        return undefined;
+    }
     const projects = projectProvider?.getProjects() || [];
-    return projects.find(p => p.installationDir === path || p.config.installationDir === path);
+    return projects.find(p => path.startsWith(p.installationDir) || path.startsWith(p.config.installationDir));
 }
 
 export function getProjectVersion(installationDir: string): string | undefined {
@@ -6731,143 +6198,6 @@ export function getCurrentProjectsInfo(): CurrentProjectInfo[] {
 }
 
 /**
- * Interface for detailed WinCC OA version information
- */
-export interface DetailedVersionInfo {
-    version: string;
-    platform: string;
-    architecture: string;
-    buildDate: string;
-    commitHash: string;
-    rawOutput: string;
-    executablePath: string;
-}
-
-/**
- * Gets detailed version information using WCCILpmon -version command
- * @param project The WinCC OA system project to get version info for
- * @returns Promise with detailed version information
- */
-export async function getDetailedVersionInfo(project: WinCCOAProject): Promise<DetailedVersionInfo> {
-    if (!project.isWinCCOASystem || !project.version) {
-        throw new Error('Can only get version information for WinCC OA system installations');
-    }
-
-    const pmonPath = getWCCILpmonPath(project.version);
-    if (!pmonPath || !fs.existsSync(pmonPath)) {
-        throw new Error(`WCCILpmon not found for WinCC OA version ${project.version}`);
-    }
-
-    return new Promise<DetailedVersionInfo>((resolve, reject) => {
-        outputChannel.appendLine(`[Version Info] Executing: ${pmonPath} -version`);
-        outputChannel.show(true);
-
-        const child = childProcess.spawn(pmonPath, ['-version'], {
-            stdio: ['pipe', 'pipe', 'pipe'],
-            shell: false
-        });
-
-        let stdout = '';
-        let stderr = '';
-
-        child.stdout.on('data', (data: Buffer) => {
-            const text = data.toString();
-            stdout += text;
-            outputChannel.append(text);
-        });
-
-        child.stderr.on('data', (data: Buffer) => {
-            const text = data.toString();
-            stderr += text;
-            outputChannel.append(text);
-        });
-
-        child.on('close', (code: number | null) => {
-            if (code === 0 || code === 1) {
-                // WCCILpmon -version exits with code 1
-                try {
-                    const versionInfo = parseVersionOutput(stdout + stderr, pmonPath);
-                    outputChannel.appendLine(`[Version Info] ✅ Successfully retrieved version information`);
-                    resolve(versionInfo);
-                } catch (error) {
-                    outputChannel.appendLine(`[Version Info] ❌ Failed to parse version output: ${error}`);
-                    reject(error);
-                }
-            } else {
-                const errorMsg = `WCCILpmon exited with code ${code}. Output: ${stdout + stderr}`;
-                outputChannel.appendLine(`[Version Info] ❌ ${errorMsg}`);
-                reject(new Error(errorMsg));
-            }
-        });
-
-        child.on('error', (error: Error) => {
-            outputChannel.appendLine(`[Version Info] ❌ Failed to execute WCCILpmon: ${error.message}`);
-            reject(new Error(`Failed to execute WCCILpmon: ${error.message}`));
-        });
-    });
-}
-
-/**
- * Parses the output from WCCILpmon -version command
- * @param output The raw output from the command
- * @param executablePath The path to the WCCILpmon executable
- * @returns Parsed version information
- */
-export function parseVersionOutput(output: string, executablePath: string): DetailedVersionInfo {
-    // Example output:
-    // WCCILpmon    (1), 2025.11.03 15:15:01.846: 3.20.5 platform Windows AMD64 linked at Mar  2 2025 09:51:08 (faf9f4332a)
-    // WCCILpmon    (1), 2025.11.03 15:15:01.847: exit(1) called!
-
-    const lines = output.split('\n').filter(line => line.trim());
-
-    for (const line of lines) {
-        // Look for the full version line (contains version, platform, build date, commit hash)
-        const fullVersionMatch = line.match(
-            /:\s*(\d+\.\d+\.\d+)\s+platform\s+(\w+)\s+(\w+)\s+linked\s+at\s+([^(]+)\s*\(([^)]+)\)/
-        );
-
-        if (fullVersionMatch) {
-            return {
-                version: fullVersionMatch[1],
-                platform: fullVersionMatch[2],
-                architecture: fullVersionMatch[3],
-                buildDate: fullVersionMatch[4].trim(),
-                commitHash: fullVersionMatch[5],
-                rawOutput: output,
-                executablePath: executablePath
-            };
-        }
-
-        // Look for partial version line (version and platform without build info)
-        const partialVersionMatch = line.match(/:\s*(\d+\.\d+\.\d+)\s+platform\s+(\w+)\s+(\w+)(?!\s+linked)/);
-
-        if (partialVersionMatch) {
-            return {
-                version: partialVersionMatch[1],
-                platform: partialVersionMatch[2],
-                architecture: partialVersionMatch[3],
-                buildDate: 'Unknown',
-                commitHash: 'Unknown',
-                rawOutput: output,
-                executablePath: executablePath
-            };
-        }
-    }
-
-    // If parsing fails, try to extract basic version information
-    const basicVersionMatch = output.match(/:\s*(\d+\.\d+\.\d+)/);
-    return {
-        version: basicVersionMatch ? basicVersionMatch[1] : 'Unknown',
-        platform: 'Unknown',
-        architecture: 'Unknown',
-        buildDate: 'Unknown',
-        commitHash: 'Unknown',
-        rawOutput: output,
-        executablePath: executablePath
-    };
-}
-
-/**
  * Shows detailed version information in a formatted dialog
  * @param versionInfo The version information to display
  */
@@ -6921,6 +6251,35 @@ export async function showVersionInfoDialog(versionInfo: DetailedVersionInfo): P
         outputChannel.appendLine(versionInfo.rawOutput);
         outputChannel.show(true);
     }
+}
+
+export async function selectWinCCOAVersion(): Promise<WinCCOAProject | undefined> {
+    // Show selection dialog for WinCC OA system projects
+    const systemProjects = getProjects().filter(p => p.isWinCCOASystem);
+
+    if (systemProjects.length === 0) {
+        vscode.window.showErrorMessage('No WinCC OA system installations found.');
+        return undefined;
+    }
+
+    const projectItems = systemProjects.map((p: WinCCOAProject) => ({
+        label: p.config.name,
+        description: p.config.installationDir,
+        detail: `WinCC OA v${p.version} System Installation`,
+        project: p
+    }));
+
+    const selected = await vscode.window.showQuickPick(projectItems, {
+        placeHolder: 'Select WinCC OA version',
+        matchOnDescription: true,
+        matchOnDetail: true
+    });
+
+    if (!selected) {
+        return undefined; // User cancelled
+    }
+
+    return selected.project;
 }
 
 // Export the path utility functions and new types
