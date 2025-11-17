@@ -57,7 +57,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - If consuming new component classes, import from `src/types/components/implementations/*`.
 - Enable formatting commands via command palette (no configuration required; auto-detects astyle).
 
-
 ## [2.2.0] - 2025-11-05
 
 ### Added
