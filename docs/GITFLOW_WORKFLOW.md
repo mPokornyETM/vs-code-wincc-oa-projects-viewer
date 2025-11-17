@@ -98,13 +98,25 @@ git pull origin develop
 git checkout -b release/1.2.0
 
 # Prepare release (version bump, changelog, etc.)
+
+# Fetch origin and get diff main..develop (2/5)
+git fetch origin ; git diff --name-status origin/main...HEAD ; git log --pretty=format:"%H|%s" origin/main..HEAD
+
+# increment vs-code extension version in package.json
+```json
+"version": "1.2.0",
+```
+
 git add .
 git commit -m "chore: prepare release 1.2.0"
 git push origin release/1.2.0
 
 # Create Pull Requests:
+
 # 1. release/1.2.0 → main (for production)
+
 # 2. release/1.2.0 → develop (to sync back)
+
 ```
 
 ### 3. Hotfix Process
