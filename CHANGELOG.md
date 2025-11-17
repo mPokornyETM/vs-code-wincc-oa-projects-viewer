@@ -1,9 +1,23 @@
 # Changelog
 
-All notable changes to the "WinCC OA Projects" extension will be documented in this file.
+All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [3.0.0](https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/compare/v2.2.0...v3.0.0) (2025-11-17)
+
+
+### 🐛 Bug Fixes
+
+* prevent automatic releases on every main push - only trigger on release PRs ([fcbac3a](https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/commit/fcbac3ae872dfb2806a62becbc97e68b696cdf3a))
+* simplify checkout in publish-marketplace job ([f0935b4](https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/commit/f0935b42c77bf624ab51373f25763e50f1d2c035))
+
+
+### 🔨 Maintenance
+
+* auto-delete old pre-releases to keep only latest ([85d2ac4](https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/commit/85d2ac44af1fd7e2d27f771c33fcd79938e2a3c6))
+* remove automated project assignment workflows ([2cd0fe9](https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/commit/2cd0fe9c53567f1f3f2a87ec81d899633bf3d661))
 
 ## [2.3.0] - 2025-11-17
 
