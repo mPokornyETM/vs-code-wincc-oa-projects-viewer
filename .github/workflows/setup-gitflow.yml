@@ -22,7 +22,7 @@ jobs:
 
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v5
+              uses: actions/checkout@v6
 
             - name: Setup branch protection for main
               uses: actions/github-script@v8
@@ -121,7 +121,7 @@ jobs:
 
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v5
+              uses: actions/checkout@v6
 
             - name: Validate Git Flow branches exist
               run: |
