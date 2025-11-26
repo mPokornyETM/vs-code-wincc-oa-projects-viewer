@@ -568,6 +568,6 @@
         "@types/marked": "^6.0.0",
         "dompurify": "^3.3.0",
         "jsdom": "^27.2.0",
-        "marked": "^17.0.0"
+        "marked": "^17.0.1"
     }
 }
